@@ -372,21 +372,10 @@ contract DN404Mirror {
             }
             _return(1);
         }
-        // `logTransfer(address,address,uint256)`.
-        if (fnSelector == 0xf51ac936) {
-            if (msg.sender != $.rootERC20) revert Unauthorized();
-
-            address from = address(uint160(_calldataload(0x04)));
-            address to = address(uint160(_calldataload(0x24)));
-            uint256 id = _calldataload(0x44);
-
-            emit Transfer(from, to, id);
-            _return(1);
-        }
         _;
     }
 
-    function logMint(uint256[] memory p) external returns (bool) {
+    function logMint(uint256[] calldata p) external returns (bool) {
         DN404NFTStorage storage $ = _getDN404NFTStorage();
         if (msg.sender != $.rootERC20) revert Unauthorized();
 
@@ -402,7 +391,7 @@ contract DN404Mirror {
         _return(1);
     }
 
-    function logBurn(uint256[] memory p) external returns (bool) {
+    function logBurn(uint256[] calldata p) external returns (bool) {
         DN404NFTStorage storage $ = _getDN404NFTStorage();
         if (msg.sender != $.rootERC20) revert Unauthorized();
 

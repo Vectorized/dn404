@@ -37,15 +37,7 @@ abstract contract DN404 {
 
     error TransferFromIncorrectOwner();
 
-    error TransferToNonERC721ReceiverImplementer();
-
     error TokenDoesNotExist();
-
-    error CannotLink();
-
-    error AlreadyLinked();
-
-    error NotLinked();
 
     uint256 private constant _WAD = 1000000000000000000;
 
@@ -280,7 +272,6 @@ abstract contract DN404 {
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        // _logNFTTransfer(t.mirror, from, address(0), id);
                         packedLogs[n++] = (uint256(uint160(from)) << 96) | id;
                     } while (i != end);
                     _logNFTBurn(t.mirror, packedLogs);
@@ -311,7 +302,6 @@ abstract contract DN404 {
                         $.ownerships.set(id, toAlias);
                         $.ownedIndex.set(id, uint32(i++));
 
-                        // _logNFTTransfer(t.mirror, address(0), to, id);
                         packedLogs[n++] = (uint256(uint160(_to)) << 96) | id;
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
@@ -334,26 +324,6 @@ abstract contract DN404 {
 
     function _logNFTMint(address mirror, uint256[] memory p) private {
         require(DN404Mirror(payable(mirror)).logMint(p));
-    }
-
-    function _logNFTTransfer(address mirror, address from, address to, uint256 id) private {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let m := mload(0x40)
-            mstore(m, 0xf51ac936) // `logTransfer(address,address,uint256)`.
-            mstore(add(m, 0x20), shr(96, shl(96, from)))
-            mstore(add(m, 0x40), shr(96, shl(96, to)))
-            mstore(add(m, 0x60), id)
-            if iszero(
-                and(
-                    and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
-                    call(gas(), mirror, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
-                )
-            ) {
-                returndatacopy(m, 0x00, returndatasize())
-                revert(m, returndatasize())
-            }
-        }
     }
 
     function _ownerAt(uint256 id) internal view virtual returns (address result) {
