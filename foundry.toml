@@ -1,0 +1,44 @@
+# Foundry Configuration File
+# Default definitions: https://github.com/gakonst/foundry/blob/b7917fa8491aedda4dd6db53fbb206ea233cd531/config/src/lib.rs#L782
+# See more config options at: https://github.com/gakonst/foundry/tree/master/config
+
+# The Default Profile
+[profile.default]
+solc_version = "0.8.24"
+evm_version = "cancun"
+auto_detect_solc = false
+ignored_error_codes = [2394]
+optimizer = true
+optimizer_runs = 1_000
+gas_limit = 100_000_000 # ETH is 30M, but we use a higher value.
+remappings = [
+  "forge-std=test/utils/forge-std/"
+]
+
+[fmt]
+line_length = 100 # While we allow up to 120, we lint at 100 for readability.
+
+[profile.default.fuzz]
+runs = 256
+
+[profile.intense.fuzz]
+runs = 5_000
+
+[profile.via-ir]
+via_ir = true
+
+[profile.via-ir.fuzz]
+runs = 1_000
+
+[profile.min-solc]
+solc_version = "0.8.4"
+
+[profile.min-solc.fuzz]
+runs = 1_000
+
+[profile.min-solc-via-ir]
+via_ir = true
+solc_version = "0.8.4"
+
+[profile.min-solc-via-ir.fuzz]
+runs = 1_000

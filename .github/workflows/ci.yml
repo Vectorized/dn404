@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    paths:
+      - '**.sol'
+
+jobs:
+  tests:
+    name: Forge Testing
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        profile: [via-ir,intense]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install Dependencies
+        run: forge install
+
+      - name: Run Lint Check
+        run: forge fmt --check
+
+      - name: Run Tests with ${{ matrix.profile }}
+        run: FOUNDRY_PROFILE=${{ matrix.profile }} forge test
+
+  codespell:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run codespell
+        uses: codespell-project/actions-codespell@v2.0
+        with:
+          check_filenames: true
+          ignore_words_list: usera
+          skip: ./.git,package-lock.json,ackee-blockchain-solady-report.pdf,EIP712Mock.sol
