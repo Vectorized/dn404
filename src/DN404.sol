@@ -238,6 +238,14 @@ abstract contract DN404 {
         return addressAlias;
     }
 
+    struct _TransferTemps {
+        address sister;
+        uint256 fromBalanceBefore;
+        uint256 toBalanceBefore;
+        uint256 toBalance;
+        uint256 fromBalance;
+    }
+
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -246,18 +254,20 @@ abstract contract DN404 {
         AddressData storage fromAddressData = $.addressData[from];
         AddressData storage toAddressData = $.addressData[to];
 
-        uint256 fromBalanceBefore = fromAddressData.balance;
-        fromAddressData.balance = uint96(fromBalanceBefore - amount);
+        _TransferTemps memory t;
+        t.sister = $.sisterERC721;
+
+        t.fromBalanceBefore = fromAddressData.balance;
+        fromAddressData.balance = uint96(t.fromBalance = t.fromBalanceBefore - amount);
 
         unchecked {
-            uint256 toBalanceBefore = toAddressData.balance;
-            toAddressData.balance = uint96(toBalanceBefore + amount);
+            t.toBalanceBefore = toAddressData.balance;
+            toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
 
             if (!$.whitelist[from]) {
                 LibMap.Uint32Map storage fromOwned = $.owned[from];
                 uint256 i = fromAddressData.ownedLength;
-                uint256 end =
-                    i - ((fromBalanceBefore / _WAD) - ((fromBalanceBefore - amount) / _WAD));
+                uint256 end = i - ((t.fromBalanceBefore / _WAD) - (t.fromBalance / _WAD));
                 // Burn loop.
                 if (i != end) {
                     do {
@@ -266,7 +276,7 @@ abstract contract DN404 {
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        _logNFTTransfer($.sisterERC721, from, address(0), id);
+                        _logNFTTransfer(t.sister, from, address(0), id);
                     } while (i != end);
                     fromAddressData.ownedLength = uint32(i);
                 }
@@ -275,22 +285,23 @@ abstract contract DN404 {
             if (!$.whitelist[to]) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 i = toAddressData.ownedLength;
-                uint256 end = i + (((toBalanceBefore + amount) / _WAD) - (toBalanceBefore / _WAD));
+                uint256 end = i + ((t.toBalance / _WAD) - (t.toBalanceBefore / _WAD));
                 uint256 id = $.nextTokenId;
                 uint32 toAlias = _registerAndResolveAlias(to);
+                uint256 totalNFTSupply = $.totalNFTSupply;
                 // Mint loop.
                 if (i != end) {
                     do {
-                        while ($.ownerships.get(id) != 0) if (++id > _MAX_TOKEN_ID) id = 1;
+                        while ($.ownerships.get(id) != 0) if (++id > totalNFTSupply) id = 1;
 
                         toOwned.set(i, uint32(id));
                         $.ownerships.set(id, toAlias);
                         $.ownedIndex.set(id, uint32(i++));
 
-                        _logNFTTransfer($.sisterERC721, address(0), to, id);
+                        _logNFTTransfer(t.sister, address(0), to, id);
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
-                        if (++id > _MAX_TOKEN_ID) id = 1;
+                        if (++id > totalNFTSupply) id = 1;
                     } while (i != end);
                     toAddressData.ownedLength = uint32(i);
                     $.nextTokenId = uint32(id);

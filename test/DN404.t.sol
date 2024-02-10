@@ -55,6 +55,25 @@ contract DN404Test is SoladyTest {
         }
     }
 
+    function testWrapAround(uint32 totalNFTSupply, uint256 r) public {
+        address alice = address(111);
+        address bob = address(222);
+        totalNFTSupply = uint32(_bound(totalNFTSupply, 1, 5));
+        dn.initializeDN404(totalNFTSupply, address(this), address(shadow));
+        dn.transfer(alice, _WAD * uint256(totalNFTSupply));
+        for (uint256 t; t != 2; ++t) {
+            uint256 id = _bound(r, 1, totalNFTSupply);
+            vm.prank(alice);
+            shadow.transferFrom(alice, bob, id);
+            vm.prank(bob);
+            shadow.transferFrom(bob, alice, id);
+            vm.prank(alice);
+            dn.transfer(bob, _WAD);
+            vm.prank(bob);
+            dn.transfer(alice, _WAD);
+        }
+    }
+
     function testSetAndGetOperatorApprovals(address owner, address operator, bool approved)
         public
     {
