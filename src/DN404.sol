@@ -24,13 +24,11 @@ abstract contract DN404 {
 
     error InvalidTotalNFTSupply();
 
-    error FailToLinkToSister();
-
     error Unauthorized();
 
     error TransferToZeroAddress();
 
-    error SisterAddressIsZero();
+    error MirrorAddressIsZero();
 
     error ApprovalCallerNotOwnerNorApproved();
 
@@ -65,7 +63,7 @@ abstract contract DN404 {
         uint32 numAliases;
         uint32 nextTokenId;
         uint32 totalNFTSupply;
-        address sisterERC721;
+        address mirrorERC721;
         mapping(uint32 => address) aliasToAddress;
         mapping(address => mapping(address => bool)) operatorApprovals;
         mapping(uint256 => address) tokenApprovals;
@@ -77,22 +75,24 @@ abstract contract DN404 {
         mapping(address => bool) whitelist;
     }
 
-    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address sister)
+    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address mirror)
         internal
     {
-        if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) revert InvalidTotalNFTSupply();
+        if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) {
+            revert InvalidTotalNFTSupply();
+        }
         if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
 
         if ($.nextTokenId != 0) revert AlreadyInitialized();
 
-        if (sister == address(0)) revert SisterAddressIsZero();
-        _linkSisterContract(sister);
+        if (mirror == address(0)) revert MirrorAddressIsZero();
+        _linkMirrorContract(mirror);
 
         $.nextTokenId = 1;
         $.totalNFTSupply = totalNFTSupply;
-        $.sisterERC721 = sister;
+        $.mirrorERC721 = mirror;
 
         unchecked {
             uint256 balance = uint256(totalNFTSupply) * _WAD;
@@ -239,7 +239,7 @@ abstract contract DN404 {
     }
 
     struct _TransferTemps {
-        address sister;
+        address mirror;
         uint256 fromBalanceBefore;
         uint256 toBalanceBefore;
         uint256 toBalance;
@@ -255,7 +255,7 @@ abstract contract DN404 {
         AddressData storage toAddressData = $.addressData[to];
 
         _TransferTemps memory t;
-        t.sister = $.sisterERC721;
+        t.mirror = $.mirrorERC721;
 
         t.fromBalanceBefore = fromAddressData.balance;
         fromAddressData.balance = uint96(t.fromBalance = t.fromBalanceBefore - amount);
@@ -276,7 +276,7 @@ abstract contract DN404 {
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        _logNFTTransfer(t.sister, from, address(0), id);
+                        _logNFTTransfer(t.mirror, from, address(0), id);
                     } while (i != end);
                     fromAddressData.ownedLength = uint32(i);
                 }
@@ -292,13 +292,15 @@ abstract contract DN404 {
                 // Mint loop.
                 if (i != end) {
                     do {
-                        while ($.ownerships.get(id) != 0) if (++id > totalNFTSupply) id = 1;
+                        while ($.ownerships.get(id) != 0) {
+                            if (++id > totalNFTSupply) id = 1;
+                        }
 
                         toOwned.set(i, uint32(id));
                         $.ownerships.set(id, toAlias);
                         $.ownedIndex.set(id, uint32(i++));
 
-                        _logNFTTransfer(t.sister, address(0), to, id);
+                        _logNFTTransfer(t.mirror, address(0), to, id);
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
                         if (++id > totalNFTSupply) id = 1;
@@ -313,7 +315,7 @@ abstract contract DN404 {
         return true;
     }
 
-    function _logNFTTransfer(address sister, address from, address to, uint256 id) private {
+    function _logNFTTransfer(address mirror, address from, address to, uint256 id) private {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
@@ -324,7 +326,7 @@ abstract contract DN404 {
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
-                    call(gas(), sister, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
+                    call(gas(), mirror, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -352,22 +354,22 @@ abstract contract DN404 {
         result = _getDN404Storage().tokenApprovals[id];
     }
 
-    function sisterERC721() public view returns (address sister) {
-        return _getDN404Storage().sisterERC721;
+    function mirrorERC721() public view returns (address mirror) {
+        return _getDN404Storage().mirrorERC721;
     }
 
-    function _linkSisterContract(address sister) internal {
+    function _linkMirrorContract(address mirror) internal {
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x00, 0x847aab98) // `linkSisterContract(address)`.
+            mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
             mstore(0x20, caller())
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
-                    call(gas(), sister, 0, 0x1c, 0x24, 0x00, 0x20)
+                    call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20)
                 )
             ) {
-                mstore(0x00, 0x6529b926) // `LinkSisterContractFailed()`.
+                mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
                 revert(0x1c, 0x04)
             }
         }
@@ -395,7 +397,7 @@ abstract contract DN404 {
 
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x44) revert();
 
             address owner = address(uint160(_calldataload(0x04)));
@@ -405,7 +407,7 @@ abstract contract DN404 {
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
@@ -414,7 +416,7 @@ abstract contract DN404 {
         }
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x84) revert();
 
             address from = address(uint160(_calldataload(0x04)));
@@ -427,7 +429,7 @@ abstract contract DN404 {
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x64) revert();
 
             address spender = address(uint160(_calldataload(0x04)));
@@ -439,7 +441,7 @@ abstract contract DN404 {
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x64) revert();
 
             address spender = address(uint160(_calldataload(0x04)));
@@ -450,7 +452,7 @@ abstract contract DN404 {
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
