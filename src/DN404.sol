@@ -2,7 +2,6 @@
 pragma solidity ^0.8.4;
 
 import {LibMap} from "solady/utils/LibMap.sol";
-import {DN404NonFungibleShadow} from "./DN404NonFungibleShadow.sol";
 
 abstract contract DN404 {
     using LibMap for *;
@@ -25,9 +24,13 @@ abstract contract DN404 {
 
     error InvalidTotalNFTSupply();
 
+    error FailToLinkToSister();
+
     error Unauthorized();
 
     error TransferToZeroAddress();
+
+    error SisterAddressIsZero();
 
     error ApprovalCallerNotOwnerNorApproved();
 
@@ -40,15 +43,6 @@ abstract contract DN404 {
     uint256 private constant _WAD = 1000000000000000000;
 
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
-
-    // approveNFT(address,uint256,address)
-    uint256 private constant APPROVE_NFT_SIG = 0xd10b6e0c;
-
-    // setApprovalForAll(address,bool,address)
-    uint256 private constant SET_APPROVAL_FOR_ALL_SIG = 0x813500fc;
-
-    // transferFromNFT(address,address,uint256,address)
-    uint256 private constant TRANSFER_FROM_NFT_SIG = 0xe5eb36c8;
 
     struct AddressData {
         // The alias for the address. Zero means absence of an alias.
@@ -63,7 +57,7 @@ abstract contract DN404 {
         uint32 numAliases;
         uint32 nextTokenId;
         uint32 totalNFTSupply;
-        address sisterNFTContract;
+        address sisterERC721;
         mapping(uint32 => address) aliasToAddress;
         mapping(address => mapping(address => bool)) operatorApprovals;
         mapping(uint256 => address) tokenApprovals;
@@ -78,7 +72,7 @@ abstract contract DN404 {
     function _initializeDN404(
         uint32 totalNFTSupply,
         address initialSupplyOwner,
-        address sisterNFTContract
+        address sister
     ) internal {
         if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) revert InvalidTotalNFTSupply();
         if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
@@ -87,13 +81,12 @@ abstract contract DN404 {
 
         if ($.nextTokenId != 0) revert AlreadyInitialized();
 
-        if (sisterNFTContract == address(0)) {
-            sisterNFTContract = address(new DN404NonFungibleShadow());
-        }
+        if (sister == address(0)) revert SisterAddressIsZero();
+        _linkSisterContract(sister);
 
         $.nextTokenId = 1;
         $.totalNFTSupply = totalNFTSupply;
-        $.sisterNFTContract = sisterNFTContract;
+        $.sisterERC721 = sister;
 
         unchecked {
             uint256 balance = uint256(totalNFTSupply) * _WAD;
@@ -145,7 +138,19 @@ abstract contract DN404 {
         return true;
     }
 
-    function approveNFT(address spender, uint256 id, address msgSender)
+    function transferFrom(address from, address to, uint256 amount) external virtual {
+        DN404Storage storage $ = _getDN404Storage();
+
+        uint256 allowed = $.allowance[from][msg.sender];
+
+        if (allowed != type(uint256).max) {
+            $.allowance[from][msg.sender] = allowed - amount;
+        }
+
+        _transfer(from, to, amount);
+    }
+
+    function _approveNFT(address spender, uint256 id, address msgSender)
         internal
         returns (address)
     {
@@ -164,7 +169,7 @@ abstract contract DN404 {
         return owner;
     }
 
-    function setApprovalForAll(address operator, bool approved, address msgSender)
+    function _setApprovalForAll(address operator, bool approved, address msgSender)
         internal
         virtual
     {
@@ -173,19 +178,7 @@ abstract contract DN404 {
         $.operatorApprovals[msgSender][operator] = approved;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external virtual {
-        DN404Storage storage $ = _getDN404Storage();
-
-        uint256 allowed = $.allowance[from][msg.sender];
-
-        if (allowed != type(uint256).max) {
-            $.allowance[from][msg.sender] = allowed - amount;
-        }
-
-        _transfer(from, to, amount);
-    }
-
-    function transferFromNFT(address from, address to, uint256 id, address msgSender)
+    function _transferFromNFT(address from, address to, uint256 id, address msgSender)
         internal
         virtual
     {
@@ -244,11 +237,6 @@ abstract contract DN404 {
         return _transfer(msg.sender, to, amount);
     }
 
-    function sisterNftContract() external view returns (address) {
-        DN404Storage storage $ = _getDN404Storage();
-
-        return $.sisterNFTContract;
-    }
 
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
         if (to == address(0)) revert TransferToZeroAddress();
@@ -278,9 +266,7 @@ abstract contract DN404 {
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        DN404NonFungibleShadow($.sisterNFTContract).logTransfer(
-                            from, address(0), id
-                        );
+                        _logNFTTransfer($.sisterERC721, from, address(0), id);
                     } while (i != end);
                     fromAddressData.ownedLength = uint32(i);
                 }
@@ -301,7 +287,7 @@ abstract contract DN404 {
                         $.ownerships.set(id, toAlias);
                         $.ownedIndex.set(id, uint32(i++));
 
-                        DN404NonFungibleShadow($.sisterNFTContract).logTransfer(address(0), to, id);
+                        _logNFTTransfer($.sisterERC721, address(0), to, id);
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
                         if (++id > _MAX_TOKEN_ID) id = 1;
@@ -316,42 +302,42 @@ abstract contract DN404 {
         return true;
     }
 
-    function _getDN404Storage() internal pure returns (DN404Storage storage $) {
+    function _logNFTTransfer(address sister, address from, address to, uint256 id) private {
+        /// @solidity memory-safe-assembly
         assembly {
-            // keccak256(abi.encode(uint256(keccak256("dn404")) - 1)) & ~bytes32(uint256(0xff))
-            $.slot := 0x61dd0d320a11019af7688ced18637b1235059a4e8141ed71cfccbe9f2da16600
+            let m := mload(0x40)
+            mstore(m, 0xf51ac936) // `logTransfer(address,address,uint256)`.
+            mstore(add(m, 0x20), shr(96, shl(96, from)))
+            mstore(add(m, 0x40), shr(96, shl(96, to)))
+            mstore(add(m, 0x60), id)
+            if iszero(
+                and(
+                    and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
+                    call(gas(), sister, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(m, 0x00, returndatasize())
+                revert(m, returndatasize())
+            }
         }
     }
 
-    /// @dev Perform a call to invoke {IERC721Receiver-onERC721Received} on `to`.
-    /// Reverts if the target does not support the function correctly.
-    function _checkOnERC721Received(address from, address to, uint256 id, bytes memory data)
-        private
-    {
+    function sisterERC721() public view returns (address sister) {
+        return _getDN404Storage().sisterERC721;
+    }
+
+    function _linkSisterContract(address sister) internal {
         /// @solidity memory-safe-assembly
         assembly {
-            // Prepare the calldata.
-            let m := mload(0x40)
-            let onERC721ReceivedSelector := 0x150b7a02
-            mstore(m, onERC721ReceivedSelector)
-            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
-            mstore(add(m, 0x40), shr(96, shl(96, from)))
-            mstore(add(m, 0x60), id)
-            mstore(add(m, 0x80), 0x80)
-            let n := mload(data)
-            mstore(add(m, 0xa0), n)
-            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xc0), n)) }
-            // Revert if the call reverts.
-            if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
-                if returndatasize() {
-                    // Bubble up the revert if the call reverts.
-                    returndatacopy(m, 0x00, returndatasize())
-                    revert(m, returndatasize())
-                }
-            }
-            // Load the returndata and compare it.
-            if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
-                mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
+            mstore(0x00, 0x847aab98) // `linkSisterContract(address)`.
+            mstore(0x20, caller())
+            if iszero(
+                and(
+                    and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
+                    call(gas(), sister, 0, 0x1c, 0x24, 0x00, 0x20)
+                )
+            ) {
+                mstore(0x00, 0x6529b926) // `LinkSisterContractFailed()`.
                 revert(0x1c, 0x04)
             }
         }
@@ -364,42 +350,68 @@ abstract contract DN404 {
         }
     }
 
-    fallback() external {
+    function _returnTrue() private pure {
+        uint256 zero; // To prevent a compiler bug.
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(zero, 0x01)
+            return(zero, 0x20)
+        }
+    }
+
+    modifier dn404Fallback() virtual {
         DN404Storage storage $ = _getDN404Storage();
-        if (msg.sender != $.sisterNFTContract) revert Unauthorized();
+        
+        uint256 fnSelector = _calldataload(0x00) >> 224;
 
-        uint256 fnSelector = _calldataload(0) >> 224;
-        uint256 calldatasize = msg.data.length;
+        // `_transferFromNFT(address,address,uint256,address)`.
+        if (fnSelector == 0xe5eb36c8) {
+            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.data.length < 0x84) revert();
 
-        if (fnSelector == TRANSFER_FROM_NFT_SIG) {
-            if (calldatasize < 132) revert();
+            address from = address(uint160(_calldataload(0x04)));
+            address to = address(uint160(_calldataload(0x24)));
+            uint256 id = _calldataload(0x44);
+            address msgSender = address(uint160(_calldataload(0x64)));
 
-            address from = address(uint160(_calldataload(4)));
-            address to = address(uint160(_calldataload(36)));
-            uint256 id = _calldataload(68);
-            address msgSender = address(uint160(_calldataload(100)));
+            _transferFromNFT(from, to, id, msgSender);
+            _returnTrue();
+        }
+        // `setApprovalForAll(address,bool,address)`.
+        if (fnSelector == 0x813500fc) {
+            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.data.length < 0x64) revert();
 
-            transferFromNFT(from, to, id, msgSender);
-        } else if (fnSelector == SET_APPROVAL_FOR_ALL_SIG) {
-            if (calldatasize < 100) revert();
+            address spender = address(uint160(_calldataload(0x04)));
+            bool status = _calldataload(0x24) != 0;
+            address msgSender = address(uint160(_calldataload(0x44)));
 
-            address spender = address(uint160(_calldataload(4)));
+            _setApprovalForAll(spender, status, msgSender);
+            _returnTrue();
+        } 
+        // `approveNFT(address,uint256,address)`.
+        if (fnSelector == 0xd10b6e0c) {
+            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.data.length < 0x64) revert();
 
-            uint256 s = _calldataload(36);
-            if (s > 1) revert();
-            bool status = s == 1;
+            address spender = address(uint160(_calldataload(0x04)));
+            uint256 id = _calldataload(0x24);
+            address msgSender = address(uint160(_calldataload(0x44)));
 
-            address msgSender = address(uint160(_calldataload(68)));
+            _approveNFT(spender, id, msgSender);
+            _returnTrue();
+        }
+        _;
+    }
 
-            setApprovalForAll(spender, status, msgSender);
-        } else if (fnSelector == APPROVE_NFT_SIG) {
-            if (calldatasize < 100) revert();
+    fallback() external payable virtual dn404Fallback {}
 
-            address spender = address(uint160(_calldataload(4)));
-            uint256 id = _calldataload(36);
-            address msgSender = address(uint160(_calldataload(68)));
+    receive() external payable virtual {}
 
-            approveNFT(spender, id, msgSender);
+    function _getDN404Storage() internal pure returns (DN404Storage storage $) {
+        assembly {
+            // keccak256(abi.encode(uint256(keccak256("dn404")) - 1)) & ~bytes32(uint256(0xff))
+            $.slot := 0x61dd0d320a11019af7688ced18637b1235059a4e8141ed71cfccbe9f2da16600
         }
     }
 }

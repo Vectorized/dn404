@@ -42,58 +42,65 @@ contract DN404NonFungibleShadow {
 
     error TokenDoesNotExist();
 
+    error AlreadyLinked();
+
+    error NotLinked();
+
     error TransferToNonERC721ReceiverImplementer();
 
     uint256 private constant _WAD = 1000000000000000000;
 
-    I404Fungible public immutable FUNGIBLE_SISTER_CONTRACT;
+    struct DN404NFTStorage {
+        address sisterERC20;
+        address deployer;
+    }
 
     constructor() {
-        // todo more flexible way to set fungible counterpart to allow for predeploys
-        FUNGIBLE_SISTER_CONTRACT = I404Fungible(msg.sender);
+        // For non-proxies, we will store the deployer so that only the deployer can 
+        // link the sister contract.
+        _getDN404NFTStorage().deployer = msg.sender;
     }
 
     function name() public view virtual returns (string memory) {
-        return FUNGIBLE_SISTER_CONTRACT.name();
+        return I404Fungible(sisterERC20()).name();
     }
 
     function symbol() public view virtual returns (string memory) {
-        return FUNGIBLE_SISTER_CONTRACT.symbol();
+        return I404Fungible(sisterERC20()).symbol();
     }
 
     function tokenURI(uint256 id) public view virtual returns (string memory) {
-        return FUNGIBLE_SISTER_CONTRACT.tokenURI(id);
+        return I404Fungible(sisterERC20()).tokenURI(id);
     }
 
     function totalSupply() public view returns (uint256) {
-        return FUNGIBLE_SISTER_CONTRACT.totalSupply() / _WAD;
+        return I404Fungible(sisterERC20()).totalSupply() / _WAD;
     }
 
     function balanceOf(address owner) public view virtual returns (uint256) {
-        return FUNGIBLE_SISTER_CONTRACT.balanceOf(owner) / _WAD;
+        return I404Fungible(sisterERC20()).balanceOf(owner) / _WAD;
     }
 
     function ownerOf(uint256 id) public view virtual returns (address owner) {
-        owner = FUNGIBLE_SISTER_CONTRACT.ownerOf(id);
+        owner = I404Fungible(sisterERC20()).ownerOf(id);
 
         if (owner == address(0)) revert TokenDoesNotExist();
     }
 
-    function approve(address spender, uint256 id) public virtual returns (bool) {
-        address owner = FUNGIBLE_SISTER_CONTRACT.approveNFT(spender, id, msg.sender);
+    function approve(address spender, uint256 id) public virtual {
+        address owner = I404Fungible(sisterERC20()).approveNFT(spender, id, msg.sender);
 
         emit Approval(owner, spender, id);
-        return true;
     }
 
     function setApprovalForAll(address operator, bool approved) public virtual {
         emit ApprovalForAll(msg.sender, operator, approved);
 
-        return FUNGIBLE_SISTER_CONTRACT.setApprovalForAll(operator, approved, msg.sender);
+        return I404Fungible(sisterERC20()).setApprovalForAll(operator, approved, msg.sender);
     }
 
     function transferFrom(address from, address to, uint256 id) public virtual {
-        FUNGIBLE_SISTER_CONTRACT.transferFromNFT(from, to, id, msg.sender);
+        I404Fungible(sisterERC20()).transferFromNFT(from, to, id, msg.sender);
         emit Transfer(from, to, id);
     }
 
@@ -110,12 +117,6 @@ contract DN404NonFungibleShadow {
         transferFrom(from, to, id);
 
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
-    }
-
-    function logTransfer(address from, address to, uint256 id) external {
-        if (msg.sender != address(FUNGIBLE_SISTER_CONTRACT)) revert Unauthorized();
-
-        emit Transfer(from, to, id);
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
@@ -157,6 +158,68 @@ contract DN404NonFungibleShadow {
                 mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
                 revert(0x1c, 0x04)
             }
+        }
+    }
+
+    function _calldataload(uint256 offset) private pure returns (uint256 value) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            value := calldataload(offset)
+        }
+    }
+
+    function _returnTrue() private pure {
+        uint256 zero; // To prevent a compiler bug.
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(zero, 0x01)
+            return(zero, 0x20)
+        }
+    }
+
+    function sisterERC20() public view returns (address sister) {
+        sister = _getDN404NFTStorage().sisterERC20;
+        if (sister == address(0)) revert NotLinked();
+    }
+
+    modifier dn404NFTFallback() virtual {
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+
+        uint256 fnSelector = _calldataload(0x00) >> 224;
+
+        // `linkSisterContract(address)`.
+        if (fnSelector == 0x847aab98) {
+            if ($.deployer != address(0)) {
+                if (address(uint160(_calldataload(0x04))) != $.deployer)
+                    revert Unauthorized();
+            }
+            if ($.sisterERC20 != address(0)) revert AlreadyLinked();
+            $.sisterERC20 = msg.sender;    
+            _returnTrue();
+        }
+
+        // `logTransfer(address,address,uint256)`.
+        if (fnSelector == 0xf51ac936) {
+            if (msg.sender != $.sisterERC20) revert Unauthorized();
+
+            address from = address(uint160(_calldataload(0x04)));
+            address to = address(uint160(_calldataload(0x24)));
+            uint256 id = _calldataload(0x44);
+
+            emit Transfer(from, to, id);
+            _returnTrue();
+        }
+        _;
+    }
+
+    fallback() external payable virtual dn404NFTFallback {}
+
+    receive() external payable virtual {}
+
+    function _getDN404NFTStorage() internal pure returns (DN404NFTStorage storage $) {
+        assembly {
+            // keccak256(abi.encode(uint256(keccak256("dn404.nft")) - 1)) & ~bytes32(uint256(0xff))
+            $.slot := 0xe8cb618a1de8ad2a6a7b358523c369cb09f40cc15da64205134c7e55c6a86700
         }
     }
 }
