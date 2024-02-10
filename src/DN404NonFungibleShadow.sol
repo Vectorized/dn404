@@ -16,7 +16,9 @@ interface I404Fungible {
 
     function transferFromNFT(address from, address to, uint256 id, address msgSender) external;
 
-    function approveNFT(address spender, uint256 id, address msgSender) external returns (address);
+    function approveNFT(address spender, uint256 id, address msgSender)
+        external
+        returns (address);
 
     function setApprovalForAll(address operator, bool approved, address msgSender) external;
 }
@@ -26,23 +28,11 @@ contract DN404NonFungibleShadow {
     /*                           EVENTS                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 indexed id
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 indexed id);
 
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        uint256 indexed id
-    );
+    event Transfer(address indexed from, address indexed to, uint256 indexed id);
 
-    event ApprovalForAll(
-        address indexed owner,
-        address indexed operator,
-        bool approved
-    );
+    event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
@@ -89,10 +79,7 @@ contract DN404NonFungibleShadow {
         if (owner == address(0)) revert TokenDoesNotExist();
     }
 
-    function approve(
-        address spender,
-        uint256 id
-    ) public virtual returns (bool) {
+    function approve(address spender, uint256 id) public virtual returns (bool) {
         address owner = FUNGIBLE_SISTER_CONTRACT.approveNFT(spender, id, msg.sender);
 
         emit Approval(owner, spender, id);
@@ -105,31 +92,21 @@ contract DN404NonFungibleShadow {
         return FUNGIBLE_SISTER_CONTRACT.setApprovalForAll(operator, approved, msg.sender);
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 id
-    ) public virtual {
+    function transferFrom(address from, address to, uint256 id) public virtual {
         FUNGIBLE_SISTER_CONTRACT.transferFromNFT(from, to, id, msg.sender);
         emit Transfer(from, to, id);
     }
 
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 id
-    ) public payable virtual {
+    function safeTransferFrom(address from, address to, uint256 id) public payable virtual {
         transferFrom(from, to, id);
 
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, "");
     }
 
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 id,
-        bytes calldata data
-    ) public virtual {
+    function safeTransferFrom(address from, address to, uint256 id, bytes calldata data)
+        public
+        virtual
+    {
         transferFrom(from, to, id);
 
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
