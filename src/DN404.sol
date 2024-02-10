@@ -69,11 +69,9 @@ abstract contract DN404 {
         mapping(address => bool) whitelist;
     }
 
-    function _initializeDN404(
-        uint32 totalNFTSupply,
-        address initialSupplyOwner,
-        address sister
-    ) internal {
+    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address sister)
+        internal
+    {
         if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) revert InvalidTotalNFTSupply();
         if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
 
@@ -237,7 +235,6 @@ abstract contract DN404 {
         return _transfer(msg.sender, to, amount);
     }
 
-
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -360,7 +357,7 @@ abstract contract DN404 {
 
     modifier dn404Fallback() virtual {
         DN404Storage storage $ = _getDN404Storage();
-        
+
         uint256 fnSelector = _calldataload(0x00) >> 224;
 
         // `_transferFromNFT(address,address,uint256,address)`.
@@ -387,7 +384,7 @@ abstract contract DN404 {
 
             _setApprovalForAll(spender, status, msgSender);
             _return(1);
-        } 
+        }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
             if (msg.sender != $.sisterERC721) revert Unauthorized();

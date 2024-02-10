@@ -56,7 +56,7 @@ contract DN404NonFungibleShadow {
     }
 
     constructor() {
-        // For non-proxies, we will store the deployer so that only the deployer can 
+        // For non-proxies, we will store the deployer so that only the deployer can
         // link the sister contract.
         _getDN404NFTStorage().deployer = msg.sender;
     }
@@ -119,10 +119,7 @@ contract DN404NonFungibleShadow {
         assembly {
             mstore(0x00, 0x7824407f) // `tokenSupply()`.
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x04, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x04, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -138,10 +135,7 @@ contract DN404NonFungibleShadow {
             mstore(0x00, 0x70a08231) // `balanceOf(address)`.
             mstore(0x20, shr(96, shl(96, owner)))
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -157,10 +151,7 @@ contract DN404NonFungibleShadow {
             mstore(0x00, 0x6352211e) // `ownerOf(uint256)`.
             mstore(0x20, id)
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -324,11 +315,12 @@ contract DN404NonFungibleShadow {
         // `linkSisterContract(address)`.
         if (fnSelector == 0x847aab98) {
             if ($.deployer != address(0)) {
-                if (address(uint160(_calldataload(0x04))) != $.deployer)
+                if (address(uint160(_calldataload(0x04))) != $.deployer) {
                     revert Unauthorized();
+                }
             }
             if ($.sisterERC20 != address(0)) revert AlreadyLinked();
-            $.sisterERC20 = msg.sender;    
+            $.sisterERC20 = msg.sender;
             _return(1);
         }
 
