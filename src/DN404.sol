@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import {LibMap} from "solady/utils/LibMap.sol";
+import {DN404Mirror} from "./DN404Mirror.sol";
 
 abstract contract DN404 {
     using LibMap for *;
@@ -270,14 +271,18 @@ abstract contract DN404 {
                 uint256 end = i - ((t.fromBalanceBefore / _WAD) - (t.fromBalance / _WAD));
                 // Burn loop.
                 if (i != end) {
+                    uint256[] memory packedLogs = new uint256[](i - end);
+                    uint256 n;
                     do {
                         uint256 id = fromOwned.get(--i);
                         $.ownedIndex.set(id, 0);
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        _logNFTTransfer(t.mirror, from, address(0), id);
+                        // _logNFTTransfer(t.mirror, from, address(0), id);
+                        packedLogs[n++] = (uint256(uint160(from)) << 96) | id;
                     } while (i != end);
+                    _logNFTBurn(t.mirror, packedLogs);
                     fromAddressData.ownedLength = uint32(i);
                 }
             }
@@ -289,8 +294,11 @@ abstract contract DN404 {
                 uint256 id = $.nextTokenId;
                 uint32 toAlias = _registerAndResolveAlias(to);
                 uint256 totalNFTSupply = $.totalNFTSupply;
+
                 // Mint loop.
                 if (i != end) {
+                    uint256[] memory packedLogs = new uint256[](end - i);
+                    uint256 n;
                     do {
                         while ($.ownerships.get(id) != 0) {
                             if (++id > totalNFTSupply) id = 1;
@@ -300,11 +308,13 @@ abstract contract DN404 {
                         $.ownerships.set(id, toAlias);
                         $.ownedIndex.set(id, uint32(i++));
 
-                        _logNFTTransfer(t.mirror, address(0), to, id);
+                        // _logNFTTransfer(t.mirror, address(0), to, id);
+                        packedLogs[n++] = (uint256(uint160(to)) << 96) | id;
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
                         if (++id > totalNFTSupply) id = 1;
                     } while (i != end);
+                    _logNFTMint(t.mirror, packedLogs);
                     toAddressData.ownedLength = uint32(i);
                     $.nextTokenId = uint32(id);
                 }
@@ -313,6 +323,14 @@ abstract contract DN404 {
 
         emit Transfer(from, to, amount);
         return true;
+    }
+
+    function _logNFTBurn(address mirror, uint256[] memory p) private {
+        require(DN404Mirror(payable(mirror)).logBurn(p));
+    }
+
+    function _logNFTMint(address mirror, uint256[] memory p) private {
+        require(DN404Mirror(payable(mirror)).logMint(p));
     }
 
     function _logNFTTransfer(address mirror, address from, address to, uint256 id) private {

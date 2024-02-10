@@ -386,6 +386,38 @@ contract DN404Mirror {
         _;
     }
 
+    function logMint(uint256[] memory p) external returns (bool) {
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        if (msg.sender != $.rootERC20) revert Unauthorized();
+
+        for (uint256 i; i < p.length; ++i) {
+            uint256 data = p[i];
+
+            address from = address(0);
+            address to = address(uint160(data >> 96));
+            uint256 id = data & type(uint96).max;
+
+            emit Transfer(from, to, id);
+        }
+        _return(1);
+    }
+
+    function logBurn(uint256[] memory p) external returns (bool) {
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        if (msg.sender != $.rootERC20) revert Unauthorized();
+
+        for (uint256 i; i < p.length; ++i) {
+            uint256 data = p[i];
+
+            address from = address(uint160(data >> 96));
+            address to = address(0);
+            uint256 id = data & type(uint96).max;
+
+            emit Transfer(from, to, id);
+        }
+        _return(1);
+    }
+
     fallback() external payable virtual dn404NFTFallback {}
 
     receive() external payable virtual {}
