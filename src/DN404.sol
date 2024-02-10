@@ -139,6 +139,10 @@ abstract contract DN404 {
         return true;
     }
 
+    function transfer(address to, uint256 amount) public virtual returns (bool) {
+        return _transfer(msg.sender, to, amount);
+    }
+
     function transferFrom(address from, address to, uint256 amount) external virtual {
         DN404Storage storage $ = _getDN404Storage();
 
@@ -234,10 +238,6 @@ abstract contract DN404 {
         return addressAlias;
     }
 
-    function transfer(address to, uint256 amount) public virtual returns (bool) {
-        return _transfer(msg.sender, to, amount);
-    }
-
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -322,6 +322,25 @@ abstract contract DN404 {
         }
     }
 
+    function _ownerAt(uint256 id) internal view virtual returns (address result) {
+        DN404Storage storage $ = _getDN404Storage();
+        result = $.aliasToAddress[$.ownerships.get(id)];
+    }
+
+    function _ownerOf(uint256 id) internal view virtual returns (address result) {
+        if (!_exists(id)) revert TokenDoesNotExist();
+        result = _ownerAt(id);
+    }
+
+    function _exists(uint256 id) internal view virtual returns (bool result) {
+        result = _ownerAt(id) != address(0);
+    }
+
+    function _getApproved(uint256 id) internal view returns (address result) {
+        if (!_exists(id)) revert TokenDoesNotExist();
+        result = _getDN404Storage().tokenApprovals[id];
+    }
+
     function sisterERC721() public view returns (address sister) {
         return _getDN404Storage().sisterERC721;
     }
@@ -379,12 +398,10 @@ abstract contract DN404 {
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
-            address owner = $.aliasToAddress[$.ownerships.get(id)];
-            if (owner == address(0)) revert TokenDoesNotExist();
 
-            _return(uint160(owner));
+            _return(uint160(_ownerOf(id)));
         }
-        // `_transferFromNFT(address,address,uint256,address)`.
+        // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
             if (msg.sender != $.sisterERC721) revert Unauthorized();
             if (msg.data.length < 0x84) revert();
@@ -426,10 +443,8 @@ abstract contract DN404 {
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
-            address owner = $.aliasToAddress[$.ownerships.get(id)];
-            if (owner == address(0)) revert TokenDoesNotExist();
 
-            _return(uint160($.tokenApprovals[id]));
+            _return(uint160(_getApproved(id)));
         }
         // `implementsDN404()`.
         if (fnSelector == 0xb7a94eb8) {
