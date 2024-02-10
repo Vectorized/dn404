@@ -52,7 +52,7 @@ contract DN404NonFungibleShadow {
     }
 
     constructor() {
-        // For non-proxies, we will store the deployer so that only the deployer can 
+        // For non-proxies, we will store the deployer so that only the deployer can
         // link the sister contract.
         _getDN404NFTStorage().deployer = msg.sender;
     }
@@ -115,10 +115,7 @@ contract DN404NonFungibleShadow {
         assembly {
             mstore(0x00, 0x18160ddd) // `totalSupply()`.
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x04, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x04, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -134,10 +131,7 @@ contract DN404NonFungibleShadow {
             mstore(0x00, 0x70a08231) // `balanceOf(address)`.
             mstore(0x20, shr(96, shl(96, owner)))
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -153,10 +147,7 @@ contract DN404NonFungibleShadow {
             mstore(0x00, 0x6352211e) // `ownerOf(uint256)`.
             mstore(0x20, id)
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -178,7 +169,7 @@ contract DN404NonFungibleShadow {
             if iszero(
                 and(
                     gt(returndatasize(), 0x1f),
-                    call(gas(), sister, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
+                    call(gas(), sister, callvalue(), add(m, 0x1c), 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -196,10 +187,7 @@ contract DN404NonFungibleShadow {
             mstore(0x00, 0x081812fc) // `getApproved(uint256)`.
             mstore(0x20, id)
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -220,7 +208,7 @@ contract DN404NonFungibleShadow {
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), sister, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
+                    call(gas(), sister, callvalue(), add(m, 0x1c), 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -230,7 +218,12 @@ contract DN404NonFungibleShadow {
         emit ApprovalForAll(msg.sender, operator, approved);
     }
 
-    function isApprovedForAll(address owner, address operator) public view virtual returns (bool result) {
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        virtual
+        returns (bool result)
+    {
         address sister = sisterERC20();
         /// @solidity memory-safe-assembly
         assembly {
@@ -264,7 +257,7 @@ contract DN404NonFungibleShadow {
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), sister, 0, add(m, 0x1c), 0x84, 0x00, 0x20)
+                    call(gas(), sister, callvalue(), add(m, 0x1c), 0x84, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -293,17 +286,16 @@ contract DN404NonFungibleShadow {
     /// `interfaceId`. See the corresponding
     /// [EIP section](https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified)
     /// to learn more about how these ids are created.
-    /// 
+    ///
     /// This function call must use less than 30000 gas.
     function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
         // The interface IDs are constants representing the first 4 bytes
         // of the XOR of all function selectors in the interface.
         // See: [ERC165](https://eips.ethereum.org/EIPS/eip-165)
         // (e.g. `bytes4(i.functionA.selector ^ i.functionB.selector ^ ...)`)
-        return
-            interfaceId == 0x01ffc9a7 || // ERC165 interface ID for ERC165.
-            interfaceId == 0x80ac58cd || // ERC165 interface ID for ERC721.
-            interfaceId == 0x5b5e139f; // ERC165 interface ID for ERC721Metadata.
+        return interfaceId == 0x01ffc9a7 // ERC165 interface ID for ERC165.
+            || interfaceId == 0x80ac58cd // ERC165 interface ID for ERC721.
+            || interfaceId == 0x5b5e139f; // ERC165 interface ID for ERC721Metadata.
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
@@ -376,8 +368,9 @@ contract DN404NonFungibleShadow {
         // `linkSisterContract(address)`.
         if (fnSelector == 0x847aab98) {
             if ($.deployer != address(0)) {
-                if (address(uint160(_calldataload(0x04))) != $.deployer)
+                if (address(uint160(_calldataload(0x04))) != $.deployer) {
                     revert Unauthorized();
+                }
             }
             if ($.sisterERC20 != address(0)) revert AlreadyLinked();
             $.sisterERC20 = msg.sender;

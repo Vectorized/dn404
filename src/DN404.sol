@@ -238,7 +238,6 @@ abstract contract DN404 {
         return addressAlias;
     }
 
-    
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -397,7 +396,7 @@ abstract contract DN404 {
         if (fnSelector == 0x6352211e) {
             if (msg.sender != $.sisterERC721) revert Unauthorized();
             if (msg.data.length < 0x24) revert();
-            
+
             uint256 id = _calldataload(0x04);
 
             _return(uint160(_ownerOf(id)));
