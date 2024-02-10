@@ -5,7 +5,7 @@ on:
     paths:
       - '**.sol'
   pull_request:
-    types: [opened]
+    types: [opened, synchronize, reopened]
 
 jobs:
   tests:
