@@ -42,13 +42,13 @@ abstract contract DN404 {
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
 
     // approveNFT(address,uint256,address)
-    uint256 private constant APPROVE_NFT_SIG = 0xd10b6e0c;
+    uint256 private constant _APPROVE_NFT_SIG = 0xd10b6e0c;
 
     // setApprovalForAll(address,bool,address)
-    uint256 private constant SET_APPROVAL_FOR_ALL_SIG = 0x813500fc;
+    uint256 private constant _SET_APPROVAL_FOR_ALL_SIG = 0x813500fc;
 
     // transferFromNFT(address,address,uint256,address)
-    uint256 private constant TRANSFER_FROM_NFT_SIG = 0xe5eb36c8;
+    uint256 private constant _TRANSFER_FROM_NFT_SIG = 0xe5eb36c8;
 
     struct AddressData {
         // The alias for the address. Zero means absence of an alias.
@@ -168,9 +168,7 @@ abstract contract DN404 {
         internal
         virtual
     {
-        DN404Storage storage $ = _getDN404Storage();
-
-        $.operatorApprovals[msgSender][operator] = approved;
+        _getDN404Storage().operatorApprovals[msgSender][operator] = approved;
     }
 
     function transferFrom(address from, address to, uint256 amount) external virtual {
@@ -245,9 +243,7 @@ abstract contract DN404 {
     }
 
     function sisterNftContract() external view returns (address) {
-        DN404Storage storage $ = _getDN404Storage();
-
-        return $.sisterNFTContract;
+        return _getDN404Storage().sisterNFTContract;
     }
 
     function _transfer(address from, address to, uint256 amount) internal returns (bool) {
@@ -371,7 +367,7 @@ abstract contract DN404 {
         uint256 fnSelector = _calldataload(0) >> 224;
         uint256 calldatasize = msg.data.length;
 
-        if (fnSelector == TRANSFER_FROM_NFT_SIG) {
+        if (fnSelector == _TRANSFER_FROM_NFT_SIG) {
             if (calldatasize < 132) revert();
 
             address from = address(uint160(_calldataload(4)));
@@ -380,7 +376,7 @@ abstract contract DN404 {
             address msgSender = address(uint160(_calldataload(100)));
 
             transferFromNFT(from, to, id, msgSender);
-        } else if (fnSelector == SET_APPROVAL_FOR_ALL_SIG) {
+        } else if (fnSelector == _SET_APPROVAL_FOR_ALL_SIG) {
             if (calldatasize < 100) revert();
 
             address spender = address(uint160(_calldataload(4)));
@@ -392,7 +388,7 @@ abstract contract DN404 {
             address msgSender = address(uint160(_calldataload(68)));
 
             setApprovalForAll(spender, status, msgSender);
-        } else if (fnSelector == APPROVE_NFT_SIG) {
+        } else if (fnSelector == _APPROVE_NFT_SIG) {
             if (calldatasize < 100) revert();
 
             address spender = address(uint160(_calldataload(4)));
