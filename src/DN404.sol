@@ -123,7 +123,7 @@ abstract contract DN404 {
     }
 
     function _setSkipNFT(address target, bool state) internal {
-        _getDN404Storage().addressData[target].skipNFT = state;
+        _getAddressData(target).skipNFT = state;
         emit SkipNFTSet(target, state);
     }
 
@@ -221,8 +221,8 @@ abstract contract DN404 {
             }
         }
 
-        AddressData storage fromAddressData = $.addressData[from];
-        AddressData storage toAddressData = $.addressData[to];
+        AddressData storage fromAddressData = _getAddressData(from);
+        AddressData storage toAddressData = _getAddressData(to);
 
         fromAddressData.balance -= uint96(_WAD);
 

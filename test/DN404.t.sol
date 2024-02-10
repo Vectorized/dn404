@@ -97,6 +97,9 @@ contract DN404Test is SoladyTest {
 
         dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
 
+        vm.prank(recipient);
+        dn.setSkipNFT(false);
+
         vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.getApproved(1);
 
@@ -122,6 +125,9 @@ contract DN404Test is SoladyTest {
         vm.assume(initialSupplyOwner != recipient && recipient != address(0));
 
         dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
+
+        vm.prank(recipient);
+        dn.setSkipNFT(false);
 
         vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.getApproved(1);
