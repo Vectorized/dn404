@@ -47,6 +47,8 @@ contract DN404Test is SoladyTest {
             vm.expectRevert(DN404.TransferToZeroAddress.selector);
             dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
         } else {
+            vm.expectRevert(DN404.MirrorAddressIsZero.selector);
+            dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(0));
             dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
             assertEq(dn.totalSupply(), uint256(totalNFTSupply) * 10 ** 18);
             assertEq(dn.balanceOf(initialSupplyOwner), uint256(totalNFTSupply) * 10 ** 18);
@@ -126,5 +128,22 @@ contract DN404Test is SoladyTest {
 
         vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.ownerOf(1);
+    }
+
+    function testTransferToZeroAddress(
+        uint32 totalNFTSupply,
+        address initialSupplyOwner,
+        address recipient
+    ) public {
+        vm.assume(
+            totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max
+                && initialSupplyOwner != address(0)
+        );
+        vm.assume(initialSupplyOwner != recipient && recipient != address(0));
+
+        dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
+
+        vm.expectRevert(DN404.TransferToZeroAddress.selector);
+        dn.transfer(address(0), _WAD);
     }
 }
