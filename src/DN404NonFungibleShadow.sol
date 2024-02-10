@@ -1,28 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-interface I404Fungible {
-    function name() external view returns (string memory);
-
-    function symbol() external view returns (string memory);
-
-    function tokenURI(uint256 id) external view returns (string memory);
-
-    function balanceOf(address owner) external view returns (uint256);
-
-    function ownerOf(uint256 id) external view returns (address);
-
-    function totalSupply() external view returns (uint256);
-
-    function transferFromNFT(address from, address to, uint256 id, address msgSender) external;
-
-    function approveNFT(address spender, uint256 id, address msgSender)
-        external
-        returns (address);
-
-    function setApprovalForAll(address operator, bool approved, address msgSender) external;
-}
-
 contract DN404NonFungibleShadow {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
@@ -339,7 +317,6 @@ contract DN404NonFungibleShadow {
             }
             _return(1);
         }
-
         // `logTransfer(address,address,uint256)`.
         if (fnSelector == 0xf51ac936) {
             if (msg.sender != $.sisterERC20) revert Unauthorized();

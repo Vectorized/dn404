@@ -408,6 +408,7 @@ abstract contract DN404 {
     receive() external payable virtual {}
 
     function _getDN404Storage() internal pure returns (DN404Storage storage $) {
+        /// @solidity memory-safe-assembly
         assembly {
             // keccak256(abi.encode(uint256(keccak256("dn404")) - 1)) & ~bytes32(uint256(0xff))
             $.slot := 0x61dd0d320a11019af7688ced18637b1235059a4e8141ed71cfccbe9f2da16600
