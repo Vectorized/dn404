@@ -259,6 +259,7 @@ abstract contract DN404 {
         if (addressAlias == 0) {
             addressAlias = ++$.numAliases;
             toAddressData.addressAlias = addressAlias;
+            $.aliasToAddress[addressAlias] = to;
         }
         return addressAlias;
     }

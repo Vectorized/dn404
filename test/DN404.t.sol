@@ -35,5 +35,15 @@ contract DN404Test is SoladyTest {
     	}
     }
 
+    function testMintOnTransfer(uint32 totalNFTSupply, address initialSupplyOwner, address recipient) public {
+        vm.assume(totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max && initialSupplyOwner != address(0));
+		vm.assume(initialSupplyOwner != recipient && recipient != address(0));
 
+		dn.initializeDN404(totalNFTSupply, initialSupplyOwner);
+
+		vm.startPrank(initialSupplyOwner);
+        dn.transfer(recipient, 1e18);
+
+        assertEq(dn.ownerOf(1), recipient);
+    }
 }
