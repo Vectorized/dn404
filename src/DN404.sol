@@ -11,7 +11,7 @@ abstract contract DN404 {
     /*                           EVENTS                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    event ERC20Transfer(
+    event Transfer(
         address indexed from,
         address indexed to,
         uint256 amount
@@ -21,12 +21,6 @@ abstract contract DN404 {
         address indexed owner,
         address indexed spender,
         uint256 amount
-    );
-
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        uint256 indexed id
     );
 
     event SkipNFTWhitelistSet(
@@ -117,7 +111,7 @@ abstract contract DN404 {
             uint256 balance = uint256(totalNFTSupply) * _WAD;
             $.addressData[initialSupplyOwner].balance = uint96(balance);
 
-            emit ERC20Transfer(address(0), initialSupplyOwner, balance);
+            emit Transfer(address(0), initialSupplyOwner, balance);
         }
 
         _setSkipNFTWhitelist(initialSupplyOwner, true);
@@ -339,7 +333,7 @@ abstract contract DN404 {
             }
         }
 
-        emit ERC20Transfer(from, to, amount);
+        emit Transfer(from, to, amount);
         return true;
     }
 
