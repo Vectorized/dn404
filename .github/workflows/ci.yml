@@ -5,8 +5,7 @@ on:
     paths:
       - '**.sol'
   pull_request:
-    types:
-      - "opened"
+    types: [opened]
 
 jobs:
   tests:
