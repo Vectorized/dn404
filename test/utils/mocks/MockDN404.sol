@@ -4,16 +4,31 @@ pragma solidity ^0.8.4;
 import "../../../src/DN404.sol";
 
 contract MockDN404 is DN404 {
+    string private _name;
+
+    string private _symbol;
+
+    string private _baseURI;
+
+    function setNameAndSymbol(string memory name_, string memory symbol_) public {
+        _name = name_;
+        _symbol = symbol_;
+    }
+
     function name() public view virtual override returns (string memory) {
-        return "DN404";
+        return _name;
+    }
+
+    function setBaseURI(string memory baseURI_) public {
+        _baseURI = baseURI_;
     }
 
     function symbol() public view virtual override returns (string memory) {
-        return "DN";
+        return _symbol;
     }
 
-    function tokenURI(uint256) public view virtual override returns (string memory) {
-        return "";
+    function tokenURI(uint256 id) public view virtual override returns (string memory) {
+        return string(abi.encodePacked(_baseURI, id));
     }
 
     function setWhitelist(address target, bool status) public {
