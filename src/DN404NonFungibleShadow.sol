@@ -79,21 +79,21 @@ contract DN404NonFungibleShadow {
         if (owner == address(0)) revert TokenDoesNotExist();
     }
 
-    function approve(address spender, uint256 id) public virtual returns (bool) {
+    function approve(address spender, uint256 id) public virtual {
         address owner = FUNGIBLE_SISTER_CONTRACT.approveNFT(spender, id, msg.sender);
 
         emit Approval(owner, spender, id);
-        return true;
     }
 
     function setApprovalForAll(address operator, bool approved) public virtual {
-        emit ApprovalForAll(msg.sender, operator, approved);
+        FUNGIBLE_SISTER_CONTRACT.setApprovalForAll(operator, approved, msg.sender);
 
-        return FUNGIBLE_SISTER_CONTRACT.setApprovalForAll(operator, approved, msg.sender);
+        emit ApprovalForAll(msg.sender, operator, approved);
     }
 
     function transferFrom(address from, address to, uint256 id) public virtual {
         FUNGIBLE_SISTER_CONTRACT.transferFromNFT(from, to, id, msg.sender);
+
         emit Transfer(from, to, id);
     }
 
