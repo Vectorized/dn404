@@ -350,12 +350,11 @@ abstract contract DN404 {
         }
     }
 
-    function _returnTrue() private pure {
-        uint256 zero; // To prevent a compiler bug.
+    function _return(uint256 x) private pure {
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(zero, 0x01)
-            return(zero, 0x20)
+            mstore(0x00, x)
+            return(0x00, 0x20)
         }
     }
 
@@ -375,7 +374,7 @@ abstract contract DN404 {
             address msgSender = address(uint160(_calldataload(0x64)));
 
             _transferFromNFT(from, to, id, msgSender);
-            _returnTrue();
+            _return(1);
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
@@ -387,7 +386,7 @@ abstract contract DN404 {
             address msgSender = address(uint160(_calldataload(0x44)));
 
             _setApprovalForAll(spender, status, msgSender);
-            _returnTrue();
+            _return(1);
         } 
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
@@ -398,8 +397,7 @@ abstract contract DN404 {
             uint256 id = _calldataload(0x24);
             address msgSender = address(uint160(_calldataload(0x44)));
 
-            _approveNFT(spender, id, msgSender);
-            _returnTrue();
+            _return(uint160(_approveNFT(spender, id, msgSender)));
         }
         _;
     }

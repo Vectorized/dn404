@@ -61,46 +61,181 @@ contract DN404NonFungibleShadow {
         _getDN404NFTStorage().deployer = msg.sender;
     }
 
-    function name() public view virtual returns (string memory) {
-        return I404Fungible(sisterERC20()).name();
+    function name() public view virtual returns (string memory result) {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            mstore(result, 0x06fdde03) // `name()`.
+            if iszero(staticcall(gas(), sister, add(result, 0x1c), 0x04, 0x00, 0x00)) {
+                returndatacopy(result, 0x00, returndatasize())
+                revert(result, returndatasize())
+            }
+            returndatacopy(0x00, 0x00, 0x20)
+            returndatacopy(result, mload(0x00), 0x20)
+            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result))
+            mstore(0x40, add(add(result, 0x20), mload(result)))
+        }
     }
 
-    function symbol() public view virtual returns (string memory) {
-        return I404Fungible(sisterERC20()).symbol();
+    function symbol() public view virtual returns (string memory result) {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            mstore(result, 0x95d89b41) // `symbol()`.
+            if iszero(staticcall(gas(), sister, add(result, 0x1c), 0x04, 0x00, 0x00)) {
+                returndatacopy(result, 0x00, returndatasize())
+                revert(result, returndatasize())
+            }
+            returndatacopy(0x00, 0x00, 0x20)
+            returndatacopy(result, mload(0x00), 0x20)
+            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result))
+            mstore(0x40, add(add(result, 0x20), mload(result)))
+        }
     }
 
-    function tokenURI(uint256 id) public view virtual returns (string memory) {
-        return I404Fungible(sisterERC20()).tokenURI(id);
+    function tokenURI(uint256 id) public view virtual returns (string memory result) {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            mstore(result, 0xc87b56dd) // `tokenURI()`.
+            mstore(add(result, 0x20), id)
+            if iszero(staticcall(gas(), sister, add(result, 0x1c), 0x24, 0x00, 0x00)) {
+                returndatacopy(result, 0x00, returndatasize())
+                revert(result, returndatasize())
+            }
+            returndatacopy(0x00, 0x00, 0x20)
+            returndatacopy(result, mload(0x00), 0x20)
+            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result))
+            mstore(0x40, add(add(result, 0x20), mload(result)))
+        }
     }
 
-    function totalSupply() public view returns (uint256) {
-        return I404Fungible(sisterERC20()).totalSupply() / _WAD;
+    function totalSupply() public view returns (uint256 result) {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, 0x7824407f) // `tokenSupply()`.
+            if iszero(
+                and(
+                    gt(returndatasize(), 0x1f),
+                    staticcall(gas(), sister, 0x1c, 0x04, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(mload(0x40), 0x00, returndatasize())
+                revert(mload(0x40), returndatasize())
+            }
+            result := div(mload(0x00), _WAD)
+        }
     }
 
-    function balanceOf(address owner) public view virtual returns (uint256) {
-        return I404Fungible(sisterERC20()).balanceOf(owner) / _WAD;
+    function balanceOf(address owner) public view virtual returns (uint256 result) {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, 0x70a08231) // `balanceOf(address)`.
+            mstore(0x20, shr(96, shl(96, owner)))
+            if iszero(
+                and(
+                    gt(returndatasize(), 0x1f),
+                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(mload(0x40), 0x00, returndatasize())
+                revert(mload(0x40), returndatasize())
+            }
+            result := div(mload(0x00), _WAD)
+        }
     }
 
     function ownerOf(uint256 id) public view virtual returns (address owner) {
-        owner = I404Fungible(sisterERC20()).ownerOf(id);
-
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, 0x6352211e) // `ownerOf(uint256)`.
+            mstore(0x20, id)
+            if iszero(
+                and(
+                    gt(returndatasize(), 0x1f),
+                    staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(mload(0x40), 0x00, returndatasize())
+                revert(mload(0x40), returndatasize())
+            }
+            owner := shr(96, shl(96, mload(0x00)))
+        }
         if (owner == address(0)) revert TokenDoesNotExist();
     }
 
     function approve(address spender, uint256 id) public virtual {
-        address owner = I404Fungible(sisterERC20()).approveNFT(spender, id, msg.sender);
-
+        address sister = sisterERC20();
+        address owner;
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            mstore(m, 0xd10b6e0c) // `approveNFT(address,uint256,address)`.
+            mstore(add(m, 0x20), shr(96, shl(96, spender)))
+            mstore(add(m, 0x40), id)
+            mstore(add(m, 0x60), caller())
+            if iszero(
+                and(
+                    gt(returndatasize(), 0x1f),
+                    call(gas(), sister, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(m, 0x00, returndatasize())
+                revert(m, returndatasize())
+            }
+            owner := shr(96, shl(96, mload(0x00)))
+        }
         emit Approval(owner, spender, id);
     }
 
     function setApprovalForAll(address operator, bool approved) public virtual {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            mstore(m, 0x813500fc) // `setApprovalForAll(address,bool,address)`.
+            mstore(add(m, 0x20), shr(96, shl(96, operator)))
+            mstore(add(m, 0x40), iszero(iszero(approved)))
+            mstore(add(m, 0x60), caller())
+            if iszero(
+                and(
+                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
+                    call(gas(), sister, 0, add(m, 0x1c), 0x64, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(m, 0x00, returndatasize())
+                revert(m, returndatasize())
+            }
+        }
         emit ApprovalForAll(msg.sender, operator, approved);
-
-        return I404Fungible(sisterERC20()).setApprovalForAll(operator, approved, msg.sender);
     }
 
     function transferFrom(address from, address to, uint256 id) public virtual {
-        I404Fungible(sisterERC20()).transferFromNFT(from, to, id, msg.sender);
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            mstore(m, 0xe5eb36c8) // `transferFromNFT(address,address,uint256,address)`.
+            mstore(add(m, 0x20), shr(96, shl(96, from)))
+            mstore(add(m, 0x40), shr(96, shl(96, to)))
+            mstore(add(m, 0x60), id)
+            mstore(add(m, 0x80), caller())
+            if iszero(
+                and(
+                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
+                    call(gas(), sister, 0, add(m, 0x1c), 0x84, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(m, 0x00, returndatasize())
+                revert(m, returndatasize())
+            }
+        }
         emit Transfer(from, to, id);
     }
 
@@ -168,12 +303,11 @@ contract DN404NonFungibleShadow {
         }
     }
 
-    function _returnTrue() private pure {
-        uint256 zero; // To prevent a compiler bug.
+    function _return(uint256 word) private pure {
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(zero, 0x01)
-            return(zero, 0x20)
+            mstore(0x00, word)
+            return(0x00, 0x20)
         }
     }
 
@@ -195,7 +329,7 @@ contract DN404NonFungibleShadow {
             }
             if ($.sisterERC20 != address(0)) revert AlreadyLinked();
             $.sisterERC20 = msg.sender;    
-            _returnTrue();
+            _return(1);
         }
 
         // `logTransfer(address,address,uint256)`.
@@ -207,7 +341,7 @@ contract DN404NonFungibleShadow {
             uint256 id = _calldataload(0x44);
 
             emit Transfer(from, to, id);
-            _returnTrue();
+            _return(1);
         }
         _;
     }
