@@ -97,7 +97,7 @@ contract DN404Test is SoladyTest {
 
         dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
 
-        vm.expectRevert(DN404Mirror.TokenDoesNotExist.selector);
+        vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.getApproved(1);
 
         vm.prank(initialSupplyOwner);
@@ -124,7 +124,7 @@ contract DN404Test is SoladyTest {
 
         mirror = DN404Mirror(payable(dn.mirrorERC721()));
 
-        vm.expectRevert(DN404Mirror.TokenDoesNotExist.selector);
+        vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.ownerOf(1);
     }
 }

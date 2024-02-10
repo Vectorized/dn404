@@ -16,27 +16,9 @@ contract DN404Mirror {
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    error AlreadyInitialized();
-
-    error InvalidTotalNFTSupply();
-
-    error FailToLinkToMirror();
-
     error Unauthorized();
 
-    error TransferToZeroAddress();
-
-    error MirrorAddressIsZero();
-
-    error ApprovalCallerNotOwnerNorApproved();
-
-    error TransferCallerNotOwnerNorApproved();
-
-    error TransferFromIncorrectOwner();
-
     error TransferToNonERC721ReceiverImplementer();
-
-    error TokenDoesNotExist();
 
     error CannotLink();
 

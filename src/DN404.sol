@@ -24,8 +24,6 @@ abstract contract DN404 {
 
     error InvalidTotalNFTSupply();
 
-    error FailToLinkToMirror();
-
     error Unauthorized();
 
     error TransferToZeroAddress();
