@@ -3,17 +3,6 @@ pragma solidity ^0.8.4;
 
 import {LibMap} from "solady/utils/LibMap.sol";
 
-abstract contract ERC721Receiver {
-    function onERC721Received(
-        address,
-        address,
-        uint256,
-        bytes calldata
-    ) external virtual returns (bytes4) {
-        return ERC721Receiver.onERC721Received.selector;
-    }
-}
-
 abstract contract DN404 {
     using LibMap for *;
 
@@ -76,15 +65,12 @@ abstract contract DN404 {
 
     error TransferFromIncorrectOwner();
 
-    error UnsafeRecipient();
+    error TransferToNonERC721ReceiverImplementer();
+
 
     uint256 private constant _WAD = 1000000000000000000;
 
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
-
-    // keccak256(abi.encode(uint256(keccak256("dn404")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _DN404_STORAGE_LOCATION =
-        0x61dd0d320a11019af7688ced18637b1235059a4e8141ed71cfccbe9f2da16600;
 
     struct AddressData {
         // The alias for the address. Zero means absence of an alias.
@@ -262,7 +248,7 @@ abstract contract DN404 {
         }
     }
 
-    function _registerAndResolveAlias(address to) private returns (uint32) {
+    function _registerAndResolveAlias(address to) internal returns (uint32) {
         DN404Storage storage $ = _getDN404Storage();
         AddressData storage toAddressData = $.addressData[to];
         uint32 addressAlias = toAddressData.addressAlias;
@@ -284,16 +270,10 @@ abstract contract DN404 {
         address from,
         address to,
         uint256 id
-    ) public virtual {
+    ) public payable virtual {
         transferFrom(from, to, id);
 
-        if (
-            to.code.length != 0 &&
-            ERC721Receiver(to).onERC721Received(msg.sender, from, id, "") !=
-            ERC721Receiver.onERC721Received.selector
-        ) {
-            revert UnsafeRecipient();
-        }
+        if (_hasCode(to)) _checkOnERC721Received(from, to, id, "");
     }
 
     function safeTransferFrom(
@@ -304,13 +284,7 @@ abstract contract DN404 {
     ) public virtual {
         transferFrom(from, to, id);
 
-        if (
-            to.code.length != 0 &&
-            ERC721Receiver(to).onERC721Received(msg.sender, from, id, data) !=
-            ERC721Receiver.onERC721Received.selector
-        ) {
-            revert UnsafeRecipient();
-        }
+        if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
     }
 
     function _transfer(
@@ -378,9 +352,52 @@ abstract contract DN404 {
         return true;
     }
 
-    function _getDN404Storage() private pure returns (DN404Storage storage $) {
+    function _getDN404Storage() internal pure returns (DN404Storage storage $) {
         assembly {
-            $.slot := _DN404_STORAGE_LOCATION
+            // keccak256(abi.encode(uint256(keccak256("dn404")) - 1)) & ~bytes32(uint256(0xff))
+            $.slot := 0x61dd0d320a11019af7688ced18637b1235059a4e8141ed71cfccbe9f2da16600
+        }
+    }
+
+    /// @dev Returns if `a` has bytecode of non-zero length.
+    function _hasCode(address a) private view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := extcodesize(a) // Can handle dirty upper bits.
+        }
+    }
+
+    /// @dev Perform a call to invoke {IERC721Receiver-onERC721Received} on `to`.
+    /// Reverts if the target does not support the function correctly.
+    function _checkOnERC721Received(address from, address to, uint256 id, bytes memory data)
+        private
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Prepare the calldata.
+            let m := mload(0x40)
+            let onERC721ReceivedSelector := 0x150b7a02
+            mstore(m, onERC721ReceivedSelector)
+            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
+            mstore(add(m, 0x40), shr(96, shl(96, from)))
+            mstore(add(m, 0x60), id)
+            mstore(add(m, 0x80), 0x80)
+            let n := mload(data)
+            mstore(add(m, 0xa0), n)
+            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xc0), n)) }
+            // Revert if the call reverts.
+            if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
+                if returndatasize() {
+                    // Bubble up the revert if the call reverts.
+                    returndatacopy(m, 0x00, returndatasize())
+                    revert(m, returndatasize())
+                }
+            }
+            // Load the returndata and compare it.
+            if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
+                mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
+                revert(0x1c, 0x04)
+            }
         }
     }
 }
