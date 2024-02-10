@@ -42,6 +42,8 @@ contract DN404NonFungibleShadow {
 
     error TokenDoesNotExist();
 
+    error CannotLink();
+
     error AlreadyLinked();
 
     error NotLinked();
@@ -321,6 +323,20 @@ contract DN404NonFungibleShadow {
             }
             if ($.sisterERC20 != address(0)) revert AlreadyLinked();
             $.sisterERC20 = msg.sender;
+            /// @solidity memory-safe-assembly
+            assembly {
+                // `implementsDN404()`.
+                mstore(0x00, 0xb7a94eb8)
+                if iszero(
+                    and(
+                        and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
+                        staticcall(gas(), caller(), 0x1c, 0x04, 0x00, 0x20)
+                    )
+                ) {
+                    mstore(0x00, 0x8f36fa09) // `CannotLink()`.
+                    revert(0x1c, 0x04)
+                }
+            }
             _return(1);
         }
 
@@ -343,6 +359,7 @@ contract DN404NonFungibleShadow {
     receive() external payable virtual {}
 
     function _getDN404NFTStorage() internal pure returns (DN404NFTStorage storage $) {
+        /// @solidity memory-safe-assembly
         assembly {
             // keccak256(abi.encode(uint256(keccak256("dn404.nft")) - 1)) & ~bytes32(uint256(0xff))
             $.slot := 0xe8cb618a1de8ad2a6a7b358523c369cb09f40cc15da64205134c7e55c6a86700

@@ -396,6 +396,10 @@ abstract contract DN404 {
 
             _return(uint160(_approveNFT(spender, id, msgSender)));
         }
+        // `implementsDN404()`.
+        if (fnSelector == 0xb7a94eb8) {
+            _return(1);
+        }
         _;
     }
 
