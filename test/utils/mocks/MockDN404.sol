@@ -42,8 +42,8 @@ contract MockDN404 is DN404 {
     function initializeDN404(
         uint32 totalNFTSupply,
         address initialSupplyOwner,
-        address sisterNFTContract
+        address mirrorNFTContract
     ) public {
-        _initializeDN404(totalNFTSupply, initialSupplyOwner, sisterNFTContract);
+        _initializeDN404(totalNFTSupply, initialSupplyOwner, mirrorNFTContract);
     }
 }
