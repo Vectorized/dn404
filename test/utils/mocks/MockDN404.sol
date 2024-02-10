@@ -25,7 +25,7 @@ contract MockDN404 is DN404 {
         return _registerAndResolveAlias(target);
     }
 
-    function initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner) public {
-         _initializeDN404(totalNFTSupply, initialSupplyOwner);
+    function initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address sisterNFTContract) public {
+         _initializeDN404(totalNFTSupply, initialSupplyOwner, sisterNFTContract);
     }
 }

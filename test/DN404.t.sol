@@ -2,10 +2,11 @@
 pragma solidity ^0.8.24;
 
 import "./utils/SoladyTest.sol";
-import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
+import {DN404, MockDN404, DN404NonFungibleShadow} from "./utils/mocks/MockDN404.sol";
 
 contract DN404Test is SoladyTest {
 	MockDN404 dn;
+	DN404NonFungibleShadow shadow;
 
 	function setUp() public {
 		dn = new MockDN404();
@@ -24,12 +25,12 @@ contract DN404Test is SoladyTest {
     function testInitialize(uint32 totalNFTSupply, address initialSupplyOwner) public {
     	if (totalNFTSupply == 0 || uint256(totalNFTSupply) + 1 > type(uint32).max) {
 			vm.expectRevert(DN404.InvalidTotalNFTSupply.selector);
-			dn.initializeDN404(totalNFTSupply, initialSupplyOwner);
+			dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(0));
     	} else if (initialSupplyOwner == address(0)) {
     		vm.expectRevert(DN404.TransferToZeroAddress.selector);
-    		dn.initializeDN404(totalNFTSupply, initialSupplyOwner);
-    	} else  {
-    		dn.initializeDN404(totalNFTSupply, initialSupplyOwner);
+    		dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(0));
+    	} else {
+    		dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(0));
     		assertEq(dn.totalSupply(), uint256(totalNFTSupply) * 10 ** 18);
     		assertEq(dn.balanceOf(initialSupplyOwner), uint256(totalNFTSupply) * 10 ** 18);
     	}
@@ -39,12 +40,14 @@ contract DN404Test is SoladyTest {
         vm.assume(totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max && initialSupplyOwner != address(0));
 		vm.assume(initialSupplyOwner != recipient && recipient != address(0));
 
-		dn.initializeDN404(totalNFTSupply, initialSupplyOwner);
+		dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(0));
 
 		vm.prank(initialSupplyOwner);
         dn.transfer(recipient, 1e18);
 
-        assertEq(dn.ownerOf(1), recipient);
+		shadow = DN404NonFungibleShadow(dn.sisterNftContract());
+
+        assertEq(shadow.ownerOf(1), recipient);
     }
 
     function testBurnOnTransfer(uint32 totalNFTSupply, address initialSupplyOwner, address recipient) public {
@@ -53,7 +56,9 @@ contract DN404Test is SoladyTest {
 		vm.prank(recipient);
 		dn.transfer(address(42069), totalNFTSupply + 1);
 
-		vm.expectRevert(DN404.TokenDoesNotExist.selector);
-		dn.ownerOf(1);
+		shadow = DN404NonFungibleShadow(dn.sisterNftContract());
+
+		vm.expectRevert(DN404NonFungibleShadow.TokenDoesNotExist.selector);
+		shadow.ownerOf(1);
     }
 }

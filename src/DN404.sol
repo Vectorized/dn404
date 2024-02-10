@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import {LibMap} from "solady/utils/LibMap.sol";
+import {DN404NonFungibleShadow} from "./DN404NonFungibleShadow.sol";
 
 abstract contract DN404 {
     using LibMap for *;
@@ -28,18 +29,6 @@ abstract contract DN404 {
         uint256 indexed id
     );
 
-    event ERC721Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 indexed id
-    );
-
-    event ApprovalForAll(
-        address indexed owner,
-        address indexed operator,
-        bool approved
-    );
-
     event SkipNFTWhitelistSet(
         address indexed target,
         bool status
@@ -53,11 +42,9 @@ abstract contract DN404 {
 
     error InvalidTotalNFTSupply();
 
+    error Unauthorized();
+
     error TransferToZeroAddress();
-
-    error TokenDoesNotExist();
-
-    error TokenAlreadyExists();
 
     error ApprovalCallerNotOwnerNorApproved();
 
@@ -89,6 +76,8 @@ abstract contract DN404 {
 
         uint32 totalNFTSupply;
 
+        address sisterNFTContract;
+
         mapping(uint32 => address) aliasToAddress;
 
         mapping(address => mapping(address => bool)) operatorApprovals;
@@ -108,16 +97,21 @@ abstract contract DN404 {
         mapping(address => bool) whitelist;
     }
 
-    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner) internal {
+    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address sisterNFTContract) internal {
         if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) revert InvalidTotalNFTSupply();
         if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
 
         if ($.nextTokenId != 0) revert AlreadyInitialized();
-        
+
+        if (sisterNFTContract == address(0)) {
+            sisterNFTContract = address(new DN404NonFungibleShadow());
+        }
+
         $.nextTokenId = 1;
         $.totalNFTSupply = totalNFTSupply;
+        $.sisterNFTContract = sisterNFTContract;
 
         unchecked {
             uint256 balance = uint256(totalNFTSupply) * _WAD;
@@ -125,7 +119,7 @@ abstract contract DN404 {
 
             emit ERC20Transfer(address(0), initialSupplyOwner, balance);
         }
-        
+
         _setSkipNFTWhitelist(initialSupplyOwner, true);
     }
 
@@ -157,99 +151,104 @@ abstract contract DN404 {
     function ownerOf(uint256 id) public view virtual returns (address owner) {
         DN404Storage storage $ = _getDN404Storage();
         owner = $.aliasToAddress[$.ownerships.get(id)];
-        if (owner == address(0)) revert TokenDoesNotExist();
     }
-    
+
     function approve(
         address spender,
-        uint256 amountOrId
+        uint256 amount
     ) public virtual returns (bool) {
         DN404Storage storage $ = _getDN404Storage();
 
-        if (_isId(amountOrId)) {
-            address owner = $.aliasToAddress[$.ownerships.get(amountOrId)];
+        $.allowance[msg.sender][spender] = amount;
 
-            if (msg.sender != owner)
-                if (!$.operatorApprovals[owner][msg.sender])
-                    revert ApprovalCallerNotOwnerNorApproved();
-
-            $.tokenApprovals[amountOrId] = spender;
-
-            emit Approval(owner, spender, amountOrId);
-        } else {
-            $.allowance[msg.sender][spender] = amountOrId;
-
-            emit Approval(msg.sender, spender, amountOrId);
-        }
+        emit Approval(msg.sender, spender, amount);
 
         return true;
     }
 
-    function setApprovalForAll(address operator, bool approved) public virtual {
+    function approveNFT(
+        address spender,
+        uint256 id
+    ) external returns (address) {
         DN404Storage storage $ = _getDN404Storage();
-        $.operatorApprovals[msg.sender][operator] = approved;
+        if (msg.sender != $.sisterNFTContract) revert Unauthorized();
 
-        emit ApprovalForAll(msg.sender, operator, approved);
+        address owner = $.aliasToAddress[$.ownerships.get(id)];
+
+        if (msg.sender != owner)
+            if (!$.operatorApprovals[owner][msg.sender])
+                revert ApprovalCallerNotOwnerNorApproved();
+
+        $.tokenApprovals[id] = spender;
+
+        return owner;
     }
 
-    function _isId(uint256 amountOrId) private pure returns (bool result) {
-        assembly {
-            result := iszero(or(iszero(amountOrId), gt(amountOrId, _MAX_TOKEN_ID)))
-        }
+    function setApprovalForAll(address operator, bool approved, address msgSender) public virtual {
+        DN404Storage storage $ = _getDN404Storage();
+        if (msgSender != $.sisterNFTContract) revert Unauthorized();
+
+        $.operatorApprovals[msgSender][operator] = approved;
     }
 
     function transferFrom(
         address from,
         address to,
-        uint256 amountOrId
+        uint256 amount
     ) public virtual {
         DN404Storage storage $ = _getDN404Storage();
 
-        if (_isId(amountOrId)) {
-            if (to == address(0)) revert TransferToZeroAddress();
+        uint256 allowed = $.allowance[from][msg.sender];
 
-            address owner = $.aliasToAddress[$.ownerships.get(amountOrId)];
-
-            if (from != owner) revert TransferFromIncorrectOwner();
-
-            if (msg.sender != from) {
-                if (!$.operatorApprovals[from][msg.sender])
-                    if (msg.sender != $.tokenApprovals[amountOrId])
-                        revert TransferCallerNotOwnerNorApproved();
-            }
-
-            AddressData storage fromAddressData = $.addressData[from];
-            AddressData storage toAddressData = $.addressData[to];
-
-            fromAddressData.balance -= uint96(_WAD);
-
-            unchecked {
-                toAddressData.balance += uint96(_WAD);
-
-                $.ownerships.set(amountOrId, _registerAndResolveAlias(to));
-                delete $.tokenApprovals[amountOrId];
-
-                uint256 updatedId = $.owned[from].get(--fromAddressData.ownedLength);
-                $.owned[from].set($.ownedIndex.get(amountOrId), uint32(updatedId));
-
-                uint256 n = toAddressData.ownedLength++;
-                $.ownedIndex.set(updatedId, $.ownedIndex.get(amountOrId));
-                $.owned[to].set(n, uint32(amountOrId));            
-                $.ownedIndex.set(amountOrId, uint32(n));
-            }
-
-            emit Transfer(from, to, amountOrId);
-            emit ERC20Transfer(from, to, _WAD);
-
-        } else {
-            uint256 allowed = $.allowance[from][msg.sender];
-
-            if (allowed != type(uint256).max) {
-                $.allowance[from][msg.sender] = allowed - amountOrId;
-            }
-
-            _transfer(from, to, amountOrId);
+        if (allowed != type(uint256).max) {
+            $.allowance[from][msg.sender] = allowed - amount;
         }
+
+        _transfer(from, to, amount);
+    }
+
+    function transferFromNFT(
+        address from,
+        address to,
+        uint256 id,
+        address msgSender
+    ) public virtual {
+        DN404Storage storage $ = _getDN404Storage();
+
+        if (msg.sender != $.sisterNFTContract) revert Unauthorized();
+        if (to == address(0)) revert TransferToZeroAddress();
+
+        address owner = $.aliasToAddress[$.ownerships.get(id)];
+
+        if (from != owner) revert TransferFromIncorrectOwner();
+
+        if (msgSender != from) {
+            if (!$.operatorApprovals[from][msgSender])
+                if (msgSender != $.tokenApprovals[id])
+                    revert TransferCallerNotOwnerNorApproved();
+        }
+
+        AddressData storage fromAddressData = $.addressData[from];
+        AddressData storage toAddressData = $.addressData[to];
+
+        fromAddressData.balance -= uint96(_WAD);
+
+        unchecked {
+            toAddressData.balance += uint96(_WAD);
+
+            $.ownerships.set(id, _registerAndResolveAlias(to));
+            delete $.tokenApprovals[id];
+
+            uint256 updatedId = $.owned[from].get(--fromAddressData.ownedLength);
+            $.owned[from].set($.ownedIndex.get(id), uint32(updatedId));
+
+            uint256 n = toAddressData.ownedLength++;
+            $.ownedIndex.set(updatedId, $.ownedIndex.get(id));
+            $.owned[to].set(n, uint32(id));            
+            $.ownedIndex.set(id, uint32(n));
+        }
+
+        emit Transfer(from, to, _WAD);
     }
 
     function _registerAndResolveAlias(address to) internal returns (uint32) {
@@ -271,25 +270,10 @@ abstract contract DN404 {
         return _transfer(msg.sender, to, amount);
     }
 
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 id
-    ) public payable virtual {
-        transferFrom(from, to, id);
+    function sisterNftContract() external view returns (address) {
+        DN404Storage storage $ = _getDN404Storage();
 
-        if (_hasCode(to)) _checkOnERC721Received(from, to, id, "");
-    }
-
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 id,
-        bytes calldata data
-    ) public virtual {
-        transferFrom(from, to, id);
-
-        if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
+        return $.sisterNFTContract;
     }
 
     function _transfer(
@@ -323,7 +307,7 @@ abstract contract DN404 {
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        emit Transfer(from, address(0), id);
+                        DN404NonFungibleShadow($.sisterNFTContract).logTransfer(from, address(0), id);
                     } while (i != end);
                     fromAddressData.ownedLength = uint32(i);
                 }    
@@ -344,7 +328,9 @@ abstract contract DN404 {
                         $.ownerships.set(id, toAlias);
                         $.ownedIndex.set(id, uint32(i++));
 
-                        emit Transfer(address(0), to, id);
+                        DN404NonFungibleShadow($.sisterNFTContract).logTransfer(address(0), to, id);
+
+                        // todo: ensure we don't overwrite ownership of early tokens that weren't burned
                         if (++id > _MAX_TOKEN_ID) id = 1;
                     } while (i != end);
                     toAddressData.ownedLength = uint32(i);
@@ -361,14 +347,6 @@ abstract contract DN404 {
         assembly {
             // keccak256(abi.encode(uint256(keccak256("dn404")) - 1)) & ~bytes32(uint256(0xff))
             $.slot := 0x61dd0d320a11019af7688ced18637b1235059a4e8141ed71cfccbe9f2da16600
-        }
-    }
-
-    /// @dev Returns if `a` has bytecode of non-zero length.
-    function _hasCode(address a) private view returns (bool result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := extcodesize(a) // Can handle dirty upper bits.
         }
     }
 
