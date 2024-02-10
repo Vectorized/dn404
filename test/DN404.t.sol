@@ -43,7 +43,7 @@ contract DN404Test is SoladyTest {
         if (uint256(totalNFTSupply) + 1 > type(uint32).max) {
             vm.expectRevert(DN404.InvalidTotalNFTSupply.selector);
             dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
-        } else if (initialSupplyOwner == address(0)) {
+        } else if (totalNFTSupply > 0 && initialSupplyOwner == address(0)) {
             vm.expectRevert(DN404.TransferToZeroAddress.selector);
             dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
         } else {
