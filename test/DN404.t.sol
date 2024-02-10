@@ -67,8 +67,10 @@ contract DN404Test is SoladyTest {
             uint256 id = _bound(r, 1, totalNFTSupply);
             vm.prank(alice);
             mirror.transferFrom(alice, bob, id);
+            assertEq(mirror.ownerOf(id), bob);
             vm.prank(bob);
             mirror.transferFrom(bob, alice, id);
+            assertEq(mirror.ownerOf(id), alice);
             vm.prank(alice);
             dn.transfer(bob, _WAD);
             vm.prank(bob);
