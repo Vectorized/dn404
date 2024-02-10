@@ -150,6 +150,10 @@ abstract contract DN404 {
         }
     }
 
+    function balanceOf(address owner) public view virtual returns (uint256) {
+        return _getDN404Storage().addressData[owner].balance;
+    }
+
     function ownerOf(uint256 id) public view virtual returns (address owner) {
         DN404Storage storage $ = _getDN404Storage();
         owner = $.aliasToAddress[$.ownerships.get(id)];
