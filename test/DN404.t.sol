@@ -112,11 +112,9 @@ contract DN404Test is SoladyTest {
         assertEq(mirror.getApproved(1), address(this));
     }
 
-    function testSelfTransfer(
-        uint32 totalNFTSupply,
-        address initialSupplyOwner,
-        address recipient
-    ) public {
+    function testSelfTransfer(uint32 totalNFTSupply, address initialSupplyOwner, address recipient)
+        public
+    {
         vm.assume(
             totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max
                 && initialSupplyOwner != address(0)

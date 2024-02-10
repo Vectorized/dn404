@@ -244,7 +244,10 @@ abstract contract DN404 {
         emit Transfer(from, to, _WAD);
     }
 
-    function _registerAndResolveAlias(AddressData storage toAddressData, address to) internal returns (uint32 addressAlias) {
+    function _registerAndResolveAlias(AddressData storage toAddressData, address to)
+        internal
+        returns (uint32 addressAlias)
+    {
         DN404Storage storage $ = _getDN404Storage();
         addressAlias = toAddressData.addressAlias;
         if (addressAlias == 0) {
@@ -254,13 +257,16 @@ abstract contract DN404 {
         }
     }
 
-    function _getAddressData(address _address) internal returns (AddressData storage _addressData) {
+    function _getAddressData(address _address)
+        internal
+        returns (AddressData storage _addressData)
+    {
         DN404Storage storage $ = _getDN404Storage();
         _addressData = $.addressData[_address];
 
-        if(!_addressData.initialized) {
+        if (!_addressData.initialized) {
             _addressData.initialized = true;
-            if(_hasCode(_address)) {
+            if (_hasCode(_address)) {
                 _addressData.skipNFT = true;
             }
         }
@@ -295,7 +301,7 @@ abstract contract DN404 {
             LibMap.Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 fromMaxNFTs = (t.fromBalance / _WAD);
-            if(fromIndex > fromMaxNFTs) {
+            if (fromIndex > fromMaxNFTs) {
                 uint256 fromToBurn = (fromIndex - fromMaxNFTs);
                 $.totalNFTSupply -= uint32(fromToBurn);
 
@@ -319,7 +325,7 @@ abstract contract DN404 {
                 uint256 toIndex = toAddressData.ownedLength;
                 uint256 toMaxNFTs = (t.toBalance / _WAD);
                 address cachedTo = to;
-                if(toMaxNFTs > toIndex) {
+                if (toMaxNFTs > toIndex) {
                     uint256 toToMint = toMaxNFTs - toIndex;
 
                     uint256 currentNFTSupply = _getDN404Storage().totalNFTSupply;
@@ -376,7 +382,7 @@ abstract contract DN404 {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
                 uint256 toMaxNFTs = (toBalance / _WAD);
-                if(toMaxNFTs > toIndex) {
+                if (toMaxNFTs > toIndex) {
                     uint256 toToMint = toMaxNFTs - toIndex;
 
                     uint256 currentNFTSupply = $.totalNFTSupply;
@@ -417,7 +423,7 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _getAddressData(from);
 
         uint256 fromBalance = fromAddressData.balance;
-        if(amount > fromBalance) revert BurnExceedsBalance();
+        if (amount > fromBalance) revert BurnExceedsBalance();
         unchecked {
             fromBalance -= amount;
         }
@@ -435,7 +441,7 @@ abstract contract DN404 {
             LibMap.Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 fromMaxNFTs = (fromBalance / _WAD);
-            if(fromIndex > fromMaxNFTs) {
+            if (fromIndex > fromMaxNFTs) {
                 uint256 fromToBurn = (fromIndex - fromMaxNFTs);
                 $.totalNFTSupply -= uint32(fromToBurn);
 
