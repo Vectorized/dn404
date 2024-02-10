@@ -273,6 +273,7 @@ abstract contract DN404 {
                 if (i != end) {
                     uint256[] memory packedLogs = new uint256[](i - end);
                     uint256 n;
+
                     do {
                         uint256 id = fromOwned.get(--i);
                         $.ownedIndex.set(id, 0);
@@ -294,11 +295,13 @@ abstract contract DN404 {
                 uint256 id = $.nextTokenId;
                 uint32 toAlias = _registerAndResolveAlias(to);
                 uint256 totalNFTSupply = $.totalNFTSupply;
+                address _to = to;
 
                 // Mint loop.
                 if (i != end) {
                     uint256[] memory packedLogs = new uint256[](end - i);
                     uint256 n;
+
                     do {
                         while ($.ownerships.get(id) != 0) {
                             if (++id > totalNFTSupply) id = 1;
@@ -309,7 +312,7 @@ abstract contract DN404 {
                         $.ownedIndex.set(id, uint32(i++));
 
                         // _logNFTTransfer(t.mirror, address(0), to, id);
-                        packedLogs[n++] = (uint256(uint160(to)) << 96) | id;
+                        packedLogs[n++] = (uint256(uint160(_to)) << 96) | id;
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
                         if (++id > totalNFTSupply) id = 1;
