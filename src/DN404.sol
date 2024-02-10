@@ -40,6 +40,14 @@ abstract contract DN404 {
 
     error TransferToNonERC721ReceiverImplementer();
 
+    error TokenDoesNotExist();
+
+    error CannotLink();
+
+    error AlreadyLinked();
+
+    error NotLinked();
+
     uint256 private constant _WAD = 1000000000000000000;
 
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
@@ -119,11 +127,6 @@ abstract contract DN404 {
 
     function balanceOf(address owner) public view virtual returns (uint256) {
         return _getDN404Storage().addressData[owner].balance;
-    }
-
-    function ownerOf(uint256 id) public view virtual returns (address owner) {
-        DN404Storage storage $ = _getDN404Storage();
-        owner = $.aliasToAddress[$.ownerships.get(id)];
     }
 
     function approve(address spender, uint256 amount) public virtual returns (bool) {
@@ -360,6 +363,27 @@ abstract contract DN404 {
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
 
+        // `isApprovedForAll(address,address)`.
+        if (fnSelector == 0xe985e9c5) {
+            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.data.length < 0x44) revert();
+
+            address owner = address(uint160(_calldataload(0x04)));
+            address operator = address(uint160(_calldataload(0x24)));
+
+            _return($.operatorApprovals[owner][operator] ? 1 : 0);
+        }
+        // `ownerOf(uint256)`.
+        if (fnSelector == 0x6352211e) {
+            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.data.length < 0x24) revert();
+
+            uint256 id = _calldataload(0x04);
+            address owner = $.aliasToAddress[$.ownerships.get(id)];
+            if (owner == address(0)) revert TokenDoesNotExist();
+
+            _return(uint160(owner));
+        }
         // `_transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
             if (msg.sender != $.sisterERC721) revert Unauthorized();
@@ -395,6 +419,17 @@ abstract contract DN404 {
             address msgSender = address(uint160(_calldataload(0x44)));
 
             _return(uint160(_approveNFT(spender, id, msgSender)));
+        }
+        // `getApproved(uint256)`.
+        if (fnSelector == 0x081812fc) {
+            if (msg.sender != $.sisterERC721) revert Unauthorized();
+            if (msg.data.length < 0x24) revert();
+
+            uint256 id = _calldataload(0x04);
+            address owner = $.aliasToAddress[$.ownerships.get(id)];
+            if (owner == address(0)) revert TokenDoesNotExist();
+
+            _return(uint160($.tokenApprovals[id]));
         }
         // `implementsDN404()`.
         if (fnSelector == 0xb7a94eb8) {

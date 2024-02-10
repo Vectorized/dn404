@@ -4,9 +4,10 @@ pragma solidity ^0.8.24;
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404NonFungibleShadow} from "../src/DN404NonFungibleShadow.sol";
-import "solady/utils/LibString.sol";
 
 contract DN404Test is SoladyTest {
+    uint256 private constant _WAD = 1000000000000000000;
+
     MockDN404 dn;
     DN404NonFungibleShadow shadow;
 
@@ -25,7 +26,7 @@ contract DN404Test is SoladyTest {
     function testTokenURI(string memory baseURI, uint256 id) public {
         dn.initializeDN404(1000, address(this), address(shadow));
         dn.setBaseURI(baseURI);
-        assertEq(shadow.tokenURI(id), string(abi.encodePacked(baseURI, LibString.toString(id))));
+        assertEq(shadow.tokenURI(id), string(abi.encodePacked(baseURI, id)));
     }
 
     function testRegisterAndResolveAlias(address a0, address a1) public {
@@ -49,7 +50,19 @@ contract DN404Test is SoladyTest {
             dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(shadow));
             assertEq(dn.totalSupply(), uint256(totalNFTSupply) * 10 ** 18);
             assertEq(dn.balanceOf(initialSupplyOwner), uint256(totalNFTSupply) * 10 ** 18);
+            assertEq(shadow.totalSupply(), totalNFTSupply);
+            assertEq(shadow.balanceOf(initialSupplyOwner), totalNFTSupply);
         }
+    }
+
+    function testSetAndGetOperatorApprovals(address owner, address operator, bool approved)
+        public
+    {
+        dn.initializeDN404(1000, address(this), address(shadow));
+        assertEq(shadow.isApprovedForAll(owner, operator), false);
+        vm.prank(owner);
+        shadow.setApprovalForAll(operator, approved);
+        assertEq(shadow.isApprovedForAll(owner, operator), approved);
     }
 
     function testMintOnTransfer(
@@ -65,10 +78,19 @@ contract DN404Test is SoladyTest {
 
         dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(shadow));
 
-        vm.prank(initialSupplyOwner);
-        dn.transfer(recipient, 1e18);
+        vm.expectRevert(DN404NonFungibleShadow.TokenDoesNotExist.selector);
+        shadow.getApproved(1);
 
+        vm.prank(initialSupplyOwner);
+        dn.transfer(recipient, _WAD);
+
+        assertEq(shadow.balanceOf(recipient), 1);
         assertEq(shadow.ownerOf(1), recipient);
+
+        assertEq(shadow.getApproved(1), address(0));
+        vm.prank(recipient);
+        shadow.approve(address(this), 1);
+        assertEq(shadow.getApproved(1), address(this));
     }
 
     function testBurnOnTransfer(

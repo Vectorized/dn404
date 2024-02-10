@@ -16,7 +16,25 @@ contract DN404NonFungibleShadow {
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
+    error AlreadyInitialized();
+
+    error InvalidTotalNFTSupply();
+
+    error FailToLinkToSister();
+
     error Unauthorized();
+
+    error TransferToZeroAddress();
+
+    error SisterAddressIsZero();
+
+    error ApprovalCallerNotOwnerNorApproved();
+
+    error TransferCallerNotOwnerNorApproved();
+
+    error TransferFromIncorrectOwner();
+
+    error TransferToNonERC721ReceiverImplementer();
 
     error TokenDoesNotExist();
 
@@ -25,8 +43,6 @@ contract DN404NonFungibleShadow {
     error AlreadyLinked();
 
     error NotLinked();
-
-    error TransferToNonERC721ReceiverImplementer();
 
     uint256 private constant _WAD = 1000000000000000000;
 
@@ -97,7 +113,7 @@ contract DN404NonFungibleShadow {
         address sister = sisterERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x00, 0x7824407f) // `tokenSupply()`.
+            mstore(0x00, 0x18160ddd) // `totalSupply()`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x04, 0x00, 0x20))
             ) {
@@ -124,7 +140,7 @@ contract DN404NonFungibleShadow {
         }
     }
 
-    function ownerOf(uint256 id) public view virtual returns (address owner) {
+    function ownerOf(uint256 id) public view virtual returns (address result) {
         address sister = sisterERC20();
         /// @solidity memory-safe-assembly
         assembly {
@@ -136,9 +152,8 @@ contract DN404NonFungibleShadow {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
             }
-            owner := shr(96, shl(96, mload(0x00)))
+            result := shr(96, shl(96, mload(0x00)))
         }
-        if (owner == address(0)) revert TokenDoesNotExist();
     }
 
     function approve(address spender, uint256 id) public virtual {
@@ -165,6 +180,22 @@ contract DN404NonFungibleShadow {
         emit Approval(owner, spender, id);
     }
 
+    function getApproved(uint256 id) public view virtual returns (address result) {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, 0x081812fc) // `getApproved(uint256)`.
+            mstore(0x20, id)
+            if iszero(
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), sister, 0x1c, 0x24, 0x00, 0x20))
+            ) {
+                returndatacopy(mload(0x40), 0x00, returndatasize())
+                revert(mload(0x40), returndatasize())
+            }
+            result := shr(96, shl(96, mload(0x00)))
+        }
+    }
+
     function setApprovalForAll(address operator, bool approved) public virtual {
         address sister = sisterERC20();
         /// @solidity memory-safe-assembly
@@ -185,6 +216,32 @@ contract DN404NonFungibleShadow {
             }
         }
         emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        virtual
+        returns (bool result)
+    {
+        address sister = sisterERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            mstore(m, 0xe985e9c5) // `isApprovedForAll(address,address)`.
+            mstore(add(m, 0x20), shr(96, shl(96, owner)))
+            mstore(add(m, 0x40), shr(96, shl(96, operator)))
+            if iszero(
+                and(
+                    gt(returndatasize(), 0x1f),
+                    staticcall(gas(), sister, add(m, 0x1c), 0x44, 0x00, 0x20)
+                )
+            ) {
+                returndatacopy(m, 0x00, returndatasize())
+                revert(m, returndatasize())
+            }
+            result := iszero(iszero(mload(0x00)))
+        }
     }
 
     function transferFrom(address from, address to, uint256 id) public virtual {

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.4;
 
 import "../../../src/DN404.sol";
-import "solady/utils/LibString.sol";
 
 contract MockDN404 is DN404 {
     string private _name;
@@ -29,7 +28,7 @@ contract MockDN404 is DN404 {
     }
 
     function tokenURI(uint256 id) public view virtual override returns (string memory) {
-        return string(abi.encodePacked(_baseURI, LibString.toString(id)));
+        return string(abi.encodePacked(_baseURI, id));
     }
 
     function setWhitelist(address target, bool status) public {
