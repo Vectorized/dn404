@@ -41,6 +41,15 @@ abstract contract DN404 {
 
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
 
+    // approveNFT(address,uint256,address)
+    uint256 private constant APPROVE_NFT_SIG = 0xd10b6e0c;
+
+    // setApprovalForAll(address,bool,address)
+    uint256 private constant SET_APPROVAL_FOR_ALL_SIG = 0x813500fc;
+
+    // transferFromNFT(address,address,uint256,address)
+    uint256 private constant TRANSFER_FROM_NFT_SIG = 0xe5eb36c8;
+
     struct AddressData {
         // The alias for the address. Zero means absence of an alias.
         uint32 addressAlias;
@@ -136,14 +145,16 @@ abstract contract DN404 {
         return true;
     }
 
-    function approveNFT(address spender, uint256 id) external returns (address) {
+    function approveNFT(address spender, uint256 id, address msgSender)
+        internal
+        returns (address)
+    {
         DN404Storage storage $ = _getDN404Storage();
-        if (msg.sender != $.sisterNFTContract) revert Unauthorized();
 
         address owner = $.aliasToAddress[$.ownerships.get(id)];
 
-        if (msg.sender != owner) {
-            if (!$.operatorApprovals[owner][msg.sender]) {
+        if (msgSender != owner) {
+            if (!$.operatorApprovals[owner][msgSender]) {
                 revert ApprovalCallerNotOwnerNorApproved();
             }
         }
@@ -153,14 +164,16 @@ abstract contract DN404 {
         return owner;
     }
 
-    function setApprovalForAll(address operator, bool approved, address msgSender) public virtual {
+    function setApprovalForAll(address operator, bool approved, address msgSender)
+        internal
+        virtual
+    {
         DN404Storage storage $ = _getDN404Storage();
-        if (msgSender != $.sisterNFTContract) revert Unauthorized();
 
         $.operatorApprovals[msgSender][operator] = approved;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public virtual {
+    function transferFrom(address from, address to, uint256 amount) external virtual {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 allowed = $.allowance[from][msg.sender];
@@ -173,12 +186,11 @@ abstract contract DN404 {
     }
 
     function transferFromNFT(address from, address to, uint256 id, address msgSender)
-        public
+        internal
         virtual
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        if (msg.sender != $.sisterNFTContract) revert Unauthorized();
         if (to == address(0)) revert TransferToZeroAddress();
 
         address owner = $.aliasToAddress[$.ownerships.get(id)];
@@ -342,6 +354,52 @@ abstract contract DN404 {
                 mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
                 revert(0x1c, 0x04)
             }
+        }
+    }
+
+    function _calldataload(uint256 offset) private pure returns (uint256 value) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            value := calldataload(offset)
+        }
+    }
+
+    fallback() external {
+        DN404Storage storage $ = _getDN404Storage();
+        if (msg.sender != $.sisterNFTContract) revert Unauthorized();
+
+        uint256 fnSelector = _calldataload(0) >> 224;
+        uint256 calldatasize = msg.data.length;
+
+        if (fnSelector == TRANSFER_FROM_NFT_SIG) {
+            if (calldatasize < 132) revert();
+
+            address from = address(uint160(_calldataload(4)));
+            address to = address(uint160(_calldataload(36)));
+            uint256 id = _calldataload(68);
+            address msgSender = address(uint160(_calldataload(100)));
+
+            transferFromNFT(from, to, id, msgSender);
+        } else if (fnSelector == SET_APPROVAL_FOR_ALL_SIG) {
+            if (calldatasize < 100) revert();
+
+            address spender = address(uint160(_calldataload(4)));
+
+            uint256 s = _calldataload(36);
+            if (s > 1) revert();
+            bool status = s == 1;
+
+            address msgSender = address(uint160(_calldataload(68)));
+
+            setApprovalForAll(spender, status, msgSender);
+        } else if (fnSelector == APPROVE_NFT_SIG) {
+            if (calldatasize < 100) revert();
+
+            address spender = address(uint160(_calldataload(4)));
+            uint256 id = _calldataload(36);
+            address msgSender = address(uint160(_calldataload(68)));
+
+            approveNFT(spender, id, msgSender);
         }
     }
 }
