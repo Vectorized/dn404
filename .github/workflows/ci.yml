@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - '**.sol'
+  pull_request:
+    types:
+      - "opened"
 
 jobs:
   tests:
