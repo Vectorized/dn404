@@ -112,6 +112,41 @@ contract DN404Test is SoladyTest {
         assertEq(mirror.getApproved(1), address(this));
     }
 
+    function testSelfTransfer(
+        uint32 totalNFTSupply,
+        address initialSupplyOwner,
+        address recipient
+    ) public {
+        vm.assume(
+            totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max
+                && initialSupplyOwner != address(0)
+        );
+        vm.assume(initialSupplyOwner != recipient && recipient != address(0));
+
+        dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
+
+        vm.expectRevert(DN404.TokenDoesNotExist.selector);
+        mirror.getApproved(1);
+
+        vm.prank(initialSupplyOwner);
+        dn.transfer(recipient, _WAD);
+
+        assertEq(mirror.balanceOf(recipient), 1);
+        assertEq(mirror.ownerOf(1), recipient);
+
+        vm.prank(recipient);
+        dn.transfer(recipient, _WAD);
+
+        assertEq(dn.balanceOf(recipient), _WAD);
+        assertEq(mirror.balanceOf(recipient), 1);
+        assertEq(mirror.ownerOf(1), recipient);
+
+        assertEq(mirror.getApproved(1), address(0));
+        vm.prank(recipient);
+        mirror.approve(address(this), 1);
+        assertEq(mirror.getApproved(1), address(this));
+    }
+
     function testBurnOnTransfer(
         uint32 totalNFTSupply,
         address initialSupplyOwner,

@@ -46,6 +46,8 @@ abstract contract DN404 {
 
     error NotLinked();
 
+    error BurnExceedsBalance();
+
     uint256 private constant _WAD = 1000000000000000000;
 
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
@@ -114,6 +116,10 @@ abstract contract DN404 {
 
     function decimals() public pure returns (uint8) {
         return 18;
+    }
+
+    function setSkipNFT(bool skipNFT) external {
+        _setSkipNFT(msg.sender, skipNFT);
     }
 
     function _setSkipNFT(address target, bool state) internal {
@@ -290,7 +296,7 @@ abstract contract DN404 {
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 fromMaxNFTs = (t.fromBalance / _WAD);
             if(fromIndex > fromMaxNFTs) {
-                uint256 fromToBurn = ((t.fromBalanceBefore / _WAD) - fromMaxNFTs);
+                uint256 fromToBurn = (fromIndex - fromMaxNFTs);
                 $.totalNFTSupply -= uint32(fromToBurn);
 
                 uint256 fromEnd = fromIndex - fromToBurn;
@@ -345,6 +351,111 @@ abstract contract DN404 {
         }
 
         emit Transfer(from, to, amount);
+        return true;
+    }
+
+    function _mint(address to, uint256 amount) internal returns (bool) {
+        if (to == address(0)) revert TransferToZeroAddress();
+
+        DN404Storage storage $ = _getDN404Storage();
+
+        AddressData storage toAddressData = _getAddressData(to);
+
+        address mirror = $.mirrorERC721;
+
+        uint256 currentTokenSupply = $.totalTokenSupply;
+        currentTokenSupply += amount;
+        if (currentTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
+        $.totalTokenSupply = uint96(currentTokenSupply);
+
+        unchecked {
+            uint256 toBalance = toAddressData.balance + amount;
+            toAddressData.balance = uint96(toBalance);
+
+            if (!toAddressData.skipNFT) {
+                LibMap.Uint32Map storage toOwned = $.owned[to];
+                uint256 toIndex = toAddressData.ownedLength;
+                uint256 toMaxNFTs = (toBalance / _WAD);
+                if(toMaxNFTs > toIndex) {
+                    uint256 toToMint = toMaxNFTs - toIndex;
+
+                    uint256 currentNFTSupply = $.totalNFTSupply;
+                    currentNFTSupply += toToMint;
+                    $.totalNFTSupply = uint32(currentNFTSupply);
+
+                    toAddressData.ownedLength = uint32(toMaxNFTs);
+
+                    uint256 id = $.nextTokenId;
+                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
+                    // Mint loop.
+                    do {
+                        while ($.ownerships.get(id) != 0) {
+                            if (++id > currentNFTSupply) id = 1;
+                        }
+
+                        toOwned.set(toIndex, uint32(id));
+                        $.ownerships.set(id, toAlias);
+                        $.ownedIndex.set(id, uint32(toIndex++));
+
+                        _logNFTTransfer(mirror, address(0), to, id);
+
+                        // todo: ensure we don't overwrite ownership of early tokens that weren't burned
+                        if (++id > currentNFTSupply) id = 1;
+                    } while (toIndex != toMaxNFTs);
+                    $.nextTokenId = uint32(id);
+                }
+            }
+        }
+
+        emit Transfer(address(0), to, amount);
+        return true;
+    }
+
+    function _burn(address from, uint256 amount) internal returns (bool) {
+        DN404Storage storage $ = _getDN404Storage();
+
+        AddressData storage fromAddressData = _getAddressData(from);
+
+        uint256 fromBalance = fromAddressData.balance;
+        if(amount > fromBalance) revert BurnExceedsBalance();
+        unchecked {
+            fromBalance -= amount;
+        }
+        fromAddressData.balance = uint96(fromBalance);
+
+        address mirror = $.mirrorERC721;
+
+        uint256 currentTokenSupply = $.totalTokenSupply;
+        unchecked {
+            currentTokenSupply -= amount;
+        }
+        $.totalTokenSupply = uint96(currentTokenSupply);
+
+        unchecked {
+            LibMap.Uint32Map storage fromOwned = $.owned[from];
+            uint256 fromIndex = fromAddressData.ownedLength;
+            uint256 fromMaxNFTs = (fromBalance / _WAD);
+            if(fromIndex > fromMaxNFTs) {
+                uint256 fromToBurn = (fromIndex - fromMaxNFTs);
+                $.totalNFTSupply -= uint32(fromToBurn);
+
+                uint256 fromEnd = fromIndex - fromToBurn;
+                // Burn loop.
+                if (fromIndex != fromEnd) {
+                    do {
+                        uint256 id = fromOwned.get(--fromIndex);
+                        $.ownedIndex.set(id, 0);
+                        $.ownerships.set(id, 0);
+                        delete $.tokenApprovals[id];
+
+                        _logNFTTransfer(mirror, from, address(0), id);
+                    } while (fromIndex != fromEnd);
+                    fromAddressData.ownedLength = uint32(fromIndex);
+                }
+            }
+        }
+
+        emit Transfer(from, address(0), amount);
         return true;
     }
 
