@@ -14,7 +14,7 @@ abstract contract DN404 {
 
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-    event SkipNFTWhitelistSet(address indexed target, bool status);
+    event SkipNFTSet(address indexed target, bool status);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
@@ -51,6 +51,10 @@ abstract contract DN404 {
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
 
     struct AddressData {
+        // Set true when address data storage has been initialized.
+        bool initialized;
+        // If the account should skip NFT minting.
+        bool skipNFT;
         // The alias for the address. Zero means absence of an alias.
         uint32 addressAlias;
         // The number of NFT tokens.
@@ -63,6 +67,7 @@ abstract contract DN404 {
         uint32 numAliases;
         uint32 nextTokenId;
         uint32 totalNFTSupply;
+        uint96 totalTokenSupply;
         address mirrorERC721;
         mapping(uint32 => address) aliasToAddress;
         mapping(address => mapping(address => bool)) operatorApprovals;
@@ -75,14 +80,9 @@ abstract contract DN404 {
         mapping(address => bool) whitelist;
     }
 
-    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address mirror)
+    function _initializeDN404(uint96 initialTokenSupply, address initialSupplyOwner, address mirror)
         internal
     {
-        if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) {
-            revert InvalidTotalNFTSupply();
-        }
-        if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-
         DN404Storage storage $ = _getDN404Storage();
 
         if ($.nextTokenId != 0) revert AlreadyInitialized();
@@ -91,17 +91,19 @@ abstract contract DN404 {
         _linkMirrorContract(mirror);
 
         $.nextTokenId = 1;
-        $.totalNFTSupply = totalNFTSupply;
         $.mirrorERC721 = mirror;
 
-        unchecked {
-            uint256 balance = uint256(totalNFTSupply) * _WAD;
-            $.addressData[initialSupplyOwner].balance = uint96(balance);
+        if (initialTokenSupply > 0) {
+            if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
+            if (initialTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
 
-            emit Transfer(address(0), initialSupplyOwner, balance);
+            $.totalTokenSupply = initialTokenSupply;
+            $.addressData[initialSupplyOwner].balance = initialTokenSupply;
+
+            emit Transfer(address(0), initialSupplyOwner, initialTokenSupply);
+
+            _setSkipNFT(initialSupplyOwner, true);
         }
-
-        _setSkipNFTWhitelist(initialSupplyOwner, true);
     }
 
     function name() public view virtual returns (string memory);
@@ -114,19 +116,29 @@ abstract contract DN404 {
         return 18;
     }
 
-    function _setSkipNFTWhitelist(address target, bool state) internal {
-        _getDN404Storage().whitelist[target] = state;
-        emit SkipNFTWhitelistSet(target, state);
+    function _setSkipNFT(address target, bool state) internal {
+        _getDN404Storage().addressData[target].skipNFT = state;
+        emit SkipNFTSet(target, state);
     }
 
     function totalSupply() public view returns (uint256) {
         unchecked {
-            return uint256(_getDN404Storage().totalNFTSupply) * _WAD;
+            return uint256(_getDN404Storage().totalTokenSupply);
+        }
+    }
+
+    function totalNFTSupply() public view returns (uint256) {
+        unchecked {
+            return uint256(_getDN404Storage().totalNFTSupply);
         }
     }
 
     function balanceOf(address owner) public view virtual returns (uint256) {
         return _getDN404Storage().addressData[owner].balance;
+    }
+
+    function balanceOfNFT(address owner) public view virtual returns (uint256) {
+        return _getDN404Storage().addressData[owner].ownedLength;
     }
 
     function approve(address spender, uint256 amount) public virtual returns (bool) {
@@ -211,7 +223,7 @@ abstract contract DN404 {
         unchecked {
             toAddressData.balance += uint96(_WAD);
 
-            $.ownerships.set(id, _registerAndResolveAlias(to));
+            $.ownerships.set(id, _registerAndResolveAlias(toAddressData, to));
             delete $.tokenApprovals[id];
 
             uint256 updatedId = $.owned[from].get(--fromAddressData.ownedLength);
@@ -226,16 +238,26 @@ abstract contract DN404 {
         emit Transfer(from, to, _WAD);
     }
 
-    function _registerAndResolveAlias(address to) internal returns (uint32) {
+    function _registerAndResolveAlias(AddressData storage toAddressData, address to) internal returns (uint32 addressAlias) {
         DN404Storage storage $ = _getDN404Storage();
-        AddressData storage toAddressData = $.addressData[to];
-        uint32 addressAlias = toAddressData.addressAlias;
+        addressAlias = toAddressData.addressAlias;
         if (addressAlias == 0) {
             addressAlias = ++$.numAliases;
             toAddressData.addressAlias = addressAlias;
             $.aliasToAddress[addressAlias] = to;
         }
-        return addressAlias;
+    }
+
+    function _getAddressData(address _address) internal returns (AddressData storage _addressData) {
+        DN404Storage storage $ = _getDN404Storage();
+        _addressData = $.addressData[_address];
+
+        if(!_addressData.initialized) {
+            _addressData.initialized = true;
+            if(_hasCode(_address)) {
+                _addressData.skipNFT = true;
+            }
+        }
     }
 
     struct _TransferTemps {
@@ -251,8 +273,8 @@ abstract contract DN404 {
 
         DN404Storage storage $ = _getDN404Storage();
 
-        AddressData storage fromAddressData = $.addressData[from];
-        AddressData storage toAddressData = $.addressData[to];
+        AddressData storage fromAddressData = _getAddressData(from);
+        AddressData storage toAddressData = _getAddressData(to);
 
         _TransferTemps memory t;
         t.mirror = $.mirrorERC721;
@@ -264,49 +286,60 @@ abstract contract DN404 {
             t.toBalanceBefore = toAddressData.balance;
             toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
 
-            if (!$.whitelist[from]) {
-                LibMap.Uint32Map storage fromOwned = $.owned[from];
-                uint256 i = fromAddressData.ownedLength;
-                uint256 end = i - ((t.fromBalanceBefore / _WAD) - (t.fromBalance / _WAD));
+            LibMap.Uint32Map storage fromOwned = $.owned[from];
+            uint256 fromIndex = fromAddressData.ownedLength;
+            uint256 fromMaxNFTs = (t.fromBalance / _WAD);
+            if(fromIndex > fromMaxNFTs) {
+                uint256 fromToBurn = ((t.fromBalanceBefore / _WAD) - fromMaxNFTs);
+                $.totalNFTSupply -= uint32(fromToBurn);
+
+                uint256 fromEnd = fromIndex - fromToBurn;
                 // Burn loop.
-                if (i != end) {
+                if (fromIndex != fromEnd) {
                     do {
-                        uint256 id = fromOwned.get(--i);
+                        uint256 id = fromOwned.get(--fromIndex);
                         $.ownedIndex.set(id, 0);
                         $.ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
                         _logNFTTransfer(t.mirror, from, address(0), id);
-                    } while (i != end);
-                    fromAddressData.ownedLength = uint32(i);
+                    } while (fromIndex != fromEnd);
+                    fromAddressData.ownedLength = uint32(fromIndex);
                 }
             }
 
-            if (!$.whitelist[to]) {
-                LibMap.Uint32Map storage toOwned = $.owned[to];
-                uint256 i = toAddressData.ownedLength;
-                uint256 end = i + ((t.toBalance / _WAD) - (t.toBalanceBefore / _WAD));
-                uint256 id = $.nextTokenId;
-                uint32 toAlias = _registerAndResolveAlias(to);
-                uint256 totalNFTSupply = $.totalNFTSupply;
-                // Mint loop.
-                if (i != end) {
+            if (!toAddressData.skipNFT) {
+                LibMap.Uint32Map storage toOwned = _getDN404Storage().owned[to];
+                uint256 toIndex = toAddressData.ownedLength;
+                uint256 toMaxNFTs = (t.toBalance / _WAD);
+                address cachedTo = to;
+                if(toMaxNFTs > toIndex) {
+                    uint256 toToMint = toMaxNFTs - toIndex;
+
+                    uint256 currentNFTSupply = _getDN404Storage().totalNFTSupply;
+                    currentNFTSupply += toToMint;
+                    _getDN404Storage().totalNFTSupply = uint32(currentNFTSupply);
+
+                    toAddressData.ownedLength = uint32(toMaxNFTs);
+
+                    uint256 id = _getDN404Storage().nextTokenId;
+                    uint32 toAlias = _registerAndResolveAlias(toAddressData, cachedTo);
+                    // Mint loop.
                     do {
-                        while ($.ownerships.get(id) != 0) {
-                            if (++id > totalNFTSupply) id = 1;
+                        while (_getDN404Storage().ownerships.get(id) != 0) {
+                            if (++id > currentNFTSupply) id = 1;
                         }
 
-                        toOwned.set(i, uint32(id));
-                        $.ownerships.set(id, toAlias);
-                        $.ownedIndex.set(id, uint32(i++));
+                        toOwned.set(toIndex, uint32(id));
+                        _getDN404Storage().ownerships.set(id, toAlias);
+                        _getDN404Storage().ownedIndex.set(id, uint32(toIndex++));
 
-                        _logNFTTransfer(t.mirror, address(0), to, id);
+                        _logNFTTransfer(t.mirror, address(0), cachedTo, id);
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
-                        if (++id > totalNFTSupply) id = 1;
-                    } while (i != end);
-                    toAddressData.ownedLength = uint32(i);
-                    $.nextTokenId = uint32(id);
+                        if (++id > currentNFTSupply) id = 1;
+                    } while (toIndex != toMaxNFTs);
+                    _getDN404Storage().nextTokenId = uint32(id);
                 }
             }
         }
@@ -387,6 +420,14 @@ abstract contract DN404 {
         assembly {
             mstore(0x00, x)
             return(0x00, 0x20)
+        }
+    }
+
+    /// @dev Returns if `a` has bytecode of non-zero length.
+    function _hasCode(address a) private view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := extcodesize(a) // Can handle dirty upper bits.
         }
     }
 

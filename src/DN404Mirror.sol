@@ -95,14 +95,14 @@ contract DN404Mirror {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x00, 0x18160ddd) // `totalSupply()`.
+            mstore(0x00, 0xe2c79281) // `totalNFTSupply()`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x04, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
             }
-            result := div(mload(0x00), _WAD)
+            result := mload(0x00)
         }
     }
 
@@ -110,7 +110,7 @@ contract DN404Mirror {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x00, 0x70a08231) // `balanceOf(address)`.
+            mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
             mstore(0x20, shr(96, shl(96, owner)))
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x24, 0x00, 0x20))
@@ -118,7 +118,7 @@ contract DN404Mirror {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
             }
-            result := div(mload(0x00), _WAD)
+            result := mload(0x00)
         }
     }
 

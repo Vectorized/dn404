@@ -17,14 +17,14 @@ contract DN404Test is SoladyTest {
     }
 
     function testNameAndSymbol(string memory name, string memory symbol) public {
-        dn.initializeDN404(1000, address(this), address(mirror));
+        dn.initializeDN404(uint96(1000 * _WAD), address(this), address(mirror));
         dn.setNameAndSymbol(name, symbol);
         assertEq(mirror.name(), name);
         assertEq(mirror.symbol(), symbol);
     }
 
     function testTokenURI(string memory baseURI, uint256 id) public {
-        dn.initializeDN404(1000, address(this), address(mirror));
+        dn.initializeDN404(uint96(1000 * _WAD), address(this), address(mirror));
         dn.setBaseURI(baseURI);
         assertEq(mirror.tokenURI(id), string(abi.encodePacked(baseURI, id)));
     }
@@ -40,18 +40,18 @@ contract DN404Test is SoladyTest {
     }
 
     function testInitialize(uint32 totalNFTSupply, address initialSupplyOwner) public {
-        if (totalNFTSupply == 0 || uint256(totalNFTSupply) + 1 > type(uint32).max) {
+        if (uint256(totalNFTSupply) + 1 > type(uint32).max) {
             vm.expectRevert(DN404.InvalidTotalNFTSupply.selector);
-            dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
+            dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
         } else if (initialSupplyOwner == address(0)) {
             vm.expectRevert(DN404.TransferToZeroAddress.selector);
-            dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
+            dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
         } else {
-            dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
-            assertEq(dn.totalSupply(), uint256(totalNFTSupply) * 10 ** 18);
-            assertEq(dn.balanceOf(initialSupplyOwner), uint256(totalNFTSupply) * 10 ** 18);
-            assertEq(mirror.totalSupply(), totalNFTSupply);
-            assertEq(mirror.balanceOf(initialSupplyOwner), totalNFTSupply);
+            dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
+            assertEq(dn.totalSupply(), uint256(totalNFTSupply) * _WAD);
+            assertEq(dn.balanceOf(initialSupplyOwner), uint256(totalNFTSupply) * _WAD);
+            assertEq(mirror.totalSupply(), 0);
+            assertEq(mirror.balanceOf(initialSupplyOwner), 0);
         }
     }
 
@@ -59,7 +59,7 @@ contract DN404Test is SoladyTest {
         address alice = address(111);
         address bob = address(222);
         totalNFTSupply = uint32(_bound(totalNFTSupply, 1, 5));
-        dn.initializeDN404(totalNFTSupply, address(this), address(mirror));
+        dn.initializeDN404(uint96(totalNFTSupply * _WAD), address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(totalNFTSupply));
         for (uint256 t; t != 2; ++t) {
             uint256 id = _bound(r, 1, totalNFTSupply);
@@ -77,7 +77,7 @@ contract DN404Test is SoladyTest {
     function testSetAndGetOperatorApprovals(address owner, address operator, bool approved)
         public
     {
-        dn.initializeDN404(1000, address(this), address(mirror));
+        dn.initializeDN404(uint96(1000 * _WAD), address(this), address(mirror));
         assertEq(mirror.isApprovedForAll(owner, operator), false);
         vm.prank(owner);
         mirror.setApprovalForAll(operator, approved);
@@ -95,7 +95,7 @@ contract DN404Test is SoladyTest {
         );
         vm.assume(initialSupplyOwner != recipient && recipient != address(0));
 
-        dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
+        dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
 
         vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.getApproved(1);
