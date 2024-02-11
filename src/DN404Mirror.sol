@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+/// @title DN404Mirror
+/// @notice DN404Mirror provides an interface for interacting with the
+/// NFT tokens in a DN404 implementation.
+///
+/// @author vectorized.eth (@optimizoor)
+/// @author Quit (@0xQuit)
+/// @author Michael Amadi (@AmadiMichaels)
+/// @author cygaar (@0xCygaar)
+/// @author Thomas (@0xjustadev)
+/// @author Harrison (@PopPunkOnChain)
+///
+/// @dev Note:
+/// - The ERC721 data is stored in the base DN404 contract.
 contract DN404Mirror {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
@@ -20,25 +33,37 @@ contract DN404Mirror {
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
+    /// @dev Thrown when a call for an NFT function did not originate
+    /// from the base DN404 contract.
     error Unauthorized();
 
+    /// @dev Thrown when transferring an NFT to a contract address that
+    /// does not implement ERC721Receiver.
     error TransferToNonERC721ReceiverImplementer();
 
+    /// @dev Thrown when linking to the DN404 base contract and the
+    /// DN404 supportsInterface check fails or the call reverts.
     error CannotLink();
 
+    /// @dev Thrown when a linkMirrorContract call is received and the
+    /// NFT mirror contract has already been linked to a DN404 base contract.
     error AlreadyLinked();
 
+    /// @dev Thrown when retrieving the rootERC20 address when a link has not
+    /// been established.
     error NotLinked();
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                          STORAGE                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
+    /// @dev Struct contain the NFT mirror contract storage.
     struct DN404NFTStorage {
         address rootERC20;
         address deployer;
     }
 
+    /// @dev Returns a storage pointer for DN404NFTStorage.
     function _getDN404NFTStorage() internal pure returns (DN404NFTStorage storage $) {
         /// @solidity memory-safe-assembly
         assembly {
@@ -61,6 +86,7 @@ contract DN404Mirror {
     /*                     ERC721 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
+    /// @dev Returns the token collection name from the base DN404 contract.
     function name() public view virtual returns (string memory result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -78,6 +104,7 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Returns the token collection symbol from the base DN404 contract.
     function symbol() public view virtual returns (string memory result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -95,6 +122,7 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from the base DN404 contract.
     function tokenURI(uint256 id) public view virtual returns (string memory result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -113,6 +141,7 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Returns the total NFT supply from the base DN404 contract.
     function totalSupply() public view returns (uint256 result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -128,6 +157,10 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Returns the number of NFT tokens owned by `owner` from the base DN404 contract.
+    ///
+    /// Requirements:
+    /// - `owner` must not be the zero address.
     function balanceOf(address owner) public view virtual returns (uint256 result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -144,6 +177,10 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Returns the owner of token `id` from the base DN404 contract.
+    ///
+    /// Requirements:
+    /// - Token `id` must exist.
     function ownerOf(uint256 id) public view virtual returns (address result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -160,6 +197,14 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Sets `spender` as the approved account to manage token `id` in the base DN404 contract.
+    ///
+    /// Requirements:
+    /// - Token `id` must exist.
+    /// - The caller must be the owner of the token,
+    ///   or an approved operator for the token owner.
+    ///
+    /// Emits an {Approval} event.
     function approve(address spender, uint256 id) public virtual {
         address root = rootERC20();
         address owner;
@@ -186,6 +231,10 @@ contract DN404Mirror {
         emit Approval(owner, spender, id);
     }
 
+    /// @dev Returns the account approved to manage token `id` from the base DN404 contract.
+    ///
+    /// Requirements:
+    /// - Token `id` must exist.
     function getApproved(uint256 id) public view virtual returns (address result) {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -202,6 +251,9 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Sets whether `operator` is approved to manage the tokens of the caller in the base DN404 contract.
+    ///
+    /// Emits an {ApprovalForAll} event.
     function setApprovalForAll(address operator, bool approved) public virtual {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -226,6 +278,7 @@ contract DN404Mirror {
         emit ApprovalForAll(msg.sender, operator, approved);
     }
 
+    /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from the base DN404 contract.
     function isApprovedForAll(address owner, address operator)
         public
         view
@@ -250,6 +303,16 @@ contract DN404Mirror {
         }
     }
 
+    /// @dev Transfers token `id` from `from` to `to`.
+    ///
+    /// Requirements:
+    ///
+    /// - Token `id` must exist.
+    /// - `from` must be the owner of the token.
+    /// - `to` cannot be the zero address.
+    /// - The caller must be the owner of the token, or be approved to manage the token.
+    ///
+    /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 id) public virtual {
         address root = rootERC20();
         /// @solidity memory-safe-assembly
@@ -273,12 +336,25 @@ contract DN404Mirror {
         emit Transfer(from, to, id);
     }
 
+    /// @dev Equivalent to `safeTransferFrom(from, to, id, "")`.
     function safeTransferFrom(address from, address to, uint256 id) public payable virtual {
         transferFrom(from, to, id);
 
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, "");
     }
 
+    /// @dev Transfers token `id` from `from` to `to`.
+    ///
+    /// Requirements:
+    ///
+    /// - Token `id` must exist.
+    /// - `from` must be the owner of the token.
+    /// - `to` cannot be the zero address.
+    /// - The caller must be the owner of the token, or be approved to manage the token.
+    /// - If `to` refers to a smart contract, it must implement
+    ///   {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
+    ///
+    /// Emits a {Transfer} event.
     function safeTransferFrom(address from, address to, uint256 id, bytes calldata data)
         public
         virtual
@@ -346,11 +422,13 @@ contract DN404Mirror {
     /*                     MIRROR OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
+    /// @dev Returns the address of the base DN404 contract.
     function rootERC20() public view returns (address root) {
         root = _getDN404NFTStorage().rootERC20;
         if (root == address(0)) revert NotLinked();
     }
 
+    /// @dev Fallback modifier to execute calls from the base DN404 contract.
     modifier dn404NFTFallback() virtual {
         DN404NFTStorage storage $ = _getDN404NFTStorage();
 
@@ -414,10 +492,12 @@ contract DN404Mirror {
         _;
     }
 
+    /// @dev Fallback function for calls from base DN404 contract.
     fallback() external payable virtual dn404NFTFallback {}
 
     receive() external payable virtual {}
 
+    /// @dev Returns the calldata value at `offset`.
     function _calldataload(uint256 offset) private pure returns (uint256 value) {
         /// @solidity memory-safe-assembly
         assembly {
