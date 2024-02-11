@@ -97,4 +97,25 @@ contract DN404ATest is Test {
         assertEq(nft.ownerOf(8), user3);
         assertEq(nft.ownerOf(9), user3);
     }
+
+    function test_transferToSelf() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+
+        nft.mintTokens(user1, 5);
+        nft.mintTokens(user2, 2);
+        nft.mintTokens(user1, 2);
+
+        nft.transferTokens(user1, user1, 4);
+
+        assertEq(nft.ownerOf(1), user1);
+        assertEq(nft.ownerOf(2), user1);
+        assertEq(nft.ownerOf(3), user1);
+        assertEq(nft.ownerOf(4), user1);
+        assertEq(nft.ownerOf(5), user1);
+        assertEq(nft.ownerOf(6), user2);
+        assertEq(nft.ownerOf(7), user2);
+        assertEq(nft.ownerOf(8), user1);
+        assertEq(nft.ownerOf(9), user1);
+    }
 }
