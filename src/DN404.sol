@@ -299,6 +299,9 @@ abstract contract DN404 {
             toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
 
             LibMap.Uint32Map storage fromOwned = $.owned[from];
+            LibMap.Uint32Map storage ownedIndex = $.ownedIndex;
+            LibMap.Uint32Map storage ownerships = $.ownerships;
+
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 fromMaxNFTs = (t.fromBalance / _WAD);
             if (fromIndex > fromMaxNFTs) {
@@ -307,44 +310,45 @@ abstract contract DN404 {
 
                 uint256 fromEnd = fromIndex - fromToBurn;
                 // Burn loop.
+                address cachedFrom = from;
                 if (fromIndex != fromEnd) {
                     do {
                         uint256 id = fromOwned.get(--fromIndex);
-                        $.ownedIndex.set(id, 0);
-                        $.ownerships.set(id, 0);
+                        ownedIndex.set(id, 0);
+                        ownerships.set(id, 0);
                         delete $.tokenApprovals[id];
 
-                        _logNFTTransfer(t.mirror, from, address(0), id);
+                        _logNFTTransfer(t.mirror, cachedFrom, address(0), id);
                     } while (fromIndex != fromEnd);
                     fromAddressData.ownedLength = uint32(fromIndex);
                 }
             }
 
             if (!toAddressData.skipNFT) {
-                LibMap.Uint32Map storage toOwned = _getDN404Storage().owned[to];
+                LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
                 uint256 toMaxNFTs = (t.toBalance / _WAD);
                 address cachedTo = to;
                 if (toMaxNFTs > toIndex) {
                     uint256 toToMint = toMaxNFTs - toIndex;
 
-                    uint256 currentNFTSupply = _getDN404Storage().totalNFTSupply;
+                    uint256 currentNFTSupply = $.totalNFTSupply;
                     currentNFTSupply += toToMint;
-                    _getDN404Storage().totalNFTSupply = uint32(currentNFTSupply);
+                    $.totalNFTSupply = uint32(currentNFTSupply);
 
                     toAddressData.ownedLength = uint32(toMaxNFTs);
 
-                    uint256 id = _getDN404Storage().nextTokenId;
+                    uint256 id = $.nextTokenId;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, cachedTo);
                     // Mint loop.
                     do {
-                        while (_getDN404Storage().ownerships.get(id) != 0) {
+                        while (ownerships.get(id) != 0) {
                             if (++id > currentNFTSupply) id = 1;
                         }
 
                         toOwned.set(toIndex, uint32(id));
-                        _getDN404Storage().ownerships.set(id, toAlias);
-                        _getDN404Storage().ownedIndex.set(id, uint32(toIndex++));
+                        ownerships.set(id, toAlias);
+                        ownedIndex.set(id, uint32(toIndex++));
 
                         _logNFTTransfer(t.mirror, address(0), cachedTo, id);
 
