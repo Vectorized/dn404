@@ -146,6 +146,10 @@ abstract contract DN404 {
         return _getDN404Storage().addressData[owner].balance;
     }
 
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return _getDN404Storage().allowance[owner][spender];
+    }
+
     function approve(address spender, uint256 amount) public virtual returns (bool) {
         DN404Storage storage $ = _getDN404Storage();
 
