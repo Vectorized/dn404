@@ -180,8 +180,6 @@ abstract contract DN404 {
     struct _TransferTemps {
         uint256 nftAmountToBurn; // 0x20.
         uint256 nftAmountToMint; // 0x40.
-        uint256 fromBalanceBefore;
-        uint256 toBalanceBefore;
         uint256 toBalance;
         uint256 fromBalance;
         uint256 numBurned;
@@ -198,18 +196,15 @@ abstract contract DN404 {
         _TransferTemps memory t;
         t.numBurned = $.numBurned;
 
-        t.fromBalanceBefore = fromAddressData.balance;
-        fromAddressData.balance = uint96(t.fromBalance = t.fromBalanceBefore - amount);
+        fromAddressData.balance = uint96(t.fromBalance = fromAddressData.balance - amount);
 
         unchecked {
-            t.toBalanceBefore = toAddressData.balance;
-            toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
+            toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
 
-            if (fromAddressData.ownedLength > t.fromBalance / _WAD) {
-                t.nftAmountToBurn = fromAddressData.ownedLength - t.fromBalance / _WAD;
-            }
+            t.nftAmountToBurn = _zeroFloorSub(fromAddressData.ownedLength, t.fromBalance / _WAD);
+
             if (!toAddressData.skipNFT) {
-                t.nftAmountToMint = t.toBalance / _WAD - t.toBalanceBefore / _WAD;
+                t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, toAddressData.ownedLength);
             }
 
             uint256[] memory packedLogs;
@@ -308,6 +303,14 @@ abstract contract DN404 {
         }
 
         emit Transfer(from, to, amount);
+    }
+
+    /// @dev Returns `max(0, x - y)`.
+    function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := mul(gt(x, y), sub(x, y))
+        }
     }
 
     function _transferFromNFT(address from, address to, uint256 id, address msgSender)
