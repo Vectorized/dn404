@@ -51,10 +51,10 @@ contract DN404Mirror {
     /*                        CONSTRUCTOR                         */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    constructor() {
+    constructor(address deployer) {
         // For non-proxies, we will store the deployer so that only the deployer can
         // link the root contract.
-        _getDN404NFTStorage().deployer = msg.sender;
+        _getDN404NFTStorage().deployer = deployer;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/

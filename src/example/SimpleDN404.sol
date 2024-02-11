@@ -2,12 +2,18 @@
 pragma solidity ^0.8.4;
 
 import "../DN404.sol";
+import "../DN404Mirror.sol";
 import {Ownable} from "../../lib/solady/src/auth/Ownable.sol";
 
 contract SimpleDN404 is DN404, Ownable {
     string private _name;
     string private _symbol;
     string private _baseURI;
+    uint96 private _initialTokenSupply;
+    address private _initialSupplyOwner;
+    DN404Mirror private _mirror;
+
+    error TransferFailed();
 
     constructor(
         string memory name_,
@@ -19,9 +25,14 @@ contract SimpleDN404 is DN404, Ownable {
 
         _name = name_;
         _symbol = symbol_;
+        _initialTokenSupply = initialTokenSupply;
+        _initialSupplyOwner = initialSupplyOwner;
 
-        // The mirror NFT contract will be auto deployed
-        _initializeDN404(initialTokenSupply, initialSupplyOwner, address(0));
+        _mirror = new DN404Mirror(owner());
+    }
+
+    function initializeDN404() public onlyOwner {
+        _initializeDN404(_initialTokenSupply, _initialSupplyOwner, address(_mirror));
     }
 
     // This allows anyone to mint more ERC20 tokens
@@ -43,5 +54,10 @@ contract SimpleDN404 is DN404, Ownable {
 
     function tokenURI(uint256 id) public view override returns (string memory) {
         return string(abi.encodePacked(_baseURI, id));
+    }
+
+    function withdraw() external onlyOwner {
+        (bool success,) = msg.sender.call{value: address(this).balance}("");
+        if (!success) revert TransferFailed();
     }
 }
