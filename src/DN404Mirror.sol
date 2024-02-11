@@ -366,13 +366,18 @@ contract DN404Mirror {
                 let end := add(o, shl(5, calldataload(sub(o, 0x20))))
                 returndatacopy(0x00, returndatasize(), lt(calldatasize(), end))
 
-                let evtSig := _TRANSFER_EVENT_SIGNATURE
                 for {} iszero(eq(o, end)) { o := add(0x20, o) } {
                     let d := calldataload(o) // Entry in the packed logs.
-                    switch and(0xff, d)
-                    case 0 { log4(codesize(), 0x00, evtSig, 0, shr(96, d), shr(168, shl(160, d))) }
-                    case 1 { log4(codesize(), 0x00, evtSig, shr(96, d), 0, shr(168, shl(160, d))) }
-                    default { revert(0x00, 0x00) }
+                    let a := shr(96, d) // The address.
+                    let b := and(1, d) // Whether it is a burn.
+                    log4(
+                        codesize(),
+                        0x00,
+                        _TRANSFER_EVENT_SIGNATURE,
+                        mul(a, b),
+                        mul(a, iszero(b)),
+                        shr(168, shl(160, d))
+                    )
                 }
                 mstore(0x00, 0x01)
                 return(0x00, 0x20)

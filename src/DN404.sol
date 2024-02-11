@@ -319,14 +319,11 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
 
-        {
-            uint256 currentTokenSupply = $.totalTokenSupply;
-            currentTokenSupply += amount;
+        unchecked {
+            uint256 currentTokenSupply = uint256($.totalTokenSupply) + amount;
             if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
             $.totalTokenSupply = uint96(currentTokenSupply);
-        }
 
-        unchecked {
             uint256 toBalance = toAddressData.balance + amount;
             toAddressData.balance = uint96(toBalance);
 
