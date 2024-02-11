@@ -238,7 +238,9 @@ abstract contract DN404 {
         uint256 toOwnedLength;
     }
 
-    function _skipBurnStack(uint256) internal pure virtual returns (bool) {
+    /// @dev You can override to return a pseudorandom value to skip
+    /// taking token IDs from the burned stack probabilistically.
+    function _skipBurnedStack(uint256) internal pure virtual returns (bool) {
         return false;
     }
 
@@ -297,7 +299,7 @@ abstract contract DN404 {
                 // Mint loop.
                 do {
                     uint256 id;
-                    if (numBurned != 0 && !_skipBurnStack(toIndex)) {
+                    if (numBurned != 0 && !_skipBurnedStack(toIndex)) {
                         id = $.burnedStack.get(--numBurned);
                     } else {
                         id = $.nextTokenId;
@@ -351,7 +353,7 @@ abstract contract DN404 {
                     // Mint loop.
                     do {
                         uint256 id;
-                        if (numBurned != 0 && !_skipBurnStack(toIndex)) {
+                        if (numBurned != 0 && !_skipBurnedStack(toIndex)) {
                             id = $.burnedStack.get(--numBurned);
                         } else {
                             id = $.nextTokenId;
