@@ -93,6 +93,7 @@ contract DN404Test is SoladyTest {
             totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max
                 && initialSupplyOwner != address(0)
         );
+        vm.assume(recipient.code.length == 0);
         vm.assume(initialSupplyOwner != recipient && recipient != address(0));
 
         dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));

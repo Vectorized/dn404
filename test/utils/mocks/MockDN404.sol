@@ -36,7 +36,7 @@ contract MockDN404 is DN404 {
     }
 
     function registerAndResolveAlias(address target) public returns (uint32) {
-        return _registerAndResolveAlias(target);
+        return _registerAndResolveAlias(_addressData(target), target);
     }
 
     function initializeDN404(

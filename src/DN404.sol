@@ -79,7 +79,6 @@ abstract contract DN404 {
         // Even indices: owner aliases. Odd indices: owned indices.
         LibMap.Uint32Map oo;
         mapping(address => AddressData) addressData;
-        mapping(address => bool) whitelist;
     }
 
     function _getDN404Storage() internal pure returns (DN404Storage storage $) {
@@ -179,16 +178,16 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     struct _TransferTemps {
-        bool isFromWhitelisted; // 0x00.
-        bool isToWhitelisted; // 0x20.
-        uint256 nftAmountToBurn; // 0x40.
-        uint256 nftAmountToMint; // 0x60.
-        address mirror; // 0x80.
+        bool toSkipNFT; // 0x00.
+        uint256 nftAmountToBurn; // 0x20.
+        uint256 nftAmountToMint; // 0x40.
+        address mirror; // 0x60.
         uint256 fromBalanceBefore;
         uint256 toBalanceBefore;
         uint256 toBalance;
         uint256 fromBalance;
         uint256 numBurned;
+        uint256 currentNFTSupply;
     }
 
     function _transfer(address from, address to, uint256 amount) internal {
@@ -196,8 +195,8 @@ abstract contract DN404 {
 
         DN404Storage storage $ = _getDN404Storage();
 
-        AddressData storage fromAddressData = $.addressData[from];
-        AddressData storage toAddressData = $.addressData[to];
+        AddressData storage fromAddressData = _addressData(from);
+        AddressData storage toAddressData = _addressData(to);
 
         _TransferTemps memory t;
         t.mirror = $.mirrorERC721;
@@ -210,25 +209,21 @@ abstract contract DN404 {
             t.toBalanceBefore = toAddressData.balance;
             toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
 
-            t.isFromWhitelisted = $.whitelist[from];
-            t.isToWhitelisted = $.whitelist[to];
+            t.toSkipNFT = toAddressData.skipNFT;
 
-            t.nftAmountToBurn = ((t.fromBalanceBefore / _WAD) - (t.fromBalance / _WAD));
-            t.nftAmountToMint = ((t.toBalance / _WAD) - (t.toBalanceBefore / _WAD));
+            if (fromAddressData.ownedLength > t.fromBalance / _WAD) {
+                t.nftAmountToBurn = fromAddressData.ownedLength - t.fromBalance / _WAD;
+            }
+            t.nftAmountToMint = t.toBalance / _WAD - t.toBalanceBefore / _WAD;
 
             uint256[] memory packedLogs;
             uint256 packedLogsOffset;
             /// @solidity memory-safe-assembly
             assembly {
-                let isFromWhitelisted := mload(add(t, 0x00))
-                let isToWhitelisted := mload(add(t, 0x20))
-                let nftAmountToBurn := mload(add(t, 0x40))
-                let nftAmountToMint := mload(add(t, 0x60))
-                let total :=
-                    add(
-                        mul(iszero(isFromWhitelisted), nftAmountToBurn),
-                        mul(iszero(isToWhitelisted), nftAmountToMint)
-                    )
+                let toSkipNFT := mload(add(t, 0x00))
+                let nftAmountToBurn := mload(add(t, 0x20))
+                let nftAmountToMint := mload(add(t, 0x40))
+                let total := add(nftAmountToBurn, mul(iszero(toSkipNFT), nftAmountToMint))
                 // Allocate extra space before to make calling cheaper.
                 packedLogs := add(mload(0x40), 0x40)
                 mstore(packedLogs, total)
@@ -236,11 +231,11 @@ abstract contract DN404 {
                 mstore(0x40, add(packedLogsOffset, shl(5, total)))
             }
 
-            if (!t.isFromWhitelisted) {
+            if (t.nftAmountToBurn != 0) {
                 LibMap.Uint32Map storage fromOwned = $.owned[from];
                 uint256 i = fromAddressData.ownedLength;
                 uint256 end = i - t.nftAmountToBurn;
-
+                $.totalNFTSupply -= uint32(t.nftAmountToBurn);
                 // Burn loop.
                 if (i != end) {
                     do {
@@ -259,13 +254,15 @@ abstract contract DN404 {
                 }
             }
 
-            if (!t.isToWhitelisted) {
+            if (!t.toSkipNFT) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 i = toAddressData.ownedLength;
                 uint256 end = i + t.nftAmountToMint;
                 uint256 id = $.nextTokenId;
-                uint32 toAlias = _registerAndResolveAlias(to);
+                uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 totalNFTSupply = $.totalNFTSupply;
+                totalNFTSupply += t.nftAmountToMint;
+                $.totalNFTSupply = uint32(totalNFTSupply);
 
                 // Mint loop.
                 if (i != end) {
@@ -300,7 +297,7 @@ abstract contract DN404 {
                 $.numBurned = uint32(t.numBurned);
                 /// @solidity memory-safe-assembly
                 assembly {
-                    let mirror := mload(add(t, 0x80))
+                    let mirror := mload(add(t, 0x60))
                     let o := sub(packedLogs, 0x40) // Start of calldata to send.
                     mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
                     mstore(add(o, 0x20), 0x20) // Offset of `packedLogs` in the calldata to send.
@@ -338,15 +335,15 @@ abstract contract DN404 {
             }
         }
 
-        AddressData storage fromAddressData = $.addressData[from];
-        AddressData storage toAddressData = $.addressData[to];
+        AddressData storage fromAddressData = _addressData(from);
+        AddressData storage toAddressData = _addressData(to);
 
         fromAddressData.balance -= uint96(_WAD);
 
         unchecked {
             toAddressData.balance += uint96(_WAD);
 
-            $.oo.set(_ownershipIndex(id), _registerAndResolveAlias(to));
+            $.oo.set(_ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
             delete $.tokenApprovals[id];
 
             uint256 updatedId = $.owned[from].get(--fromAddressData.ownedLength);
@@ -366,11 +363,11 @@ abstract contract DN404 {
     }
 
     function _setSkipNFT(address target, bool state) internal {
-        _getAddressData(target).skipNFT = state;
+        _addressData(target).skipNFT = state;
         emit SkipNFTSet(target, state);
     }
 
-    function _getAddressData(address a) internal returns (AddressData storage d) {
+    function _addressData(address a) internal returns (AddressData storage d) {
         DN404Storage storage $ = _getDN404Storage();
         d = $.addressData[a];
 
@@ -388,16 +385,17 @@ abstract contract DN404 {
         }
     }
 
-    function _registerAndResolveAlias(address to) internal returns (uint32) {
+    function _registerAndResolveAlias(AddressData storage toAddressData, address to)
+        internal
+        returns (uint32 addressAlias)
+    {
         DN404Storage storage $ = _getDN404Storage();
-        AddressData storage toAddressData = $.addressData[to];
-        uint32 addressAlias = toAddressData.addressAlias;
+        addressAlias = toAddressData.addressAlias;
         if (addressAlias == 0) {
             addressAlias = ++$.numAliases;
             toAddressData.addressAlias = addressAlias;
             $.aliasToAddress[addressAlias] = to;
         }
-        return addressAlias;
     }
 
     function _ownershipIndex(uint256 i) private pure returns (uint256) {
