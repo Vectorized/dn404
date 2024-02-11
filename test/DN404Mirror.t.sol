@@ -15,7 +15,7 @@ contract DN404MirrorTest is SoladyTest {
 
     function setUp() public {
         dn = new MockDN404();
-        mirror = new DN404Mirror();
+        mirror = new DN404Mirror(address(this));
     }
 
     function testNotLinked() public {

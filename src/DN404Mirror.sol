@@ -76,10 +76,10 @@ contract DN404Mirror {
     /*                        CONSTRUCTOR                         */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    constructor() {
+    constructor(address deployer) {
         // For non-proxies, we will store the deployer so that only the deployer can
         // link the root contract.
-        _getDN404NFTStorage().deployer = msg.sender;
+        _getDN404NFTStorage().deployer = deployer;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -474,17 +474,6 @@ contract DN404Mirror {
             $.rootERC20 = msg.sender;
             /// @solidity memory-safe-assembly
             assembly {
-                // `implementsDN404()`.
-                mstore(0x00, 0xb7a94eb8)
-                if iszero(
-                    and(
-                        and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                        staticcall(gas(), caller(), 0x1c, 0x04, 0x00, 0x20)
-                    )
-                ) {
-                    mstore(0x00, 0x8f36fa09) // `CannotLink()`.
-                    revert(0x1c, 0x04)
-                }
                 mstore(0x00, 0x01)
                 return(0x00, 0x20)
             }
