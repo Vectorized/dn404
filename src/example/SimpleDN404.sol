@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "../DN404.sol";
 import "../DN404Mirror.sol";
 import {Ownable} from "../../lib/solady/src/auth/Ownable.sol";
+import {LibString} from "../../lib/solady/src/utils/LibString.sol";
 
 contract SimpleDN404 is DN404, Ownable {
     string private _name;
@@ -52,8 +53,10 @@ contract SimpleDN404 is DN404, Ownable {
         _baseURI = baseURI_;
     }
 
-    function tokenURI(uint256 id) public view override returns (string memory) {
-        return string(abi.encodePacked(_baseURI, id));
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        return bytes(_baseURI).length != 0
+            ? string(abi.encodePacked(_baseURI, LibString.toString(tokenId)))
+            : "";
     }
 
     function withdraw() external onlyOwner {
