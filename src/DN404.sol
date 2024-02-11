@@ -109,7 +109,7 @@ abstract contract DN404 {
 
         if (initialTokenSupply > 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (initialTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
+            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
 
             $.totalTokenSupply = initialTokenSupply;
             $.addressData[initialSupplyOwner].balance = initialTokenSupply;
@@ -327,7 +327,7 @@ abstract contract DN404 {
 
         uint256 currentTokenSupply = $.totalTokenSupply;
         currentTokenSupply += amount;
-        if (currentTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
+        if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
         $.totalTokenSupply = uint96(currentTokenSupply);
 
         unchecked {
@@ -337,15 +337,15 @@ abstract contract DN404 {
             if (!toAddressData.skipNFT) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
-                uint256 toMaxNFTs = (toBalance / _WAD);
-                if (toMaxNFTs > toIndex) {
-                    uint256 nftAmountToMint = toMaxNFTs - toIndex;
+                uint256 toMaxNFTs = toBalance / _WAD;
+                uint256 nftAmountToMint = _zeroFloorSub(toMaxNFTs, toIndex);
 
+                if (nftAmountToMint != 0) {
                     _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToMint);
 
-                    uint256 currentNFTSupply = $.totalNFTSupply;
-                    currentNFTSupply += nftAmountToMint;
-                    $.totalNFTSupply = uint32(currentNFTSupply);
+                    uint256 totalNFTSupply = $.totalNFTSupply;
+                    totalNFTSupply += nftAmountToMint;
+                    $.totalNFTSupply = uint32(totalNFTSupply);
 
                     toAddressData.ownedLength = uint32(toMaxNFTs);
 
@@ -353,17 +353,23 @@ abstract contract DN404 {
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     // Mint loop.
                     do {
-                        while ($.oo.get(_ownershipIndex(id)) != 0) {
-                            if (++id > currentNFTSupply) id = 1;
+                        if ($.oo.get(_ownershipIndex(id)) != 0) {
+                            if ($.numBurned != 0) {
+                                id = $.burnedStack.get(--$.numBurned);
+                            } else {
+                                do {
+                                    if (++id > totalNFTSupply) id = 1;
+                                } while ($.oo.get(_ownershipIndex(id)) == 0);
+                            }
                         }
 
                         toOwned.set(toIndex, uint32(id));
                         $.oo.set(_ownershipIndex(id), toAlias);
                         $.oo.set(_ownedIndex(id), uint32(toIndex++));
+                        $.burnedStack.set($.numBurned++, uint32(id));
                         _packedLogsAppend(packedLogs, to, id, 0);
 
-                        // todo: ensure we don't overwrite ownership of early tokens that weren't burned
-                        if (++id > currentNFTSupply) id = 1;
+                        if (++id > totalNFTSupply) id = 1;
                     } while (toIndex != toMaxNFTs);
 
                     $.nextTokenId = uint32(id);
@@ -394,9 +400,9 @@ abstract contract DN404 {
         unchecked {
             LibMap.Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
-            uint256 fromMaxNFTs = (fromBalance / _WAD);
-            if (fromIndex > fromMaxNFTs) {
-                uint256 nftAmountToBurn = fromIndex - fromMaxNFTs;
+            uint256 nftAmountToBurn = _zeroFloorSub(fromIndex, fromBalance / _WAD);
+
+            if (nftAmountToBurn != 0) {
                 $.totalNFTSupply -= uint32(nftAmountToBurn);
 
                 _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToBurn);
