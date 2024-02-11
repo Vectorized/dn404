@@ -110,7 +110,8 @@ abstract contract DN404 {
             if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
 
             $.totalTokenSupply = initialTokenSupply;
-            $.addressData[initialSupplyOwner].balance = initialTokenSupply;
+            AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
+            initialOwnerAddressData.balance = initialTokenSupply;
 
             emit Transfer(address(0), initialSupplyOwner, initialTokenSupply);
 
