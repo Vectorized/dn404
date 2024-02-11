@@ -354,17 +354,6 @@ contract DN404Mirror {
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
 
-        // `logTransfer(address,address,uint256)`.
-        if (fnSelector == 0xf51ac936) {
-            if (msg.sender != $.rootERC20) revert Unauthorized();
-
-            address from = address(uint160(_calldataload(0x04)));
-            address to = address(uint160(_calldataload(0x24)));
-            uint256 id = _calldataload(0x44);
-
-            emit Transfer(from, to, id);
-            _return(1);
-        }
         // `logTransfer(uint256[])`.
         if (fnSelector == 0x263c69d6) {
             if (msg.sender != $.rootERC20) revert Unauthorized();
@@ -411,8 +400,9 @@ contract DN404Mirror {
                     mstore(0x00, 0x8f36fa09) // `CannotLink()`.
                     revert(0x1c, 0x04)
                 }
+                mstore(0x00, 0x01)
+                return(0x00, 0x20)
             }
-            _return(1);
         }
         _;
     }
@@ -425,14 +415,6 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             value := calldataload(offset)
-        }
-    }
-
-    function _return(uint256 word) private pure {
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, word)
-            return(0x00, 0x20)
         }
     }
 }
