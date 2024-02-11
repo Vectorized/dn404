@@ -55,7 +55,7 @@ contract DN404MirrorTest is SoladyTest {
         address alice = address(111);
         address bob = address(222);
 
-        dn.initializeDN404(totalNFTSupply, address(this), address(mirror));
+        dn.initializeDN404(uint96(uint256(totalNFTSupply) * _WAD), address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(5));
         assertEq(mirror.balanceOf(alice), 5);
         assertEq(mirror.balanceOf(bob), 0);
@@ -72,7 +72,7 @@ contract DN404MirrorTest is SoladyTest {
         address bob = address(222);
         address invalid = address(new Invalid721Receiver());
 
-        dn.initializeDN404(totalNFTSupply, address(this), address(mirror));
+        dn.initializeDN404(uint96(uint256(totalNFTSupply) * _WAD), address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(5));
         assertEq(mirror.balanceOf(alice), 5);
         assertEq(mirror.balanceOf(bob), 0);

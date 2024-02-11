@@ -32,18 +32,18 @@ contract MockDN404 is DN404 {
     }
 
     function setWhitelist(address target, bool status) public {
-        _setSkipNFTWhitelist(target, status);
+        _setSkipNFT(target, status);
     }
 
     function registerAndResolveAlias(address target) public returns (uint32) {
-        return _registerAndResolveAlias(target);
+        return _registerAndResolveAlias(_addressData(target), target);
     }
 
     function initializeDN404(
-        uint32 totalNFTSupply,
+        uint96 initialTokenSupply,
         address initialSupplyOwner,
         address mirrorNFTContract
     ) public {
-        _initializeDN404(totalNFTSupply, initialSupplyOwner, mirrorNFTContract);
+        _initializeDN404(initialTokenSupply, initialSupplyOwner, mirrorNFTContract);
     }
 }
