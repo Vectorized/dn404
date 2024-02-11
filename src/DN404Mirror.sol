@@ -166,19 +166,21 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
-            mstore(m, 0xd10b6e0c) // `approveNFT(address,uint256,address)`.
-            mstore(add(m, 0x20), shr(96, shl(96, spender)))
-            mstore(add(m, 0x40), id)
-            mstore(add(m, 0x60), caller())
+            mstore(0x00, 0xd10b6e0c) // `approveNFT(address,uint256,address)`.
+            mstore(0x20, shr(96, shl(96, spender)))
+            mstore(0x40, id)
+            mstore(0x60, caller())
             if iszero(
                 and(
                     gt(returndatasize(), 0x1f),
-                    call(gas(), root, callvalue(), add(m, 0x1c), 0x64, 0x00, 0x20)
+                    call(gas(), root, callvalue(), 0x1c, 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
+            mstore(0x40, m) // Restore the free memory pointer.
+            mstore(0x60, 0) // Restore the zero pointer.
             owner := shr(96, shl(96, mload(0x00)))
         }
         emit Approval(owner, spender, id);
@@ -205,19 +207,21 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
-            mstore(m, 0x813500fc) // `setApprovalForAll(address,bool,address)`.
-            mstore(add(m, 0x20), shr(96, shl(96, operator)))
-            mstore(add(m, 0x40), iszero(iszero(approved)))
-            mstore(add(m, 0x60), caller())
+            mstore(0x00, 0x813500fc) // `setApprovalForAll(address,bool,address)`.
+            mstore(0x20, shr(96, shl(96, operator)))
+            mstore(0x40, iszero(iszero(approved)))
+            mstore(0x60, caller())
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), root, callvalue(), add(m, 0x1c), 0x64, 0x00, 0x20)
+                    call(gas(), root, callvalue(), 0x1c, 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
+            mstore(0x40, m) // Restore the free memory pointer.
+            mstore(0x60, 0) // Restore the zero pointer.
         }
         emit ApprovalForAll(msg.sender, operator, approved);
     }
@@ -232,18 +236,16 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
-            mstore(m, 0xe985e9c5) // `isApprovedForAll(address,address)`.
-            mstore(add(m, 0x20), shr(96, shl(96, owner)))
-            mstore(add(m, 0x40), shr(96, shl(96, operator)))
+            mstore(0x00, 0xe985e9c5) // `isApprovedForAll(address,address)`.
+            mstore(0x20, shr(96, shl(96, owner)))
+            mstore(0x40, shr(96, shl(96, operator)))
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
-                    staticcall(gas(), root, add(m, 0x1c), 0x44, 0x00, 0x20)
-                )
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x44, 0x00, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
+            mstore(0x40, m) // Restore the free memory pointer.
             result := iszero(iszero(mload(0x00)))
         }
     }
@@ -366,13 +368,18 @@ contract DN404Mirror {
                 let end := add(o, shl(5, calldataload(sub(o, 0x20))))
                 returndatacopy(0x00, returndatasize(), lt(calldatasize(), end))
 
-                let evtSig := _TRANSFER_EVENT_SIGNATURE
                 for {} iszero(eq(o, end)) { o := add(0x20, o) } {
                     let d := calldataload(o) // Entry in the packed logs.
-                    switch and(0xff, d)
-                    case 0 { log4(codesize(), 0x00, evtSig, 0, shr(96, d), shr(168, shl(160, d))) }
-                    case 1 { log4(codesize(), 0x00, evtSig, shr(96, d), 0, shr(168, shl(160, d))) }
-                    default { revert(0x00, 0x00) }
+                    let a := shr(96, d) // The address.
+                    let b := and(1, d) // Whether it is a burn.
+                    log4(
+                        codesize(),
+                        0x00,
+                        _TRANSFER_EVENT_SIGNATURE,
+                        mul(a, b),
+                        mul(a, iszero(b)),
+                        shr(168, shl(160, d))
+                    )
                 }
                 mstore(0x00, 0x01)
                 return(0x00, 0x20)

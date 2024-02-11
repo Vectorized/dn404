@@ -177,13 +177,6 @@ abstract contract DN404 {
     /*                 SHARED TRANSFER OPERATIONS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    struct _TransferTemps {
-        uint256 nftAmountToBurn; // 0x20.
-        uint256 nftAmountToMint; // 0x40.
-        uint256 toBalance;
-        uint256 fromBalance;
-    }
-
     struct _PackedLogs {
         uint256[] logs;
         uint256 offset;
@@ -192,7 +185,7 @@ abstract contract DN404 {
     function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := add(mload(0x40), 0x40)
+            let logs := add(mload(0x40), 0x40) // Offset by 2 words for `_packedLogsSend`.
             mstore(logs, n)
             let offset := add(0x20, logs)
             mstore(0x40, add(offset, shl(5, n)))
@@ -230,6 +223,15 @@ abstract contract DN404 {
         }
     }
 
+    struct _TransferTemps {
+        uint256 nftAmountToBurn;
+        uint256 nftAmountToMint;
+        uint256 fromBalance;
+        uint256 toBalance;
+        uint256 fromOwnedLength;
+        uint256 toOwnedLength;
+    }
+
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -239,24 +241,27 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         _TransferTemps memory t;
-        uint256 numBurned = $.numBurned;
+        t.fromOwnedLength = fromAddressData.ownedLength;
+        t.toOwnedLength = toAddressData.ownedLength;
 
         fromAddressData.balance = uint96(t.fromBalance = fromAddressData.balance - amount);
+
+        uint256 numBurned = $.numBurned;
 
         unchecked {
             toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
 
-            t.nftAmountToBurn = _zeroFloorSub(fromAddressData.ownedLength, t.fromBalance / _WAD);
+            t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
 
             if (!toAddressData.skipNFT) {
-                t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, toAddressData.ownedLength);
+                t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.nftAmountToBurn + t.nftAmountToMint);
 
             if (t.nftAmountToBurn != 0) {
                 LibMap.Uint32Map storage fromOwned = $.owned[from];
-                uint256 fromIndex = fromAddressData.ownedLength;
+                uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.nftAmountToBurn;
                 $.totalNFTSupply -= uint32(t.nftAmountToBurn);
                 // Burn loop.
@@ -273,7 +278,7 @@ abstract contract DN404 {
 
             if (t.nftAmountToMint != 0) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
-                uint256 toIndex = toAddressData.ownedLength;
+                uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.nftAmountToMint;
                 uint256 id = $.nextTokenId;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
@@ -319,32 +324,27 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
 
-        {
-            uint256 currentTokenSupply = $.totalTokenSupply;
-            currentTokenSupply += amount;
+        unchecked {
+            uint256 currentTokenSupply = uint256($.totalTokenSupply) + amount;
             if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
             $.totalTokenSupply = uint96(currentTokenSupply);
-        }
 
-        unchecked {
             uint256 toBalance = toAddressData.balance + amount;
             toAddressData.balance = uint96(toBalance);
 
             if (!toAddressData.skipNFT) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
-                uint256 toMaxNFTs = toBalance / _WAD;
-                uint256 nftAmountToMint = _zeroFloorSub(toMaxNFTs, toIndex);
+                uint256 toEnd = toBalance / _WAD;
+                _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
 
-                if (nftAmountToMint != 0) {
+                if (packedLogs.logs.length != 0) {
                     uint256 numBurned = $.numBurned;
-                    _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToMint);
-
                     uint256 totalNFTSupply = $.totalNFTSupply;
-                    totalNFTSupply += nftAmountToMint;
+                    totalNFTSupply += packedLogs.logs.length;
                     $.totalNFTSupply = uint32(totalNFTSupply);
 
-                    toAddressData.ownedLength = uint32(toMaxNFTs);
+                    toAddressData.ownedLength = uint32(toEnd);
 
                     uint256 id = $.nextTokenId;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
@@ -366,7 +366,7 @@ abstract contract DN404 {
                         _packedLogsAppend(packedLogs, to, id, 0);
 
                         if (++id > totalNFTSupply) id = 1;
-                    } while (toIndex != toMaxNFTs);
+                    } while (toIndex != toEnd);
 
                     $.nextTokenId = uint32(id);
                     $.numBurned = uint32(numBurned);
@@ -463,13 +463,18 @@ abstract contract DN404 {
         emit Transfer(from, to, _WAD);
     }
 
-    function setSkipNFT(bool skipNFT) external {
+    function getSkipNFT(address a) public view virtual returns (bool) {
+        AddressData storage d = _getDN404Storage().addressData[a];
+        return d.initialized ? d.skipNFT : _hasCode(a);
+    }
+
+    function setSkipNFT(bool skipNFT) public {
         _setSkipNFT(msg.sender, skipNFT);
     }
 
-    function _setSkipNFT(address target, bool state) internal {
-        _addressData(target).skipNFT = state;
-        emit SkipNFTSet(target, state);
+    function _setSkipNFT(address a, bool state) internal {
+        _addressData(a).skipNFT = state;
+        emit SkipNFTSet(a, state);
     }
 
     function _addressData(address a) internal returns (AddressData storage d) {
