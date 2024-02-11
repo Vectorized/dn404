@@ -68,9 +68,9 @@ abstract contract DN404 {
         mapping(address => mapping(address => bool)) operatorApprovals;
         mapping(uint256 => address) tokenApprovals;
         mapping(address => mapping(address => uint256)) allowance;
-        LibMap.Uint32Map ownedIndex;
         mapping(address => LibMap.Uint32Map) owned;
-        LibMap.Uint32Map ownerships;
+        // Even indices: owner aliases. Odd indices: owned indices.
+        LibMap.Uint32Map oo;
         mapping(address => AddressData) addressData;
         mapping(address => bool) whitelist;
     }
@@ -240,8 +240,8 @@ abstract contract DN404 {
                 if (i != end) {
                     do {
                         uint256 id = fromOwned.get(--i);
-                        $.ownedIndex.set(id, 0);
-                        $.ownerships.set(id, 0);
+                        $.oo.set(_ownedIndex(id), 0);
+                        $.oo.set(_ownershipIndex(id), 0);
                         delete $.tokenApprovals[id];
                         /// @solidity memory-safe-assembly
                         assembly {
@@ -264,13 +264,13 @@ abstract contract DN404 {
                 // Mint loop.
                 if (i != end) {
                     do {
-                        while ($.ownerships.get(id) != 0) {
+                        while ($.oo.get(_ownershipIndex(id)) != 0) {
                             if (++id > totalNFTSupply) id = 1;
                         }
 
                         toOwned.set(i, uint32(id));
-                        $.ownerships.set(id, toAlias);
-                        $.ownedIndex.set(id, uint32(i++));
+                        $.oo.set(_ownershipIndex(id), toAlias);
+                        $.oo.set(_ownedIndex(id), uint32(i++));
                         /// @solidity memory-safe-assembly
                         assembly {
                             mstore(packedLogsOffset, or(shl(96, to), shl(8, id)))
@@ -313,7 +313,7 @@ abstract contract DN404 {
 
         if (to == address(0)) revert TransferToZeroAddress();
 
-        address owner = $.aliasToAddress[$.ownerships.get(id)];
+        address owner = $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
 
         if (from != owner) revert TransferFromIncorrectOwner();
 
@@ -333,16 +333,16 @@ abstract contract DN404 {
         unchecked {
             toAddressData.balance += uint96(_WAD);
 
-            $.ownerships.set(id, _registerAndResolveAlias(to));
+            $.oo.set(_ownershipIndex(id), _registerAndResolveAlias(to));
             delete $.tokenApprovals[id];
 
             uint256 updatedId = $.owned[from].get(--fromAddressData.ownedLength);
-            $.owned[from].set($.ownedIndex.get(id), uint32(updatedId));
+            $.owned[from].set($.oo.get(_ownedIndex(id)), uint32(updatedId));
 
             uint256 n = toAddressData.ownedLength++;
-            $.ownedIndex.set(updatedId, $.ownedIndex.get(id));
+            $.oo.set(_ownedIndex(updatedId), $.oo.get(_ownedIndex(id)));
             $.owned[to].set(n, uint32(id));
-            $.ownedIndex.set(id, uint32(n));
+            $.oo.set(_ownedIndex(id), uint32(n));
         }
 
         emit Transfer(from, to, _WAD);
@@ -365,6 +365,16 @@ abstract contract DN404 {
         return addressAlias;
     }
 
+    function _ownershipIndex(uint256 i) private pure returns (uint256) {
+        return i << 1;
+    }
+
+    function _ownedIndex(uint256 i) private pure returns (uint256) {
+        unchecked {
+            return (i << 1) + 1;
+        }
+    }
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                     MIRROR OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -375,7 +385,7 @@ abstract contract DN404 {
 
     function _ownerAt(uint256 id) internal view virtual returns (address result) {
         DN404Storage storage $ = _getDN404Storage();
-        result = $.aliasToAddress[$.ownerships.get(id)];
+        result = $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
     }
 
     function _ownerOf(uint256 id) internal view virtual returns (address result) {
@@ -398,7 +408,7 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        address owner = $.aliasToAddress[$.ownerships.get(id)];
+        address owner = $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
 
         if (msgSender != owner) {
             if (!$.operatorApprovals[owner][msgSender]) {
