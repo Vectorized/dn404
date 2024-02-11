@@ -121,6 +121,30 @@ contract DN404Test is SoladyTest {
         mirror.ownerOf(1);
     }
 
+    function testMintAndBurn() public {
+        address initialSupplyOwner = address(1111);
+
+        dn.initializeDN404(0, initialSupplyOwner, address(mirror));
+        assertEq(dn.getSkipNFT(initialSupplyOwner), false);
+        assertEq(dn.getSkipNFT(address(this)), true);
+
+        vm.prank(initialSupplyOwner);
+        dn.setSkipNFT(false);
+
+        dn.mint(initialSupplyOwner, 4 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 4);
+
+        dn.burn(initialSupplyOwner, 2 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 2);
+
+        dn.mint(initialSupplyOwner, 3 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 5);
+
+        for (uint256 i = 1; i <= 5; ++i) {
+            assertEq(mirror.ownerOf(i), initialSupplyOwner);
+        }
+    }
+
     // for viewing gas
     function testBatchNFTLog() external {
         uint32 totalNFTSupply = 10;

@@ -39,6 +39,14 @@ contract MockDN404 is DN404 {
         return _registerAndResolveAlias(_addressData(target), target);
     }
 
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
+    }
+
+    function burn(address from, uint256 amount) public {
+        _burn(from, amount);
+    }
+
     function initializeDN404(
         uint96 initialTokenSupply,
         address initialSupplyOwner,
