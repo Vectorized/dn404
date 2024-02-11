@@ -20,7 +20,7 @@ abstract contract DN404 {
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    error AlreadyInitialized();
+    error DNAlreadyInitialized();
 
     /// @dev Insufficient balance.
     error InsufficientBalance();
@@ -104,7 +104,7 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        if ($.nextTokenId != 0) revert AlreadyInitialized();
+        if ($.nextTokenId != 0) revert DNAlreadyInitialized();
 
         if (mirror == address(0)) revert MirrorAddressIsZero();
         _linkMirrorContract(mirror);
