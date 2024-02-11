@@ -62,15 +62,17 @@ abstract contract DN404 {
     struct DN404Storage {
         uint32 numAliases;
         uint32 nextTokenId;
+        uint32 numBurned;
         uint32 totalNFTSupply;
         address mirrorERC721;
         mapping(uint32 => address) aliasToAddress;
         mapping(address => mapping(address => bool)) operatorApprovals;
         mapping(uint256 => address) tokenApprovals;
         mapping(address => mapping(address => uint256)) allowance;
-        LibMap.Uint32Map ownedIndex;
         mapping(address => LibMap.Uint32Map) owned;
-        LibMap.Uint32Map ownerships;
+        LibMap.Uint32Map burnedStack;
+        // Even indices: owner aliases. Odd indices: owned indices.
+        LibMap.Uint32Map oo;
         mapping(address => AddressData) addressData;
         mapping(address => bool) whitelist;
     }
@@ -89,6 +91,7 @@ abstract contract DN404 {
 
     function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address mirror)
         internal
+        virtual
     {
         if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) {
             revert InvalidTotalNFTSupply();
@@ -126,15 +129,15 @@ abstract contract DN404 {
 
     function tokenURI(uint256 id) public view virtual returns (string memory);
 
-    function decimals() public pure returns (uint8) {
-        return 18;
-    }
-
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    function totalSupply() public view returns (uint256) {
+    function decimals() public pure returns (uint8) {
+        return 18;
+    }
+
+    function totalSupply() public view virtual returns (uint256) {
         unchecked {
             return uint256(_getDN404Storage().totalNFTSupply) * _WAD;
         }
@@ -159,7 +162,7 @@ abstract contract DN404 {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external virtual {
+    function transferFrom(address from, address to, uint256 amount) public virtual {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 allowed = $.allowance[from][msg.sender];
@@ -185,6 +188,7 @@ abstract contract DN404 {
         uint256 toBalanceBefore;
         uint256 toBalance;
         uint256 fromBalance;
+        uint256 numBurned;
     }
 
     function _transfer(address from, address to, uint256 amount) internal {
@@ -197,6 +201,7 @@ abstract contract DN404 {
 
         _TransferTemps memory t;
         t.mirror = $.mirrorERC721;
+        t.numBurned = $.numBurned;
 
         t.fromBalanceBefore = fromAddressData.balance;
         fromAddressData.balance = uint96(t.fromBalance = t.fromBalanceBefore - amount);
@@ -240,8 +245,9 @@ abstract contract DN404 {
                 if (i != end) {
                     do {
                         uint256 id = fromOwned.get(--i);
-                        $.ownedIndex.set(id, 0);
-                        $.ownerships.set(id, 0);
+                        $.oo.set(_ownedIndex(id), 0);
+                        $.oo.set(_ownershipIndex(id), 0);
+                        $.burnedStack.set(t.numBurned++, uint32(id));
                         delete $.tokenApprovals[id];
                         /// @solidity memory-safe-assembly
                         assembly {
@@ -264,13 +270,19 @@ abstract contract DN404 {
                 // Mint loop.
                 if (i != end) {
                     do {
-                        while ($.ownerships.get(id) != 0) {
-                            if (++id > totalNFTSupply) id = 1;
+                        if ($.oo.get(_ownershipIndex(id)) != 0) {
+                            if (t.numBurned != 0) {
+                                id = $.burnedStack.get(--t.numBurned);
+                            } else {
+                                do {
+                                    if (++id > totalNFTSupply) id = 1;
+                                } while ($.oo.get(_ownershipIndex(id)) == 0);
+                            }
                         }
 
                         toOwned.set(i, uint32(id));
-                        $.ownerships.set(id, toAlias);
-                        $.ownedIndex.set(id, uint32(i++));
+                        $.oo.set(_ownershipIndex(id), toAlias);
+                        $.oo.set(_ownedIndex(id), uint32(i++));
                         /// @solidity memory-safe-assembly
                         assembly {
                             mstore(packedLogsOffset, or(shl(96, to), shl(8, id)))
@@ -284,9 +296,10 @@ abstract contract DN404 {
                 }
             }
 
-            /// @solidity memory-safe-assembly
-            assembly {
-                if mload(packedLogs) {
+            if (packedLogs.length != 0) {
+                $.numBurned = uint32(t.numBurned);
+                /// @solidity memory-safe-assembly
+                assembly {
                     let mirror := mload(add(t, 0x80))
                     let o := sub(packedLogs, 0x40) // Start of calldata to send.
                     mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
@@ -313,7 +326,7 @@ abstract contract DN404 {
 
         if (to == address(0)) revert TransferToZeroAddress();
 
-        address owner = $.aliasToAddress[$.ownerships.get(id)];
+        address owner = $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
 
         if (from != owner) revert TransferFromIncorrectOwner();
 
@@ -333,16 +346,16 @@ abstract contract DN404 {
         unchecked {
             toAddressData.balance += uint96(_WAD);
 
-            $.ownerships.set(id, _registerAndResolveAlias(to));
+            $.oo.set(_ownershipIndex(id), _registerAndResolveAlias(to));
             delete $.tokenApprovals[id];
 
             uint256 updatedId = $.owned[from].get(--fromAddressData.ownedLength);
-            $.owned[from].set($.ownedIndex.get(id), uint32(updatedId));
+            $.owned[from].set($.oo.get(_ownedIndex(id)), uint32(updatedId));
 
             uint256 n = toAddressData.ownedLength++;
-            $.ownedIndex.set(updatedId, $.ownedIndex.get(id));
+            $.oo.set(_ownedIndex(updatedId), $.oo.get(_ownedIndex(id)));
             $.owned[to].set(n, uint32(id));
-            $.ownedIndex.set(id, uint32(n));
+            $.oo.set(_ownedIndex(id), uint32(n));
         }
 
         emit Transfer(from, to, _WAD);
@@ -365,31 +378,41 @@ abstract contract DN404 {
         return addressAlias;
     }
 
+    function _ownershipIndex(uint256 i) private pure returns (uint256) {
+        return i << 1;
+    }
+
+    function _ownedIndex(uint256 i) private pure returns (uint256) {
+        unchecked {
+            return (i << 1) + 1;
+        }
+    }
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                     MIRROR OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    function mirrorERC721() public view returns (address mirror) {
+    function mirrorERC721() public view returns (address) {
         return _getDN404Storage().mirrorERC721;
     }
 
-    function _ownerAt(uint256 id) internal view virtual returns (address result) {
+    function _ownerAt(uint256 id) internal view virtual returns (address) {
         DN404Storage storage $ = _getDN404Storage();
-        result = $.aliasToAddress[$.ownerships.get(id)];
+        return $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
     }
 
-    function _ownerOf(uint256 id) internal view virtual returns (address result) {
+    function _ownerOf(uint256 id) internal view virtual returns (address) {
         if (!_exists(id)) revert TokenDoesNotExist();
-        result = _ownerAt(id);
+        return _ownerAt(id);
     }
 
-    function _exists(uint256 id) internal view virtual returns (bool result) {
-        result = _ownerAt(id) != address(0);
+    function _exists(uint256 id) internal view virtual returns (bool) {
+        return _ownerAt(id) != address(0);
     }
 
-    function _getApproved(uint256 id) internal view returns (address result) {
+    function _getApproved(uint256 id) internal view returns (address) {
         if (!_exists(id)) revert TokenDoesNotExist();
-        result = _getDN404Storage().tokenApprovals[id];
+        return _getDN404Storage().tokenApprovals[id];
     }
 
     function _approveNFT(address spender, uint256 id, address msgSender)
@@ -398,7 +421,7 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        address owner = $.aliasToAddress[$.ownerships.get(id)];
+        address owner = $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
 
         if (msgSender != owner) {
             if (!$.operatorApprovals[owner][msgSender]) {
@@ -415,9 +438,7 @@ abstract contract DN404 {
         internal
         virtual
     {
-        DN404Storage storage $ = _getDN404Storage();
-
-        $.operatorApprovals[msgSender][operator] = approved;
+        _getDN404Storage().operatorApprovals[msgSender][operator] = approved;
     }
 
     function _linkMirrorContract(address mirror) internal {
