@@ -178,10 +178,8 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     struct _TransferTemps {
-        bool toSkipNFT; // 0x00.
         uint256 nftAmountToBurn; // 0x20.
         uint256 nftAmountToMint; // 0x40.
-        address mirror; // 0x60.
         uint256 fromBalanceBefore;
         uint256 toBalanceBefore;
         uint256 toBalance;
@@ -198,7 +196,6 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         _TransferTemps memory t;
-        t.mirror = $.mirrorERC721;
         t.numBurned = $.numBurned;
 
         t.fromBalanceBefore = fromAddressData.balance;
@@ -208,21 +205,20 @@ abstract contract DN404 {
             t.toBalanceBefore = toAddressData.balance;
             toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
 
-            t.toSkipNFT = toAddressData.skipNFT;
-
             if (fromAddressData.ownedLength > t.fromBalance / _WAD) {
                 t.nftAmountToBurn = fromAddressData.ownedLength - t.fromBalance / _WAD;
             }
-            t.nftAmountToMint = t.toBalance / _WAD - t.toBalanceBefore / _WAD;
+            if (!toAddressData.skipNFT) {
+                t.nftAmountToMint = t.toBalance / _WAD - t.toBalanceBefore / _WAD;
+            }
 
             uint256[] memory packedLogs;
             uint256 packedLogsOffset;
             /// @solidity memory-safe-assembly
             assembly {
-                let toSkipNFT := mload(add(t, 0x00))
-                let nftAmountToBurn := mload(add(t, 0x20))
-                let nftAmountToMint := mload(add(t, 0x40))
-                let total := add(nftAmountToBurn, mul(iszero(toSkipNFT), nftAmountToMint))
+                let nftAmountToBurn := mload(add(t, 0x00))
+                let nftAmountToMint := mload(add(t, 0x20))
+                let total := add(nftAmountToBurn, nftAmountToMint)
                 // Allocate extra space before to make calling cheaper.
                 packedLogs := add(mload(0x40), 0x40)
                 mstore(packedLogs, total)
@@ -253,7 +249,7 @@ abstract contract DN404 {
                 }
             }
 
-            if (!t.toSkipNFT) {
+            if (t.nftAmountToMint != 0) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 i = toAddressData.ownedLength;
                 uint256 end = i + t.nftAmountToMint;
@@ -294,9 +290,9 @@ abstract contract DN404 {
 
             if (packedLogs.length != 0) {
                 $.numBurned = uint32(t.numBurned);
+                address mirror = $.mirrorERC721;
                 /// @solidity memory-safe-assembly
                 assembly {
-                    let mirror := mload(add(t, 0x60))
                     let o := sub(packedLogs, 0x40) // Start of calldata to send.
                     mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
                     mstore(add(o, 0x20), 0x20) // Offset of `packedLogs` in the calldata to send.
