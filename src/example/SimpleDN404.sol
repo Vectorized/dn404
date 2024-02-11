@@ -10,8 +10,6 @@ contract SimpleDN404 is DN404, Ownable {
     string private _name;
     string private _symbol;
     string private _baseURI;
-    uint96 private _initialTokenSupply;
-    address private _initialSupplyOwner;
     DN404Mirror private _mirror;
 
     error TransferFailed();
@@ -26,14 +24,9 @@ contract SimpleDN404 is DN404, Ownable {
 
         _name = name_;
         _symbol = symbol_;
-        _initialTokenSupply = initialTokenSupply;
-        _initialSupplyOwner = initialSupplyOwner;
 
         _mirror = new DN404Mirror(owner());
-    }
-
-    function initializeDN404() public onlyOwner {
-        _initializeDN404(_initialTokenSupply, _initialSupplyOwner, address(_mirror));
+        _initializeDN404(initialTokenSupply, initialSupplyOwner, address(_mirror));
     }
 
     // This allows anyone to mint more ERC20 tokens
