@@ -10,7 +10,6 @@ contract SimpleDN404Test is SoladyTest {
 
     function setUp() public {
         dn = new SimpleDN404("DN404", "DN", 1000, address(this));
-        // dn.initializeDN404();
     }
 
     function testMint() public {
