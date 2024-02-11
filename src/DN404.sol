@@ -109,7 +109,7 @@ abstract contract DN404 {
 
         if (initialTokenSupply > 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (initialTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
+            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
 
             $.totalTokenSupply = initialTokenSupply;
             $.addressData[initialSupplyOwner].balance = initialTokenSupply;
@@ -182,7 +182,6 @@ abstract contract DN404 {
         uint256 nftAmountToMint; // 0x40.
         uint256 toBalance;
         uint256 fromBalance;
-        uint256 numBurned;
     }
 
     struct _PackedLogs {
@@ -240,7 +239,7 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         _TransferTemps memory t;
-        t.numBurned = $.numBurned;
+        uint256 numBurned = $.numBurned;
 
         fromAddressData.balance = uint96(t.fromBalance = fromAddressData.balance - amount);
 
@@ -257,27 +256,25 @@ abstract contract DN404 {
 
             if (t.nftAmountToBurn != 0) {
                 LibMap.Uint32Map storage fromOwned = $.owned[from];
-                uint256 i = fromAddressData.ownedLength;
-                uint256 end = i - t.nftAmountToBurn;
+                uint256 fromIndex = fromAddressData.ownedLength;
+                uint256 fromEnd = fromIndex - t.nftAmountToBurn;
                 $.totalNFTSupply -= uint32(t.nftAmountToBurn);
                 // Burn loop.
-                if (i != end) {
-                    do {
-                        uint256 id = fromOwned.get(--i);
-                        $.oo.set(_ownedIndex(id), 0);
-                        $.oo.set(_ownershipIndex(id), 0);
-                        $.burnedStack.set(t.numBurned++, uint32(id));
-                        delete $.tokenApprovals[id];
-                        _packedLogsAppend(packedLogs, from, id, 1);
-                    } while (i != end);
-                    fromAddressData.ownedLength = uint32(i);
-                }
+                do {
+                    uint256 id = fromOwned.get(--fromIndex);
+                    $.oo.set(_ownedIndex(id), 0);
+                    $.oo.set(_ownershipIndex(id), 0);
+                    $.burnedStack.set(numBurned++, uint32(id));
+                    delete $.tokenApprovals[id];
+                    _packedLogsAppend(packedLogs, from, id, 1);
+                } while (fromIndex != fromEnd);
+                fromAddressData.ownedLength = uint32(fromIndex);
             }
 
             if (t.nftAmountToMint != 0) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
-                uint256 i = toAddressData.ownedLength;
-                uint256 end = i + t.nftAmountToMint;
+                uint256 toIndex = toAddressData.ownedLength;
+                uint256 toEnd = toIndex + t.nftAmountToMint;
                 uint256 id = $.nextTokenId;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 totalNFTSupply = $.totalNFTSupply;
@@ -285,36 +282,33 @@ abstract contract DN404 {
                 $.totalNFTSupply = uint32(totalNFTSupply);
 
                 // Mint loop.
-                if (i != end) {
-                    do {
-                        if ($.oo.get(_ownershipIndex(id)) != 0) {
-                            if (t.numBurned != 0) {
-                                id = $.burnedStack.get(--t.numBurned);
-                            } else {
-                                do {
-                                    if (++id > totalNFTSupply) id = 1;
-                                } while ($.oo.get(_ownershipIndex(id)) == 0);
-                            }
+                do {
+                    if ($.oo.get(_ownershipIndex(id)) != 0) {
+                        if (numBurned != 0) {
+                            id = $.burnedStack.get(--numBurned);
+                        } else {
+                            do {
+                                if (++id > totalNFTSupply) id = 1;
+                            } while ($.oo.get(_ownershipIndex(id)) == 0);
                         }
+                    }
 
-                        toOwned.set(i, uint32(id));
-                        $.oo.set(_ownershipIndex(id), toAlias);
-                        $.oo.set(_ownedIndex(id), uint32(i++));
-                        _packedLogsAppend(packedLogs, to, id, 0);
+                    toOwned.set(toIndex, uint32(id));
+                    $.oo.set(_ownershipIndex(id), toAlias);
+                    $.oo.set(_ownedIndex(id), uint32(toIndex++));
+                    _packedLogsAppend(packedLogs, to, id, 0);
 
-                        if (++id > totalNFTSupply) id = 1;
-                    } while (i != end);
-                    toAddressData.ownedLength = uint32(i);
-                    $.nextTokenId = uint32(id);
-                }
+                    if (++id > totalNFTSupply) id = 1;
+                } while (toIndex != toEnd);
+                toAddressData.ownedLength = uint32(toIndex);
+                $.nextTokenId = uint32(id);
             }
 
             if (packedLogs.logs.length != 0) {
-                $.numBurned = uint32(t.numBurned);
+                $.numBurned = uint32(numBurned);
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
-
         emit Transfer(from, to, amount);
     }
 
@@ -325,10 +319,12 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
 
-        uint256 currentTokenSupply = $.totalTokenSupply;
-        currentTokenSupply += amount;
-        if (currentTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
-        $.totalTokenSupply = uint96(currentTokenSupply);
+        {
+            uint256 currentTokenSupply = $.totalTokenSupply;
+            currentTokenSupply += amount;
+            if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
+            $.totalTokenSupply = uint96(currentTokenSupply);
+        }
 
         unchecked {
             uint256 toBalance = toAddressData.balance + amount;
@@ -337,15 +333,16 @@ abstract contract DN404 {
             if (!toAddressData.skipNFT) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
-                uint256 toMaxNFTs = (toBalance / _WAD);
-                if (toMaxNFTs > toIndex) {
-                    uint256 nftAmountToMint = toMaxNFTs - toIndex;
+                uint256 toMaxNFTs = toBalance / _WAD;
+                uint256 nftAmountToMint = _zeroFloorSub(toMaxNFTs, toIndex);
 
+                if (nftAmountToMint != 0) {
+                    uint256 numBurned = $.numBurned;
                     _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToMint);
 
-                    uint256 currentNFTSupply = $.totalNFTSupply;
-                    currentNFTSupply += nftAmountToMint;
-                    $.totalNFTSupply = uint32(currentNFTSupply);
+                    uint256 totalNFTSupply = $.totalNFTSupply;
+                    totalNFTSupply += nftAmountToMint;
+                    $.totalNFTSupply = uint32(totalNFTSupply);
 
                     toAddressData.ownedLength = uint32(toMaxNFTs);
 
@@ -353,8 +350,14 @@ abstract contract DN404 {
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     // Mint loop.
                     do {
-                        while ($.oo.get(_ownershipIndex(id)) != 0) {
-                            if (++id > currentNFTSupply) id = 1;
+                        if ($.oo.get(_ownershipIndex(id)) != 0) {
+                            if (numBurned != 0) {
+                                id = $.burnedStack.get(--numBurned);
+                            } else {
+                                do {
+                                    if (++id > totalNFTSupply) id = 1;
+                                } while ($.oo.get(_ownershipIndex(id)) == 0);
+                            }
                         }
 
                         toOwned.set(toIndex, uint32(id));
@@ -362,17 +365,15 @@ abstract contract DN404 {
                         $.oo.set(_ownedIndex(id), uint32(toIndex++));
                         _packedLogsAppend(packedLogs, to, id, 0);
 
-                        // todo: ensure we don't overwrite ownership of early tokens that weren't burned
-                        if (++id > currentNFTSupply) id = 1;
+                        if (++id > totalNFTSupply) id = 1;
                     } while (toIndex != toMaxNFTs);
 
                     $.nextTokenId = uint32(id);
-
+                    $.numBurned = uint32(numBurned);
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
             }
         }
-
         emit Transfer(address(0), to, amount);
     }
 
@@ -386,39 +387,36 @@ abstract contract DN404 {
         fromAddressData.balance = uint96(fromBalance);
 
         uint256 currentTokenSupply = $.totalTokenSupply;
-        unchecked {
-            currentTokenSupply -= amount;
-        }
+        currentTokenSupply -= amount;
         $.totalTokenSupply = uint96(currentTokenSupply);
 
         unchecked {
             LibMap.Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
-            uint256 fromMaxNFTs = (fromBalance / _WAD);
-            if (fromIndex > fromMaxNFTs) {
-                uint256 nftAmountToBurn = fromIndex - fromMaxNFTs;
+            uint256 nftAmountToBurn = _zeroFloorSub(fromIndex, fromBalance / _WAD);
+
+            if (nftAmountToBurn != 0) {
+                uint256 numBurned = $.numBurned;
                 $.totalNFTSupply -= uint32(nftAmountToBurn);
 
                 _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToBurn);
 
                 uint256 fromEnd = fromIndex - nftAmountToBurn;
                 // Burn loop.
-                if (fromIndex != fromEnd) {
-                    do {
-                        uint256 id = fromOwned.get(--fromIndex);
-                        $.oo.set(_ownedIndex(id), 0);
-                        $.oo.set(_ownershipIndex(id), 0);
-                        delete $.tokenApprovals[id];
-                        _packedLogsAppend(packedLogs, from, id, 1);
-                    } while (fromIndex != fromEnd);
+                do {
+                    uint256 id = fromOwned.get(--fromIndex);
+                    $.oo.set(_ownedIndex(id), 0);
+                    $.oo.set(_ownershipIndex(id), 0);
+                    delete $.tokenApprovals[id];
+                    $.burnedStack.set(numBurned++, uint32(id));
+                    _packedLogsAppend(packedLogs, from, id, 1);
+                } while (fromIndex != fromEnd);
 
-                    fromAddressData.ownedLength = uint32(fromIndex);
-
-                    _packedLogsSend(packedLogs, $.mirrorERC721);
-                }
+                fromAddressData.ownedLength = uint32(fromIndex);
+                $.numBurned = uint32(numBurned);
+                _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
-
         emit Transfer(from, address(0), amount);
     }
 
