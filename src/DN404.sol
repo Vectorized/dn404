@@ -20,7 +20,7 @@ abstract contract DN404 {
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    error DNAlreadyInitialized();
+    error AlreadyInitialized();
 
     /// @dev Insufficient balance.
     error InsufficientBalance();
@@ -104,7 +104,7 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        if ($.nextTokenId != 0) revert DNAlreadyInitialized();
+        if ($.nextTokenId != 0) revert AlreadyInitialized();
 
         if (mirror == address(0)) revert MirrorAddressIsZero();
         _linkMirrorContract(mirror);
@@ -113,12 +113,8 @@ abstract contract DN404 {
         $.mirrorERC721 = mirror;
 
         if (initialTokenSupply > 0) {
-            if (initialSupplyOwner == address(0)) {
-                revert TransferToZeroAddress();
-            }
-            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) {
-                revert InvalidTotalNFTSupply();
-            }
+            if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
+            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
 
             $.totalTokenSupply = initialTokenSupply;
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
@@ -340,9 +336,7 @@ abstract contract DN404 {
 
         unchecked {
             uint256 currentTokenSupply = uint256($.totalTokenSupply) + amount;
-            if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) {
-                revert InvalidTotalNFTSupply();
-            }
+            if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
             $.totalTokenSupply = uint96(currentTokenSupply);
 
             uint256 toBalance = toAddressData.balance + amount;
