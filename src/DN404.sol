@@ -22,6 +22,13 @@ abstract contract DN404 {
 
     error AlreadyInitialized();
 
+    /// @dev Insufficient balance.
+    error InsufficientBalance();
+
+    /// @dev Insufficient allowance.
+    error InsufficientAllowance();
+
+    /// @dev The total supply has overflowed.
     error InvalidTotalNFTSupply();
 
     error Unauthorized();
@@ -169,7 +176,10 @@ abstract contract DN404 {
         uint256 allowed = $.allowance[from][msg.sender];
 
         if (allowed != type(uint256).max) {
-            $.allowance[from][msg.sender] = allowed - amount;
+            if (amount > allowed) revert InsufficientAllowance();
+            unchecked {
+                $.allowance[from][msg.sender] = allowed - amount;
+            }
         }
 
         _transfer(from, to, amount);
@@ -253,10 +263,13 @@ abstract contract DN404 {
         _TransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
+        t.fromBalance = fromAddressData.balance;
 
-        fromAddressData.balance = uint96(t.fromBalance = fromAddressData.balance - amount);
+        if (amount > t.fromBalance) revert InsufficientBalance();
 
         unchecked {
+            t.fromBalance -= amount;
+            fromAddressData.balance = uint96(t.fromBalance);
             toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
 
             t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
@@ -365,14 +378,16 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
 
         uint256 fromBalance = fromAddressData.balance;
-        fromBalance -= amount;
-        fromAddressData.balance = uint96(fromBalance);
+        if (amount > fromBalance) revert InsufficientBalance();
 
         uint256 currentTokenSupply = $.totalTokenSupply;
-        currentTokenSupply -= amount;
-        $.totalTokenSupply = uint96(currentTokenSupply);
 
         unchecked {
+            fromBalance -= amount;
+            fromAddressData.balance = uint96(fromBalance);
+            currentTokenSupply -= amount;
+            $.totalTokenSupply = uint96(currentTokenSupply);
+
             LibMap.Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 nftAmountToBurn = _zeroFloorSub(fromIndex, fromBalance / _WAD);
