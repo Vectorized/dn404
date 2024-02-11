@@ -190,6 +190,44 @@ contract DN404Test is SoladyTest {
         assertEq(count, 2);
     }
 
+    function testTransfersAndBurns() public {
+        address initialSupplyOwner = address(1111);
+        address alice = address(111);
+        address bob = address(222);
+
+        dn.initializeDN404(uint96(10 * _WAD), initialSupplyOwner, address(mirror));
+        assertEq(dn.getSkipNFT(initialSupplyOwner), true);
+        assertEq(dn.getSkipNFT(alice), false);
+        assertEq(dn.getSkipNFT(bob), false);
+
+        vm.prank(initialSupplyOwner);
+        dn.transfer(alice, 5 * _WAD);
+
+        vm.prank(initialSupplyOwner);
+        dn.transfer(bob, 5 * _WAD);
+
+        for (uint256 i = 1; i <= 5; ++i) {
+            assertEq(dn.ownerAt(i), alice);
+        }
+        for (uint256 i = 6; i <= 10; ++i) {
+            assertEq(dn.ownerAt(i), bob);
+        }
+
+        vm.prank(alice);
+        dn.transfer(initialSupplyOwner, 5 * _WAD);
+
+        for (uint256 i = 1; i <= 5; ++i) {
+            assertEq(dn.ownerAt(i), address(0));
+        }
+        for (uint256 i = 6; i <= 10; ++i) {
+            assertEq(dn.ownerAt(i), bob);
+        }
+
+        vm.prank(initialSupplyOwner);
+        dn.transfer(alice, 1 * _WAD);
+        assertEq(dn.ownerAt(1), alice);
+    }
+
     // for viewing gas
     function testBatchNFTLog() external {
         uint32 totalNFTSupply = 10;
