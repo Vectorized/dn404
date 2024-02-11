@@ -76,7 +76,6 @@ contract DN404ATest is Test {
         assertEq(nft.ownerOf(5), user2);
     }
 
-
     function test_transferMultipleLots() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
