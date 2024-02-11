@@ -366,7 +366,7 @@ abstract contract DN404 {
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
-    /*                  ERC721 MIRROR OPERATIONS                  */
+    /*                     MIRROR OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     function mirrorERC721() public view returns (address mirror) {
@@ -516,10 +516,6 @@ abstract contract DN404 {
     fallback() external payable virtual dn404Fallback {}
 
     receive() external payable virtual {}
-
-    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
-    /*                      PRIVATE HELPERS                       */
-    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     function _calldataload(uint256 offset) private pure returns (uint256 value) {
         /// @solidity memory-safe-assembly

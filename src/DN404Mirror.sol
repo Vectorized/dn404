@@ -12,6 +12,10 @@ contract DN404Mirror {
 
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
+    /// @dev `keccak256(bytes("Transfer(address,address,uint256)"))`.
+    uint256 private constant _TRANSFER_EVENT_SIGNATURE =
+        0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -26,18 +30,42 @@ contract DN404Mirror {
 
     error NotLinked();
 
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                         CONSTANTS                          */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
     uint256 private constant _WAD = 1000000000000000000;
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                          STORAGE                           */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     struct DN404NFTStorage {
         address rootERC20;
         address deployer;
     }
 
+    function _getDN404NFTStorage() internal pure returns (DN404NFTStorage storage $) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // keccak256(abi.encode(uint256(keccak256("dn404.nft")) - 1)) & ~bytes32(uint256(0xff))
+            $.slot := 0xe8cb618a1de8ad2a6a7b358523c369cb09f40cc15da64205134c7e55c6a86700
+        }
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                        CONSTRUCTOR                         */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
     constructor() {
         // For non-proxies, we will store the deployer so that only the deployer can
         // link the root contract.
         _getDN404NFTStorage().deployer = msg.sender;
     }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                     ERC721 OPERATIONS                      */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     function name() public view virtual returns (string memory result) {
         address root = rootERC20();
@@ -264,20 +292,16 @@ contract DN404Mirror {
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
     }
 
-    /// @dev Returns true if this contract implements the interface defined by
-    /// `interfaceId`. See the corresponding
-    /// [EIP section](https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified)
-    /// to learn more about how these ids are created.
-    ///
+    /// @dev Returns true if this contract implements the interface defined by `interfaceId`.
+    /// See: https://eips.ethereum.org/EIPS/eip-165
     /// This function call must use less than 30000 gas.
-    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
-        // The interface IDs are constants representing the first 4 bytes
-        // of the XOR of all function selectors in the interface.
-        // See: [ERC165](https://eips.ethereum.org/EIPS/eip-165)
-        // (e.g. `bytes4(i.functionA.selector ^ i.functionB.selector ^ ...)`)
-        return interfaceId == 0x01ffc9a7 // ERC165 interface ID for ERC165.
-            || interfaceId == 0x80ac58cd // ERC165 interface ID for ERC721.
-            || interfaceId == 0x5b5e139f; // ERC165 interface ID for ERC721Metadata.
+    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := shr(224, interfaceId)
+            // ERC165: 0x01ffc9a7, ERC721: 0x80ac58cd, ERC721Metadata: 0x5b5e139f.
+            result := or(or(eq(s, 0x01ffc9a7), eq(s, 0x80ac58cd)), eq(s, 0x5b5e139f))
+        }
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
@@ -322,20 +346,9 @@ contract DN404Mirror {
         }
     }
 
-    function _calldataload(uint256 offset) private pure returns (uint256 value) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            value := calldataload(offset)
-        }
-    }
-
-    function _return(uint256 word) private pure {
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, word)
-            return(0x00, 0x20)
-        }
-    }
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                     MIRROR OPERATIONS                      */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     function rootERC20() public view returns (address root) {
         root = _getDN404NFTStorage().rootERC20;
@@ -347,6 +360,30 @@ contract DN404Mirror {
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
 
+        // `logTransfer(uint256[])`.
+        if (fnSelector == 0x263c69d6) {
+            if (msg.sender != $.rootERC20) revert Unauthorized();
+            /// @solidity memory-safe-assembly
+            assembly {
+                // When returndatacopy copies 1 or more out-of-bounds bytes, it reverts.
+                returndatacopy(0x00, returndatasize(), lt(calldatasize(), 0x20))
+                let o := add(0x24, calldataload(0x04)) // Packed logs offset.
+                returndatacopy(0x00, returndatasize(), lt(calldatasize(), o))
+                let end := add(o, shl(5, calldataload(sub(o, 0x20))))
+                returndatacopy(0x00, returndatasize(), lt(calldatasize(), end))
+
+                let evtSig := _TRANSFER_EVENT_SIGNATURE
+                for {} iszero(eq(o, end)) { o := add(0x20, o) } {
+                    let d := calldataload(o) // Entry in the packed logs.
+                    switch and(0xff, d)
+                    case 0 { log4(codesize(), 0x00, evtSig, 0, shr(96, d), shr(168, shl(160, d))) }
+                    case 1 { log4(codesize(), 0x00, evtSig, shr(96, d), 0, shr(168, shl(160, d))) }
+                    default { revert(0x00, 0x00) }
+                }
+                mstore(0x00, 0x01)
+                return(0x00, 0x20)
+            }
+        }
         // `linkMirrorContract(address)`.
         if (fnSelector == 0x0f4599e5) {
             if ($.deployer != address(0)) {
@@ -369,45 +406,21 @@ contract DN404Mirror {
                     mstore(0x00, 0x8f36fa09) // `CannotLink()`.
                     revert(0x1c, 0x04)
                 }
+                mstore(0x00, 0x01)
+                return(0x00, 0x20)
             }
-            _return(1);
         }
         _;
-    }
-
-    function logTransfer(uint256[] calldata packedLogs) external returns (bool) {
-        DN404NFTStorage storage $ = _getDN404NFTStorage();
-        if (msg.sender != $.rootERC20) revert Unauthorized();
-
-        for (uint256 i; i < packedLogs.length; ++i) {
-            uint256 data = packedLogs[i];
-
-            address addr = address(uint160(data >> 96));
-            uint256 id = (data & type(uint96).max) >> 8;
-            uint256 action = data & 0xff;
-
-            if (action == 0) {
-                // mint
-                emit Transfer(address(0), addr, id);
-            } else if (action == 1) {
-                // burn
-                emit Transfer(addr, address(0), id);
-            } else {
-                revert();
-            }
-        }
-        _return(1);
     }
 
     fallback() external payable virtual dn404NFTFallback {}
 
     receive() external payable virtual {}
 
-    function _getDN404NFTStorage() internal pure returns (DN404NFTStorage storage $) {
+    function _calldataload(uint256 offset) private pure returns (uint256 value) {
         /// @solidity memory-safe-assembly
         assembly {
-            // keccak256(abi.encode(uint256(keccak256("dn404.nft")) - 1)) & ~bytes32(uint256(0xff))
-            $.slot := 0xe8cb618a1de8ad2a6a7b358523c369cb09f40cc15da64205134c7e55c6a86700
+            value := calldataload(offset)
         }
     }
 }

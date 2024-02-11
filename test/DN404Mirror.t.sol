@@ -116,6 +116,8 @@ contract DN404MirrorTest is SoladyTest {
         emit DN404Mirror.Transfer(address(0), to, id);
         vm.expectEmit(true, true, true, true);
         emit DN404Mirror.Transfer(from, address(0), id);
-        mirror.logTransfer(packedLogs);
+        (bool success,) =
+            address(mirror).call(abi.encodeWithSignature("logTransfer(uint256[])", packedLogs));
+        assertTrue(success);
     }
 }
