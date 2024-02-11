@@ -62,6 +62,7 @@ abstract contract DN404 {
     struct DN404Storage {
         uint32 numAliases;
         uint32 nextTokenId;
+        uint32 numBurned;
         uint32 totalNFTSupply;
         address mirrorERC721;
         mapping(uint32 => address) aliasToAddress;
@@ -69,6 +70,7 @@ abstract contract DN404 {
         mapping(uint256 => address) tokenApprovals;
         mapping(address => mapping(address => uint256)) allowance;
         mapping(address => LibMap.Uint32Map) owned;
+        LibMap.Uint32Map burnStack;
         // Even indices: owner aliases. Odd indices: owned indices.
         LibMap.Uint32Map oo;
         mapping(address => AddressData) addressData;
@@ -242,6 +244,7 @@ abstract contract DN404 {
                         uint256 id = fromOwned.get(--i);
                         $.oo.set(_ownedIndex(id), 0);
                         $.oo.set(_ownershipIndex(id), 0);
+                        $.burnStack.set($.numBurned++, uint32(id));
                         delete $.tokenApprovals[id];
                         /// @solidity memory-safe-assembly
                         assembly {
@@ -264,8 +267,14 @@ abstract contract DN404 {
                 // Mint loop.
                 if (i != end) {
                     do {
-                        while ($.oo.get(_ownershipIndex(id)) != 0) {
-                            if (++id > totalNFTSupply) id = 1;
+                        if ($.oo.get(_ownershipIndex(id)) != 0) {
+                            if ($.numBurned != 0) {
+                                id = $.burnStack.get(--$.numBurned);
+                            } else {
+                                do {
+                                    if (++id > totalNFTSupply) id = 1;
+                                } while ($.oo.get(_ownershipIndex(id)) == 0);
+                            }
                         }
 
                         toOwned.set(i, uint32(id));
