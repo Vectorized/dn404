@@ -337,8 +337,8 @@ abstract contract DN404 {
         return true;
     }
 
-    function _logNftTransfer(address mirror, uint256[] memory p) private {
-        require(DN404Mirror(payable(mirror)).logTransfer(p));
+    function _logNftTransfer(address mirror, uint256[] memory packedLogs) private {
+        require(DN404Mirror(payable(mirror)).logTransfer(packedLogs));
     }
 
     function _ownerAt(uint256 id) internal view virtual returns (address result) {

@@ -99,4 +99,23 @@ contract DN404MirrorTest is SoladyTest {
         assertEq(success, true);
         assertEq(data, abi.encode(0x1));
     }
+
+    function testLogTransfer() public {
+        dn.initializeDN404(1000, address(this), address(mirror));
+
+        uint256[] memory packedLogs = new uint256[](2);
+
+        address to = address(111);
+        address from = address(222);
+        uint32 id = 88;
+        packedLogs[0] = (uint256(uint160(to)) << 96) | (id << 8);
+        packedLogs[1] = (uint256(uint160(from)) << 96) | (id << 8) | 1;
+
+        vm.prank(address(dn));
+        vm.expectEmit(true, true, true, true);
+        emit DN404Mirror.Transfer(address(0), to, id);
+        vm.expectEmit(true, true, true, true);
+        emit DN404Mirror.Transfer(from, address(0), id);
+        mirror.logTransfer(packedLogs);
+    }
 }
