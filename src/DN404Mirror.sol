@@ -375,12 +375,12 @@ contract DN404Mirror {
         _;
     }
 
-    function logTransfer(uint256[] calldata p) external returns (bool) {
+    function logTransfer(uint256[] calldata packedLogs) external returns (bool) {
         DN404NFTStorage storage $ = _getDN404NFTStorage();
         if (msg.sender != $.rootERC20) revert Unauthorized();
 
-        for (uint256 i; i < p.length; ++i) {
-            uint256 data = p[i];
+        for (uint256 i; i < packedLogs.length; ++i) {
+            uint256 data = packedLogs[i];
 
             address addr = address(uint160(data >> 96));
             uint256 id = (data & type(uint96).max) >> 8;
