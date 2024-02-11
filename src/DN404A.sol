@@ -168,14 +168,13 @@ abstract contract DN404A {
         $.oo.set(_ownershipIndex(headId), toAlias);
         $.oo.set(_ownedIndex(headId), lotIndex);
 
-        // Store lot size if above one (can detect that it's not an actual index by seeing that the
-        // alias is 0).
+        // Store lot size if above one (can later detect that it's not an actual index by seeing
+        // that the alias is 0).
         if (tokenCount > 1) {
             $.oo.set(_ownedIndex(headId + 1), uint32(tokenCount));
         }
 
         unchecked {
-            // Assuming initialized will always be 0 (even if tokenCount = 0).
             uint256 lastId = numMinted + tokenCount;
             if (lastId > _MAX_TOKEN_ID) revert InvalidTotalNFTSupply();
 
