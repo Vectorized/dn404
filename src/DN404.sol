@@ -238,6 +238,10 @@ abstract contract DN404 {
         uint256 toOwnedLength;
     }
 
+    function _skipBurnStack(uint256) internal pure virtual returns (bool) {
+        return false;
+    }
+
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -293,7 +297,7 @@ abstract contract DN404 {
                 // Mint loop.
                 do {
                     uint256 id;
-                    if (numBurned != 0) {
+                    if (numBurned != 0 && !_skipBurnStack(toIndex)) {
                         id = $.burnedStack.get(--numBurned);
                     } else {
                         id = $.nextTokenId;
@@ -347,7 +351,7 @@ abstract contract DN404 {
                     // Mint loop.
                     do {
                         uint256 id;
-                        if (numBurned != 0) {
+                        if (numBurned != 0 && !_skipBurnStack(toIndex)) {
                             id = $.burnedStack.get(--numBurned);
                         } else {
                             id = $.nextTokenId;
