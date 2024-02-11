@@ -238,6 +238,10 @@ abstract contract DN404 {
         uint256 toOwnedLength;
     }
 
+    function _skipBurnStack(uint256) internal pure virtual returns (bool) {
+        return false;
+    }
+
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -286,33 +290,27 @@ abstract contract DN404 {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.nftAmountToMint;
-                uint256 id = $.nextTokenId;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 totalNFTSupply = $.totalNFTSupply;
-                totalNFTSupply += t.nftAmountToMint;
-                $.totalNFTSupply = uint32(totalNFTSupply);
-
+                uint256 maxNFTId = $.totalTokenSupply / _WAD;
+                $.totalNFTSupply += uint32(t.nftAmountToMint);
+                toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
-                    if ($.oo.get(_ownershipIndex(id)) != 0) {
-                        if (numBurned != 0) {
-                            id = $.burnedStack.get(--numBurned);
-                        } else {
-                            do {
-                                if (++id > totalNFTSupply) id = 1;
-                            } while ($.oo.get(_ownershipIndex(id)) == 0);
+                    uint256 id;
+                    if (numBurned != 0 && !_skipBurnStack(toIndex)) {
+                        id = $.burnedStack.get(--numBurned);
+                    } else {
+                        id = $.nextTokenId;
+                        while ($.oo.get(_ownershipIndex(id)) != 0) {
+                            if (++id > maxNFTId) id = 1;
                         }
+                        $.nextTokenId = uint32(id >= maxNFTId ? 1 : id + 1);
                     }
-
                     toOwned.set(toIndex, uint32(id));
                     $.oo.set(_ownershipIndex(id), toAlias);
                     $.oo.set(_ownedIndex(id), uint32(toIndex++));
                     _packedLogsAppend(packedLogs, to, id, 0);
-
-                    if (++id > totalNFTSupply) id = 1;
                 } while (toIndex != toEnd);
-                toAddressData.ownedLength = uint32(toIndex);
-                $.nextTokenId = uint32(id);
             }
 
             if (packedLogs.logs.length != 0) {
@@ -346,35 +344,28 @@ abstract contract DN404 {
 
                 if (packedLogs.logs.length != 0) {
                     uint256 numBurned = $.numBurned;
-                    uint256 totalNFTSupply = $.totalNFTSupply;
-                    totalNFTSupply += packedLogs.logs.length;
-                    $.totalNFTSupply = uint32(totalNFTSupply);
-
-                    toAddressData.ownedLength = uint32(toEnd);
-
-                    uint256 id = $.nextTokenId;
+                    uint256 maxNFTId = $.totalTokenSupply / _WAD;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
+                    $.totalNFTSupply += uint32(packedLogs.logs.length);
+                    toAddressData.ownedLength = uint32(toEnd);
                     // Mint loop.
                     do {
-                        if ($.oo.get(_ownershipIndex(id)) != 0) {
-                            if (numBurned != 0) {
-                                id = $.burnedStack.get(--numBurned);
-                            } else {
-                                do {
-                                    if (++id > totalNFTSupply) id = 1;
-                                } while ($.oo.get(_ownershipIndex(id)) == 0);
+                        uint256 id;
+                        if (numBurned != 0 && !_skipBurnStack(toIndex)) {
+                            id = $.burnedStack.get(--numBurned);
+                        } else {
+                            id = $.nextTokenId;
+                            while ($.oo.get(_ownershipIndex(id)) != 0) {
+                                if (++id > maxNFTId) id = 1;
                             }
+                            $.nextTokenId = uint32(id >= maxNFTId ? 1 : id + 1);
                         }
-
                         toOwned.set(toIndex, uint32(id));
                         $.oo.set(_ownershipIndex(id), toAlias);
                         $.oo.set(_ownedIndex(id), uint32(toIndex++));
                         _packedLogsAppend(packedLogs, to, id, 0);
-
-                        if (++id > totalNFTSupply) id = 1;
                     } while (toIndex != toEnd);
 
-                    $.nextTokenId = uint32(id);
                     $.numBurned = uint32(numBurned);
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }

@@ -61,7 +61,7 @@ contract DN404Test is SoladyTest {
         totalNFTSupply = uint32(_bound(totalNFTSupply, 1, 5));
         dn.initializeDN404(uint96(totalNFTSupply * _WAD), address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(totalNFTSupply));
-        for (uint256 t; t != 2; ++t) {
+        for (uint256 t; t != 1; ++t) {
             uint256 id = _bound(r, 1, totalNFTSupply);
             vm.prank(alice);
             mirror.transferFrom(alice, bob, id);
@@ -143,6 +143,51 @@ contract DN404Test is SoladyTest {
         for (uint256 i = 1; i <= 5; ++i) {
             assertEq(mirror.ownerOf(i), initialSupplyOwner);
         }
+
+        uint256 count;
+        for (uint256 i = 0; i < 10; ++i) {
+            if (dn.ownerAt(i) == initialSupplyOwner) ++count;
+        }
+        assertEq(count, 5);
+
+        dn.mint(initialSupplyOwner, 3 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 8);
+    }
+
+    function testMintAndBurn2() public {
+        address initialSupplyOwner = address(1111);
+
+        dn.initializeDN404(0, initialSupplyOwner, address(mirror));
+        assertEq(dn.getSkipNFT(initialSupplyOwner), false);
+        assertEq(dn.getSkipNFT(address(this)), true);
+
+        vm.prank(initialSupplyOwner);
+        dn.setSkipNFT(false);
+
+        dn.mint(initialSupplyOwner, 1 * _WAD - 1);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 0);
+
+        dn.burn(initialSupplyOwner, 1);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 0);
+
+        dn.mint(initialSupplyOwner, 1 * _WAD + 2);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 2);
+
+        dn.burn(initialSupplyOwner, 1);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 1);
+
+        dn.mint(initialSupplyOwner, 1);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 2);
+
+        for (uint256 i = 1; i <= 2; ++i) {
+            assertEq(mirror.ownerOf(i), initialSupplyOwner);
+        }
+
+        uint256 count;
+        for (uint256 i = 0; i < 10; ++i) {
+            if (dn.ownerAt(i) == initialSupplyOwner) ++count;
+        }
+        assertEq(count, 2);
     }
 
     // for viewing gas
