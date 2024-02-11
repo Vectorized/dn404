@@ -9,6 +9,7 @@ contract SimpleDN404Test is SoladyTest {
     address alice = address(111);
 
     function setUp() public {
+        vm.prank(alice);
         dn = new SimpleDN404("DN404", "DN", 1000, address(this));
     }
 
@@ -17,8 +18,26 @@ contract SimpleDN404Test is SoladyTest {
         assertEq(dn.totalSupply(), 1100);
     }
 
+    function testName() public {
+        assertEq(dn.name(), "DN404");
+    }
+
+    function testSymbol() public {
+        assertEq(dn.symbol(), "DN");
+    }
+
     function testSetBaseURI() public {
+        vm.prank(alice);
         dn.setBaseURI("https://example.com/");
         assertEq(dn.tokenURI(1), "https://example.com/1");
+    }
+
+    function testWithdraw() public {
+        payable(address(dn)).transfer(1 ether);
+        assertEq(address(dn).balance, 1 ether);
+        vm.prank(alice);
+        dn.withdraw();
+        assertEq(address(dn).balance, 0);
+        assertEq(alice.balance, 1 ether);
     }
 }
