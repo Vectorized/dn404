@@ -84,28 +84,24 @@ contract DN404Test is SoladyTest {
         assertEq(mirror.isApprovedForAll(owner, operator), approved);
     }
 
-    function testMintOnTransfer(
-        uint32 totalNFTSupply,
-        address initialSupplyOwner,
-        address recipient
-    ) public {
-        vm.assume(
-            totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max
-                && initialSupplyOwner != address(0)
-        );
+    function testMintOnTransfer(uint32 totalNFTSupply, address recipient) public {
+        vm.assume(totalNFTSupply != 0 && uint256(totalNFTSupply) + 1 <= type(uint32).max);
         vm.assume(recipient.code.length == 0);
-        vm.assume(initialSupplyOwner != recipient && recipient != address(0));
+        vm.assume(recipient != address(0));
 
-        dn.initializeDN404(uint96(totalNFTSupply * _WAD), initialSupplyOwner, address(mirror));
+        dn.initializeDN404(uint96(totalNFTSupply * _WAD), address(this), address(mirror));
+
+        assertEq(dn.totalSupply(), uint96(totalNFTSupply * _WAD));
+        assertEq(mirror.totalSupply(), 0);
 
         vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.getApproved(1);
 
-        vm.prank(initialSupplyOwner);
         dn.transfer(recipient, _WAD);
 
         assertEq(mirror.balanceOf(recipient), 1);
         assertEq(mirror.ownerOf(1), recipient);
+        assertEq(mirror.totalSupply(), 1);
 
         assertEq(mirror.getApproved(1), address(0));
         vm.prank(recipient);
@@ -113,12 +109,8 @@ contract DN404Test is SoladyTest {
         assertEq(mirror.getApproved(1), address(this));
     }
 
-    function testBurnOnTransfer(
-        uint32 totalNFTSupply,
-        address initialSupplyOwner,
-        address recipient
-    ) public {
-        testMintOnTransfer(totalNFTSupply, initialSupplyOwner, recipient);
+    function testBurnOnTransfer(uint32 totalNFTSupply, address recipient) public {
+        testMintOnTransfer(totalNFTSupply, recipient);
 
         vm.prank(recipient);
         dn.transfer(address(42069), totalNFTSupply + 1);
