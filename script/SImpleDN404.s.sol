@@ -5,6 +5,8 @@ import {SimpleDN404} from "../src/example/SimpleDN404.sol";
 import "forge-std/Script.sol";
 
 contract SimpleDN404Script is Script {
+    uint256 private constant _WAD = 1000000000000000000;
+
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -16,7 +18,7 @@ contract SimpleDN404Script is Script {
         uint96 initialSupply = 1000;
         address owner = address(this);
 
-        new SimpleDN404(name, symbol, initialSupply, owner);
+        new SimpleDN404(name, symbol, uint96(initialSupply * _WAD), owner);
         vm.stopBroadcast();
     }
 }
