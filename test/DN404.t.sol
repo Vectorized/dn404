@@ -127,4 +127,17 @@ contract DN404Test is SoladyTest {
         vm.expectRevert(DN404.TokenDoesNotExist.selector);
         mirror.ownerOf(1);
     }
+
+    // for viewing gas
+    function test_batch_nft_log() external {
+        uint32 totalNFTSupply = 10;
+        address initialSupplyOwner = address(1111);
+        dn.initializeDN404(totalNFTSupply, initialSupplyOwner, address(mirror));
+
+        vm.startPrank(initialSupplyOwner);
+        dn.transfer(address(2222), 10e18);
+
+        vm.startPrank(address(2222));
+        dn.transfer(address(1111), 10e18);
+    }
 }

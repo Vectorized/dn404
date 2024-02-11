@@ -372,18 +372,31 @@ contract DN404Mirror {
             }
             _return(1);
         }
-        // `logTransfer(address,address,uint256)`.
-        if (fnSelector == 0xf51ac936) {
-            if (msg.sender != $.rootERC20) revert Unauthorized();
-
-            address from = address(uint160(_calldataload(0x04)));
-            address to = address(uint160(_calldataload(0x24)));
-            uint256 id = _calldataload(0x44);
-
-            emit Transfer(from, to, id);
-            _return(1);
-        }
         _;
+    }
+
+    function logTransfer(uint256[] calldata p) external returns (bool) {
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        if (msg.sender != $.rootERC20) revert Unauthorized();
+
+        for (uint256 i; i < p.length; ++i) {
+            uint256 data = p[i];
+
+            address addr = address(uint160(data >> 96));
+            uint256 id = (data & type(uint96).max) >> 8;
+            uint256 action = data & 0xff;
+
+            if (action == 0) {
+                // mint
+                emit Transfer(address(0), addr, id);
+            } else if (action == 1) {
+                // burn
+                emit Transfer(addr, address(0), id);
+            } else {
+                revert();
+            }
+        }
+        _return(1);
     }
 
     fallback() external payable virtual dn404NFTFallback {}
