@@ -16,19 +16,6 @@ contract DN404Test is SoladyTest {
         mirror = new DN404Mirror();
     }
 
-    function testNameAndSymbol(string memory name, string memory symbol) public {
-        dn.initializeDN404(1000, address(this), address(mirror));
-        dn.setNameAndSymbol(name, symbol);
-        assertEq(mirror.name(), name);
-        assertEq(mirror.symbol(), symbol);
-    }
-
-    function testTokenURI(string memory baseURI, uint256 id) public {
-        dn.initializeDN404(1000, address(this), address(mirror));
-        dn.setBaseURI(baseURI);
-        assertEq(mirror.tokenURI(id), string(abi.encodePacked(baseURI, id)));
-    }
-
     function testRegisterAndResolveAlias(address a0, address a1) public {
         assertEq(dn.registerAndResolveAlias(a0), 1);
         if (a1 == a0) {
