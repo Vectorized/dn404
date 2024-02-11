@@ -185,6 +185,52 @@ abstract contract DN404 {
         uint256 numBurned;
     }
 
+    struct _PackedLogs {
+        uint256[] logs;
+        uint256 offset;
+    }
+
+    function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let logs := add(mload(0x40), 0x40)
+            mstore(logs, n)
+            let offset := add(0x20, logs)
+            mstore(0x40, add(offset, shl(5, n)))
+            mstore(p, logs)
+            mstore(add(0x20, p), offset)
+        }
+    }
+
+    function _packedLogsAppend(_PackedLogs memory p, address a, uint256 id, uint256 burnBit)
+        private
+        pure
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let offset := mload(add(0x20, p))
+            mstore(offset, or(or(shl(96, a), shl(8, id)), burnBit))
+            mstore(add(0x20, p), add(offset, 0x20))
+        }
+    }
+
+    function _packedLogsSend(_PackedLogs memory p, address mirror) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let logs := mload(p)
+            let o := sub(logs, 0x40) // Start of calldata to send.
+            mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
+            mstore(add(o, 0x20), 0x20) // Offset of `logs` in the calldata to send.
+            let n := add(0x44, shl(5, mload(logs))) // Length of calldata to send.
+            if iszero(
+                and(
+                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
+                    call(gas(), mirror, 0, add(o, 0x1c), n, 0x00, 0x20)
+                )
+            ) { revert(0x00, 0x00) }
+        }
+    }
+
     function _transfer(address from, address to, uint256 amount) internal {
         if (to == address(0)) revert TransferToZeroAddress();
 
@@ -207,19 +253,7 @@ abstract contract DN404 {
                 t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, toAddressData.ownedLength);
             }
 
-            uint256[] memory packedLogs;
-            uint256 packedLogsOffset;
-            /// @solidity memory-safe-assembly
-            assembly {
-                let nftAmountToBurn := mload(add(t, 0x00))
-                let nftAmountToMint := mload(add(t, 0x20))
-                let total := add(nftAmountToBurn, nftAmountToMint)
-                // Allocate extra space before to make calling cheaper.
-                packedLogs := add(mload(0x40), 0x40)
-                mstore(packedLogs, total)
-                packedLogsOffset := add(0x20, packedLogs)
-                mstore(0x40, add(packedLogsOffset, shl(5, total)))
-            }
+            _PackedLogs memory packedLogs = _packedLogsMalloc(t.nftAmountToBurn + t.nftAmountToMint);
 
             if (t.nftAmountToBurn != 0) {
                 LibMap.Uint32Map storage fromOwned = $.owned[from];
@@ -234,11 +268,7 @@ abstract contract DN404 {
                         $.oo.set(_ownershipIndex(id), 0);
                         $.burnedStack.set(t.numBurned++, uint32(id));
                         delete $.tokenApprovals[id];
-                        /// @solidity memory-safe-assembly
-                        assembly {
-                            mstore(packedLogsOffset, or(or(shl(96, from), shl(8, id)), 1))
-                            packedLogsOffset := add(packedLogsOffset, 0x20)
-                        }
+                        _packedLogsAppend(packedLogs, from, id, 1);
                     } while (i != end);
                     fromAddressData.ownedLength = uint32(i);
                 }
@@ -270,12 +300,8 @@ abstract contract DN404 {
                         toOwned.set(i, uint32(id));
                         $.oo.set(_ownershipIndex(id), toAlias);
                         $.oo.set(_ownedIndex(id), uint32(i++));
-                        /// @solidity memory-safe-assembly
-                        assembly {
-                            mstore(packedLogsOffset, or(shl(96, to), shl(8, id)))
-                            packedLogsOffset := add(packedLogsOffset, 0x20)
-                        }
-                        // todo: ensure we don't overwrite ownership of early tokens that weren't burned
+                        _packedLogsAppend(packedLogs, to, id, 0);
+
                         if (++id > totalNFTSupply) id = 1;
                     } while (i != end);
                     toAddressData.ownedLength = uint32(i);
@@ -283,34 +309,117 @@ abstract contract DN404 {
                 }
             }
 
-            if (packedLogs.length != 0) {
+            if (packedLogs.logs.length != 0) {
                 $.numBurned = uint32(t.numBurned);
-                address mirror = $.mirrorERC721;
-                /// @solidity memory-safe-assembly
-                assembly {
-                    let o := sub(packedLogs, 0x40) // Start of calldata to send.
-                    mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
-                    mstore(add(o, 0x20), 0x20) // Offset of `packedLogs` in the calldata to send.
-                    let n := add(0x44, shl(5, mload(packedLogs))) // Length of calldata to send.
-                    if iszero(
-                        and(
-                            and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                            call(gas(), mirror, 0, add(o, 0x1c), n, 0x00, 0x20)
-                        )
-                    ) { revert(0x00, 0x00) }
-                }
+                _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
 
         emit Transfer(from, to, amount);
     }
 
-    /// @dev Returns `max(0, x - y)`.
-    function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(gt(x, y), sub(x, y))
+    function _mint(address to, uint256 amount) internal {
+        if (to == address(0)) revert TransferToZeroAddress();
+
+        DN404Storage storage $ = _getDN404Storage();
+
+        AddressData storage toAddressData = _addressData(to);
+
+        uint256 currentTokenSupply = $.totalTokenSupply;
+        currentTokenSupply += amount;
+        if (currentTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
+        $.totalTokenSupply = uint96(currentTokenSupply);
+
+        unchecked {
+            uint256 toBalance = toAddressData.balance + amount;
+            toAddressData.balance = uint96(toBalance);
+
+            if (!toAddressData.skipNFT) {
+                LibMap.Uint32Map storage toOwned = $.owned[to];
+                uint256 toIndex = toAddressData.ownedLength;
+                uint256 toMaxNFTs = (toBalance / _WAD);
+                if (toMaxNFTs > toIndex) {
+                    uint256 nftAmountToMint = toMaxNFTs - toIndex;
+
+                    _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToMint);
+
+                    uint256 currentNFTSupply = $.totalNFTSupply;
+                    currentNFTSupply += nftAmountToMint;
+                    $.totalNFTSupply = uint32(currentNFTSupply);
+
+                    toAddressData.ownedLength = uint32(toMaxNFTs);
+
+                    uint256 id = $.nextTokenId;
+                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
+                    // Mint loop.
+                    do {
+                        while ($.oo.get(_ownershipIndex(id)) != 0) {
+                            if (++id > currentNFTSupply) id = 1;
+                        }
+
+                        toOwned.set(toIndex, uint32(id));
+                        $.oo.set(_ownershipIndex(id), toAlias);
+                        $.oo.set(_ownedIndex(id), uint32(toIndex++));
+                        _packedLogsAppend(packedLogs, to, id, 0);
+
+                        // todo: ensure we don't overwrite ownership of early tokens that weren't burned
+                        if (++id > currentNFTSupply) id = 1;
+                    } while (toIndex != toMaxNFTs);
+
+                    $.nextTokenId = uint32(id);
+
+                    _packedLogsSend(packedLogs, $.mirrorERC721);
+                }
+            }
         }
+
+        emit Transfer(address(0), to, amount);
+    }
+
+    function _burn(address from, uint256 amount) internal {
+        DN404Storage storage $ = _getDN404Storage();
+
+        AddressData storage fromAddressData = _addressData(from);
+
+        uint256 fromBalance = fromAddressData.balance;
+        fromBalance -= amount;
+        fromAddressData.balance = uint96(fromBalance);
+
+        uint256 currentTokenSupply = $.totalTokenSupply;
+        unchecked {
+            currentTokenSupply -= amount;
+        }
+        $.totalTokenSupply = uint96(currentTokenSupply);
+
+        unchecked {
+            LibMap.Uint32Map storage fromOwned = $.owned[from];
+            uint256 fromIndex = fromAddressData.ownedLength;
+            uint256 fromMaxNFTs = (fromBalance / _WAD);
+            if (fromIndex > fromMaxNFTs) {
+                uint256 nftAmountToBurn = fromIndex - fromMaxNFTs;
+                $.totalNFTSupply -= uint32(nftAmountToBurn);
+
+                _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToBurn);
+
+                uint256 fromEnd = fromIndex - nftAmountToBurn;
+                // Burn loop.
+                if (fromIndex != fromEnd) {
+                    do {
+                        uint256 id = fromOwned.get(--fromIndex);
+                        $.oo.set(_ownedIndex(id), 0);
+                        $.oo.set(_ownershipIndex(id), 0);
+                        delete $.tokenApprovals[id];
+                        _packedLogsAppend(packedLogs, from, id, 1);
+                    } while (fromIndex != fromEnd);
+
+                    fromAddressData.ownedLength = uint32(fromIndex);
+
+                    _packedLogsSend(packedLogs, $.mirrorERC721);
+                }
+            }
+        }
+
+        emit Transfer(from, address(0), amount);
     }
 
     function _transferFromNFT(address from, address to, uint256 id, address msgSender)
@@ -393,6 +502,14 @@ abstract contract DN404 {
             addressAlias = ++$.numAliases;
             toAddressData.addressAlias = addressAlias;
             $.aliasToAddress[addressAlias] = to;
+        }
+    }
+
+    /// @dev Returns `max(0, x - y)`.
+    function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := mul(gt(x, y), sub(x, y))
         }
     }
 
