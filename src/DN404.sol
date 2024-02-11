@@ -14,7 +14,7 @@ abstract contract DN404 {
 
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-    event SkipNFTWhitelistSet(address indexed target, bool status);
+    event SkipNFTSet(address indexed target, bool status);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
@@ -51,6 +51,10 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     struct AddressData {
+        // Set true when address data storage has been initialized.
+        bool initialized;
+        // If the account should skip NFT minting.
+        bool skipNFT;
         // The alias for the address. Zero means absence of an alias.
         uint32 addressAlias;
         // The number of NFT tokens.
@@ -64,6 +68,7 @@ abstract contract DN404 {
         uint32 nextTokenId;
         uint32 numBurned;
         uint32 totalNFTSupply;
+        uint96 totalTokenSupply;
         address mirrorERC721;
         mapping(uint32 => address) aliasToAddress;
         mapping(address => mapping(address => bool)) operatorApprovals;
@@ -89,15 +94,10 @@ abstract contract DN404 {
     /*                         INITIALIZER                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address mirror)
+    function _initializeDN404(uint96 initialTokenSupply, address initialSupplyOwner, address mirror)
         internal
         virtual
     {
-        if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) {
-            revert InvalidTotalNFTSupply();
-        }
-        if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-
         DN404Storage storage $ = _getDN404Storage();
 
         if ($.nextTokenId != 0) revert AlreadyInitialized();
@@ -106,17 +106,19 @@ abstract contract DN404 {
         _linkMirrorContract(mirror);
 
         $.nextTokenId = 1;
-        $.totalNFTSupply = totalNFTSupply;
         $.mirrorERC721 = mirror;
 
-        unchecked {
-            uint256 balance = uint256(totalNFTSupply) * _WAD;
-            $.addressData[initialSupplyOwner].balance = uint96(balance);
+        if (initialTokenSupply > 0) {
+            if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
+            if (initialTokenSupply / _WAD > (_MAX_TOKEN_ID - 1)) revert InvalidTotalNFTSupply();
 
-            emit Transfer(address(0), initialSupplyOwner, balance);
+            $.totalTokenSupply = initialTokenSupply;
+            $.addressData[initialSupplyOwner].balance = initialTokenSupply;
+
+            emit Transfer(address(0), initialSupplyOwner, initialTokenSupply);
+
+            _setSkipNFT(initialSupplyOwner, true);
         }
-
-        _setSkipNFTWhitelist(initialSupplyOwner, true);
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -138,9 +140,7 @@ abstract contract DN404 {
     }
 
     function totalSupply() public view virtual returns (uint256) {
-        unchecked {
-            return uint256(_getDN404Storage().totalNFTSupply) * _WAD;
-        }
+        return uint256(_getDN404Storage().totalTokenSupply);
     }
 
     function balanceOf(address owner) public view virtual returns (uint256) {
@@ -361,9 +361,31 @@ abstract contract DN404 {
         emit Transfer(from, to, _WAD);
     }
 
-    function _setSkipNFTWhitelist(address target, bool state) internal {
-        _getDN404Storage().whitelist[target] = state;
-        emit SkipNFTWhitelistSet(target, state);
+    function setSkipNFT(bool skipNFT) external {
+        _setSkipNFT(msg.sender, skipNFT);
+    }
+
+    function _setSkipNFT(address target, bool state) internal {
+        _getAddressData(target).skipNFT = state;
+        emit SkipNFTSet(target, state);
+    }
+
+    function _getAddressData(address a) internal returns (AddressData storage d) {
+        DN404Storage storage $ = _getDN404Storage();
+        d = $.addressData[a];
+
+        if (!d.initialized) {
+            d.initialized = true;
+            if (_hasCode(a)) d.skipNFT = true;
+        }
+    }
+
+    /// @dev Returns if `a` has bytecode of non-zero length.
+    function _hasCode(address a) private view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := extcodesize(a) // Can handle dirty upper bits.
+        }
     }
 
     function _registerAndResolveAlias(address to) internal returns (uint32) {
@@ -394,6 +416,14 @@ abstract contract DN404 {
 
     function mirrorERC721() public view returns (address) {
         return _getDN404Storage().mirrorERC721;
+    }
+
+    function _totalNFTSupply() internal view virtual returns (uint256) {
+        return _getDN404Storage().totalNFTSupply;
+    }
+
+    function _balanceOfNFT(address owner) internal view virtual returns (uint256) {
+        return _getDN404Storage().addressData[owner].ownedLength;
     }
 
     function _ownerAt(uint256 id) internal view virtual returns (address) {
@@ -526,6 +556,22 @@ abstract contract DN404 {
             uint256 id = _calldataload(0x04);
 
             _return(uint160(_getApproved(id)));
+        }
+        // `balanceOfNFT(address)`.
+        if (fnSelector == 0xf5b100ea) {
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
+            if (msg.data.length < 0x24) revert();
+
+            address owner = address(uint160(_calldataload(0x04)));
+
+            _return(_balanceOfNFT(owner));
+        }
+        // `totalNFTSupply()`.
+        if (fnSelector == 0xe2c79281) {
+            if (msg.sender != $.mirrorERC721) revert Unauthorized();
+            if (msg.data.length < 0x04) revert();
+
+            _return(_totalNFTSupply());
         }
         // `implementsDN404()`.
         if (fnSelector == 0xb7a94eb8) {
