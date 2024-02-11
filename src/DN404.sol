@@ -615,9 +615,14 @@ abstract contract DN404 {
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
 
+        // `implementsDN404()`.
+        if (fnSelector == 0xb7a94eb8) {
+            _return(1);
+        }
+
+        if (msg.sender != $.mirrorERC721) revert Unauthorized();
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x44) revert();
 
             address owner = address(uint160(_calldataload(0x04)));
@@ -627,7 +632,6 @@ abstract contract DN404 {
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
@@ -636,7 +640,6 @@ abstract contract DN404 {
         }
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x84) revert();
 
             address from = address(uint160(_calldataload(0x04)));
@@ -649,7 +652,6 @@ abstract contract DN404 {
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x64) revert();
 
             address spender = address(uint160(_calldataload(0x04)));
@@ -661,7 +663,6 @@ abstract contract DN404 {
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x64) revert();
 
             address spender = address(uint160(_calldataload(0x04)));
@@ -672,7 +673,6 @@ abstract contract DN404 {
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
@@ -681,7 +681,6 @@ abstract contract DN404 {
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x24) revert();
 
             address owner = address(uint160(_calldataload(0x04)));
@@ -690,14 +689,9 @@ abstract contract DN404 {
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != $.mirrorERC721) revert Unauthorized();
             if (msg.data.length < 0x04) revert();
 
             _return(_totalNFTSupply());
-        }
-        // `implementsDN404()`.
-        if (fnSelector == 0xb7a94eb8) {
-            _return(1);
         }
         _;
     }
