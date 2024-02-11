@@ -91,6 +91,7 @@ abstract contract DN404 {
 
     function _initializeDN404(uint32 totalNFTSupply, address initialSupplyOwner, address mirror)
         internal
+        virtual
     {
         if (totalNFTSupply == 0 || totalNFTSupply >= _MAX_TOKEN_ID) {
             revert InvalidTotalNFTSupply();
@@ -128,15 +129,15 @@ abstract contract DN404 {
 
     function tokenURI(uint256 id) public view virtual returns (string memory);
 
-    function decimals() public pure returns (uint8) {
-        return 18;
-    }
-
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    function totalSupply() public view returns (uint256) {
+    function decimals() public pure returns (uint8) {
+        return 18;
+    }
+
+    function totalSupply() public view virtual returns (uint256) {
         unchecked {
             return uint256(_getDN404Storage().totalNFTSupply) * _WAD;
         }
@@ -161,7 +162,7 @@ abstract contract DN404 {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external virtual {
+    function transferFrom(address from, address to, uint256 amount) public virtual {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 allowed = $.allowance[from][msg.sender];
@@ -391,27 +392,27 @@ abstract contract DN404 {
     /*                     MIRROR OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    function mirrorERC721() public view returns (address mirror) {
+    function mirrorERC721() public view returns (address) {
         return _getDN404Storage().mirrorERC721;
     }
 
-    function _ownerAt(uint256 id) internal view virtual returns (address result) {
+    function _ownerAt(uint256 id) internal view virtual returns (address) {
         DN404Storage storage $ = _getDN404Storage();
-        result = $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
+        return $.aliasToAddress[$.oo.get(_ownershipIndex(id))];
     }
 
-    function _ownerOf(uint256 id) internal view virtual returns (address result) {
+    function _ownerOf(uint256 id) internal view virtual returns (address) {
         if (!_exists(id)) revert TokenDoesNotExist();
-        result = _ownerAt(id);
+        return _ownerAt(id);
     }
 
-    function _exists(uint256 id) internal view virtual returns (bool result) {
-        result = _ownerAt(id) != address(0);
+    function _exists(uint256 id) internal view virtual returns (bool) {
+        return _ownerAt(id) != address(0);
     }
 
-    function _getApproved(uint256 id) internal view returns (address result) {
+    function _getApproved(uint256 id) internal view returns (address) {
         if (!_exists(id)) revert TokenDoesNotExist();
-        result = _getDN404Storage().tokenApprovals[id];
+        return _getDN404Storage().tokenApprovals[id];
     }
 
     function _approveNFT(address spender, uint256 id, address msgSender)
@@ -437,9 +438,7 @@ abstract contract DN404 {
         internal
         virtual
     {
-        DN404Storage storage $ = _getDN404Storage();
-
-        $.operatorApprovals[msgSender][operator] = approved;
+        _getDN404Storage().operatorApprovals[msgSender][operator] = approved;
     }
 
     function _linkMirrorContract(address mirror) internal {
