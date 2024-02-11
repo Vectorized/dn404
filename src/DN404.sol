@@ -187,7 +187,6 @@ abstract contract DN404 {
         uint256 toBalance;
         uint256 fromBalance;
         uint256 numBurned;
-        uint256 currentNFTSupply;
     }
 
     function _transfer(address from, address to, uint256 amount) internal {
