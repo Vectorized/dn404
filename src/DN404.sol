@@ -257,73 +257,88 @@ abstract contract DN404 {
             t.toBalanceBefore = toAddressData.balance;
             toAddressData.balance = uint96(t.toBalance = t.toBalanceBefore + amount);
 
-            if (!$.whitelist[from]) {
-                LibMap.Uint32Map storage fromOwned = $.owned[from];
+            bool isFromWhitelisted = $.whitelist[from];
+            bool isToWhitelisted = $.whitelist[to];
+
+            uint256 nftAmountToBurn = ((t.fromBalanceBefore / _WAD) - (t.fromBalance / _WAD));
+            uint256 nftAmountToMint = ((t.toBalance / _WAD) - (t.toBalanceBefore / _WAD));
+
+            uint256 total;
+            if (!isFromWhitelisted && !isToWhitelisted) {
+                total = nftAmountToBurn + nftAmountToMint;
+            } else if (isFromWhitelisted && isToWhitelisted) {
+                total = 0;
+            } else if (isFromWhitelisted) {
+                total = nftAmountToMint;
+            } else if (isToWhitelisted) {
+                total = nftAmountToBurn;
+            }
+
+            uint256[] memory packedLogs = new uint256[](total);
+            uint256 n;
+
+            if (!isFromWhitelisted) {
+                address _from = from;
+                LibMap.Uint32Map storage fromOwned = $.owned[_from];
                 uint256 i = fromAddressData.ownedLength;
-                uint256 end = i - ((t.fromBalanceBefore / _WAD) - (t.fromBalance / _WAD));
+                uint256 end = i - nftAmountToBurn;
+                DN404Storage storage _$ = $;
+
                 // Burn loop.
                 if (i != end) {
-                    uint256[] memory packedLogs = new uint256[](i - end);
-                    uint256 n;
-
                     do {
                         uint256 id = fromOwned.get(--i);
-                        $.ownedIndex.set(id, 0);
-                        $.ownerships.set(id, 0);
-                        delete $.tokenApprovals[id];
+                        _$.ownedIndex.set(id, 0);
+                        _$.ownerships.set(id, 0);
+                        delete _$.tokenApprovals[id];
 
-                        packedLogs[n++] = (uint256(uint160(from)) << 96) | id;
+                        packedLogs[n++] = (uint256(uint160(_from)) << 96) | (id << 8) | 1;
                     } while (i != end);
-                    _logNFTBurn(t.mirror, packedLogs);
                     fromAddressData.ownedLength = uint32(i);
                 }
             }
 
-            if (!$.whitelist[to]) {
-                LibMap.Uint32Map storage toOwned = $.owned[to];
-                uint256 i = toAddressData.ownedLength;
-                uint256 end = i + ((t.toBalance / _WAD) - (t.toBalanceBefore / _WAD));
-                uint256 id = $.nextTokenId;
-                uint32 toAlias = _registerAndResolveAlias(to);
-                uint256 totalNFTSupply = $.totalNFTSupply;
+            if (!isToWhitelisted) {
                 address _to = to;
+                DN404Storage storage _$ = $;
+                LibMap.Uint32Map storage toOwned = $.owned[_to];
+                uint256 i = toAddressData.ownedLength;
+                AddressData storage _toAddressData = toAddressData;
+                uint256 end = i + nftAmountToMint;
+                uint256 id = _$.nextTokenId;
+                uint32 toAlias = _registerAndResolveAlias(_to);
+                uint256 totalNFTSupply = _$.totalNFTSupply;
 
                 // Mint loop.
                 if (i != end) {
-                    uint256[] memory packedLogs = new uint256[](end - i);
-                    uint256 n;
-
                     do {
-                        while ($.ownerships.get(id) != 0) {
+                        while (_$.ownerships.get(id) != 0) {
                             if (++id > totalNFTSupply) id = 1;
                         }
 
                         toOwned.set(i, uint32(id));
-                        $.ownerships.set(id, toAlias);
-                        $.ownedIndex.set(id, uint32(i++));
+                        _$.ownerships.set(id, toAlias);
+                        _$.ownedIndex.set(id, uint32(i++));
 
-                        packedLogs[n++] = (uint256(uint160(_to)) << 96) | id;
+                        packedLogs[n++] = (uint256(uint160(_to)) << 96) | (id << 8);
 
                         // todo: ensure we don't overwrite ownership of early tokens that weren't burned
                         if (++id > totalNFTSupply) id = 1;
                     } while (i != end);
-                    _logNFTMint(t.mirror, packedLogs);
-                    toAddressData.ownedLength = uint32(i);
-                    $.nextTokenId = uint32(id);
+                    _toAddressData.ownedLength = uint32(i);
+                    _$.nextTokenId = uint32(id);
                 }
             }
+
+            if (packedLogs.length > 0) _logNftTransfer(t.mirror, packedLogs);
         }
 
         emit Transfer(from, to, amount);
         return true;
     }
 
-    function _logNFTBurn(address mirror, uint256[] memory p) private {
-        require(DN404Mirror(payable(mirror)).logBurn(p));
-    }
-
-    function _logNFTMint(address mirror, uint256[] memory p) private {
-        require(DN404Mirror(payable(mirror)).logMint(p));
+    function _logNftTransfer(address mirror, uint256[] memory p) private {
+        require(DN404Mirror(payable(mirror)).logTransfer(p));
     }
 
     function _ownerAt(uint256 id) internal view virtual returns (address result) {

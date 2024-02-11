@@ -375,34 +375,26 @@ contract DN404Mirror {
         _;
     }
 
-    function logMint(uint256[] calldata p) external returns (bool) {
+    function logTransfer(uint256[] calldata p) external returns (bool) {
         DN404NFTStorage storage $ = _getDN404NFTStorage();
         if (msg.sender != $.rootERC20) revert Unauthorized();
 
         for (uint256 i; i < p.length; ++i) {
             uint256 data = p[i];
 
-            address from = address(0);
-            address to = address(uint160(data >> 96));
-            uint256 id = data & type(uint96).max;
+            address addr = address(uint160(data >> 96));
+            uint256 id = (data & type(uint96).max) >> 8;
+            uint256 action = data & 0xff;
 
-            emit Transfer(from, to, id);
-        }
-        _return(1);
-    }
-
-    function logBurn(uint256[] calldata p) external returns (bool) {
-        DN404NFTStorage storage $ = _getDN404NFTStorage();
-        if (msg.sender != $.rootERC20) revert Unauthorized();
-
-        for (uint256 i; i < p.length; ++i) {
-            uint256 data = p[i];
-
-            address from = address(uint160(data >> 96));
-            address to = address(0);
-            uint256 id = data & type(uint96).max;
-
-            emit Transfer(from, to, id);
+            if (action == 0) {
+                // mint
+                emit Transfer(address(0), addr, id);
+            } else if (action == 1) {
+                // burn
+                emit Transfer(addr, address(0), id);
+            } else {
+                revert();
+            }
         }
         _return(1);
     }
