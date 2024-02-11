@@ -161,7 +161,7 @@ abstract contract DN404 {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public virtual {
+    function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 allowed = $.allowance[from][msg.sender];
@@ -171,6 +171,8 @@ abstract contract DN404 {
         }
 
         _transfer(from, to, amount);
+
+        return true;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
