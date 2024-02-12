@@ -272,13 +272,20 @@ contract DN404Test is SoladyTest {
         addresses[2] = initialSupplyOwner;
 
         for (uint256 t; t != 5; ++t) {
-            {
+            if (_random() % 2 == 0) {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
 
                 uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
                 vm.prank(from);
                 dn.transfer(to, amount);
+            } else {
+                address from = addresses[_random() % 3];
+                address to = addresses[_random() % 3];
+
+                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
+                dn.burn(from, amount);
+                dn.mint(to, amount);
             }
 
             if (_random() % 4 == 0) {
