@@ -3,9 +3,9 @@ pragma solidity ^0.8.4;
 
 import "../DN404.sol";
 import "../DN404Mirror.sol";
-import {Ownable} from "../../lib/solady/src/auth/Ownable.sol";
-import {LibString} from "../../lib/solady/src/utils/LibString.sol";
-import {SafeTransferLib} from "../../lib/solady/src/utils/SafeTransferLib.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
+import {LibString} from "solady/utils/LibString.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 contract SimpleDN404 is DN404, Ownable {
     string private _name;
@@ -27,11 +27,6 @@ contract SimpleDN404 is DN404, Ownable {
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
     }
 
-    // This allows the owner of the contract to mint more tokens.
-    function mint(address to, uint256 amount) public onlyOwner {
-        _mint(to, amount);
-    }
-
     function name() public view override returns (string memory) {
         return _name;
     }
@@ -40,14 +35,19 @@ contract SimpleDN404 is DN404, Ownable {
         return _symbol;
     }
 
-    function setBaseURI(string calldata baseURI_) public onlyOwner {
-        _baseURI = baseURI_;
+    function tokenURI(uint256 tokenId) public view override returns (string memory result) {
+        if (bytes(_baseURI).length != 0) {
+            result = string(abi.encodePacked(_baseURI, LibString.toString(tokenId)));
+        }
     }
 
-    function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        return bytes(_baseURI).length != 0
-            ? string(abi.encodePacked(_baseURI, LibString.toString(tokenId)))
-            : "";
+    // This allows the owner of the contract to mint more tokens.
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+
+    function setBaseURI(string calldata baseURI_) public onlyOwner {
+        _baseURI = baseURI_;
     }
 
     function withdraw() public onlyOwner {
