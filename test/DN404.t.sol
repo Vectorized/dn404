@@ -264,7 +264,8 @@ contract DN404Test is SoladyTest {
 
     function testMixed(uint256) public {
         address initialSupplyOwner = address(1111);
-        dn.initializeDN404(10 * _WAD, initialSupplyOwner, address(mirror));
+        uint256 n = _bound(_random(), 0, 16);
+        dn.initializeDN404(n * _WAD, initialSupplyOwner, address(mirror));
 
         address[] memory addresses = new address[](3);
         addresses[0] = address(111);
@@ -299,7 +300,7 @@ contract DN404Test is SoladyTest {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
 
-                for (uint256 id = 1; id <= 10; ++id) {
+                for (uint256 id = 1; id <= n; ++id) {
                     if (dn.ownerAt(id) == from && _random() % 2 == 0) {
                         vm.prank(from);
                         mirror.transferFrom(from, to, id);
@@ -322,22 +323,24 @@ contract DN404Test is SoladyTest {
             assertEq(nftBalanceSum, mirror.totalSupply());
 
             uint256 numOwned;
-            for (uint256 i = 1; i <= 10; ++i) {
+            for (uint256 i = 1; i <= n; ++i) {
                 if (dn.ownerAt(i) != address(0)) numOwned++;
             }
             assertEq(numOwned, nftBalanceSum);
             assertEq(dn.ownerAt(0), address(0));
-            assertEq(dn.ownerAt(11), address(0));
+            assertEq(dn.ownerAt(n + 1), address(0));
         }
 
-        for (uint256 i; i != 3; ++i) {
-            address a = addresses[i];
-            vm.prank(a);
-            dn.setSkipNFT(false);
-            uint256 amount = dn.balanceOf(a);
-            vm.prank(a);
-            dn.transfer(a, amount);
-            assertEq(mirror.balanceOf(a), dn.balanceOf(a) / _WAD);
+        if (_random() % 4 == 0) {
+            for (uint256 i; i != 3; ++i) {
+                address a = addresses[i];
+                vm.prank(a);
+                dn.setSkipNFT(false);
+                uint256 amount = dn.balanceOf(a);
+                vm.prank(a);
+                dn.transfer(a, amount);
+                assertEq(mirror.balanceOf(a), dn.balanceOf(a) / _WAD);
+            }
         }
 
         if (_random() % 32 == 0) {
