@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
-import {DN404Mirror} from "../src/DN404Mirror.sol";
+import {DN404Mirror, MockDN404Mirror} from "./utils/mocks/MockDN404Mirror.sol";
 
 contract Invalid721Receiver {}
 
@@ -17,11 +17,11 @@ contract DN404MirrorTest is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
 
     MockDN404 dn;
-    DN404Mirror mirror;
+    MockDN404Mirror mirror;
 
     function setUp() public {
         dn = new MockDN404();
-        mirror = new DN404Mirror(address(this));
+        mirror = new MockDN404Mirror(address(this));
     }
 
     function testNotLinked() public {
