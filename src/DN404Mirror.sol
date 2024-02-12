@@ -32,6 +32,14 @@ contract DN404Mirror {
     uint256 private constant _TRANSFER_EVENT_SIGNATURE =
         0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef;
 
+    /// @dev `keccak256(bytes("Approval(address,address,uint256)"))`.
+    uint256 private constant _APPROVAL_EVENT_SIGNATURE =
+        0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925;
+
+    /// @dev `keccak256(bytes("ApprovalForAll(address,address,bool)"))`.
+    uint256 private constant _APPROVAL_FOR_ALL_EVENT_SIGNATURE =
+        0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -212,15 +220,14 @@ contract DN404Mirror {
     /// Emits an {Approval} event.
     function approve(address spender, uint256 id) public virtual {
         address base = baseERC20();
-        address owner;
         /// @solidity memory-safe-assembly
         assembly {
+            spender := shr(96, shl(96, spender))
             let m := mload(0x40)
-            mstore(0x60, caller())
+            mstore(0x00, 0xd10b6e0c) // `approveNFT(address,uint256,address)`.
+            mstore(0x20, spender)
             mstore(0x40, id)
-            mstore(0x2c, shl(96, spender))
-            mstore(0x0c, 0xd10b6e0c000000000000000000000000) // `approveNFT(address,uint256,address)`.
-
+            mstore(0x60, caller())
             if iszero(
                 and(
                     gt(returndatasize(), 0x1f),
@@ -232,9 +239,9 @@ contract DN404Mirror {
             }
             mstore(0x40, m) // Restore the free memory pointer.
             mstore(0x60, 0) // Restore the zero pointer.
-            owner := shr(96, mload(0x0c))
+            // Emit the {Approval} event.
+            log4(codesize(), 0x00, _APPROVAL_EVENT_SIGNATURE, shr(96, mload(0x0c)), spender, id)
         }
-        emit Approval(owner, spender, id);
     }
 
     /// @dev Returns the account approved to manage token `id` from
@@ -266,21 +273,23 @@ contract DN404Mirror {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
+            operator := shr(96, shl(96, operator))
             let m := mload(0x40)
-            mstore(0x60, caller())
+            mstore(0x00, 0x813500fc) // `setApprovalForAll(address,bool,address)`.
+            mstore(0x20, operator)
             mstore(0x40, iszero(iszero(approved)))
-            mstore(0x2c, shl(96, operator))
-            mstore(0x0c, 0x813500fc000000000000000000000000) // `setApprovalForAll(address,bool,address)`.
+            mstore(0x60, caller())
             if iszero(
                 and(eq(mload(0x00), 1), call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
+            // Emit the {ApprovalForAll} event.
+            log3(0x40, 0x20, _APPROVAL_FOR_ALL_EVENT_SIGNATURE, caller(), operator)
             mstore(0x40, m) // Restore the free memory pointer.
             mstore(0x60, 0) // Restore the zero pointer.
         }
-        emit ApprovalForAll(msg.sender, operator, approved);
     }
 
     /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from
@@ -323,21 +332,23 @@ contract DN404Mirror {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
+            from := shr(96, shl(96, from))
+            to := shr(96, shl(96, to))
             let m := mload(0x40)
-            mstore(add(m, 0x80), caller())
-            mstore(add(m, 0x60), id)
+            mstore(m, 0xe5eb36c8) // `transferFromNFT(address,address,uint256,address)`.
+            mstore(add(m, 0x20), from)
             mstore(add(m, 0x40), to)
-            mstore(add(m, 0x2c), shl(96, from))
-            // `transferFromNFT(address,address,uint256,address)`.
-            mstore(add(m, 0x0c), 0xe5eb36c8000000000000000000000000)
+            mstore(add(m, 0x60), id)
+            mstore(add(m, 0x80), caller())
             if iszero(
                 and(eq(mload(m), 1), call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
+            // Emit the {Transfer} event.
+            log4(codesize(), 0x00, _TRANSFER_EVENT_SIGNATURE, from, to, id)
         }
-        emit Transfer(from, to, id);
     }
 
     /// @dev Equivalent to `safeTransferFrom(from, to, id, "")`.
