@@ -50,6 +50,24 @@ contract DN404MirrorTest is SoladyTest {
         assertEq(mirror.baseERC20(), address(dn));
     }
 
+    function testSetAndGetApproved() public {
+        dn.initializeDN404(uint96(10 * _WAD), address(this), address(mirror));
+        address alice = address(111);
+        address bob = address(222);
+
+        dn.transfer(alice, _WAD * uint256(1));
+
+        assertEq(mirror.getApproved(1), address(0));
+
+        vm.prank(alice);
+        mirror.approve(bob, 1);
+        assertEq(mirror.getApproved(1), bob);
+
+        vm.prank(alice);
+        mirror.transferFrom(alice, bob, 1);
+        assertEq(mirror.getApproved(1), address(0));
+    }
+
     function testTransferFrom(uint32 totalNFTSupply) public {
         totalNFTSupply = uint32(_bound(totalNFTSupply, 5, 1000000));
         address alice = address(111);
