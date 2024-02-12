@@ -306,7 +306,7 @@ abstract contract DN404 {
 
         unchecked {
             uint256 currentTokenSupply = uint256($.totalSupply) + amount;
-            if (amount > _MAX_SUPPLY || currentTokenSupply > _MAX_SUPPLY) {
+            if (_or(amount > _MAX_SUPPLY, currentTokenSupply > _MAX_SUPPLY)) {
                 revert TotalSupplyOverflow();
             }
             $.totalSupply = uint96(currentTokenSupply);

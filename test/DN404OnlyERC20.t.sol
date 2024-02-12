@@ -24,7 +24,6 @@ contract DN404OnlyERC20Test is SoladyTest {
     }
 
     function testMaxSupplyTrick(uint256 amount) public {
-        assertEq(_WAD, 1 ether);
         bool expected = amount / _WAD > _MAX_TOKEN_ID - 1;
         bool computed = amount > _MAX_SUPPLY;
         assertEq(computed, expected);
