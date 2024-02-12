@@ -328,7 +328,7 @@ contract DN404Mirror {
             if iszero(
                 and(eq(mload(m), 1), call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20))
             ) {
-                returndatacopy(0x00, 0x00, returndatasize())
+                returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
         }
