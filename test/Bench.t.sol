@@ -106,7 +106,7 @@ abstract contract ERC404 is Ownable {
     /// @dev Allowance of user in fractional representation
     mapping(address => mapping(address => uint256)) public allowance;
 
-    /// @dev Approval in native representaion
+    /// @dev Approval in native representation
     mapping(uint256 => address) public getApproved;
 
     /// @dev Approval for all in native representation
