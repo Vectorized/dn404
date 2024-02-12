@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
 import {SimpleDN404} from "../src/example/SimpleDN404.sol";
