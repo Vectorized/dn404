@@ -268,10 +268,7 @@ contract DN404Mirror {
             mstore(0x40, iszero(iszero(approved)))
             mstore(0x60, caller())
             if iszero(
-                and(
-                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20)
-                )
+                and(eq(mload(0x00), 1), call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
@@ -329,10 +326,7 @@ contract DN404Mirror {
             mstore(add(m, 0x60), id)
             mstore(add(m, 0x80), caller())
             if iszero(
-                and(
-                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), base, callvalue(), add(m, 0x1c), 0x84, 0x00, 0x20)
-                )
+                and(eq(mload(m), 1), call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
@@ -378,48 +372,6 @@ contract DN404Mirror {
             let s := shr(224, interfaceId)
             // ERC165: 0x01ffc9a7, ERC721: 0x80ac58cd, ERC721Metadata: 0x5b5e139f.
             result := or(or(eq(s, 0x01ffc9a7), eq(s, 0x80ac58cd)), eq(s, 0x5b5e139f))
-        }
-    }
-
-    /// @dev Returns if `a` has bytecode of non-zero length.
-    function _hasCode(address a) private view returns (bool result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := extcodesize(a) // Can handle dirty upper bits.
-        }
-    }
-
-    /// @dev Perform a call to invoke {IERC721Receiver-onERC721Received} on `to`.
-    /// Reverts if the target does not support the function correctly.
-    function _checkOnERC721Received(address from, address to, uint256 id, bytes memory data)
-        private
-    {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Prepare the calldata.
-            let m := mload(0x40)
-            let onERC721ReceivedSelector := 0x150b7a02
-            mstore(m, onERC721ReceivedSelector)
-            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
-            mstore(add(m, 0x40), shr(96, shl(96, from)))
-            mstore(add(m, 0x60), id)
-            mstore(add(m, 0x80), 0x80)
-            let n := mload(data)
-            mstore(add(m, 0xa0), n)
-            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xc0), n)) }
-            // Revert if the call reverts.
-            if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
-                if returndatasize() {
-                    // Bubble up the revert if the call reverts.
-                    returndatacopy(m, 0x00, returndatasize())
-                    revert(m, returndatasize())
-                }
-            }
-            // Load the returndata and compare it.
-            if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
-                mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
-                revert(0x1c, 0x04)
-            }
         }
     }
 
@@ -491,11 +443,57 @@ contract DN404Mirror {
 
     receive() external payable virtual {}
 
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                      PRIVATE HELPERS                       */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
     /// @dev Returns the calldata value at `offset`.
     function _calldataload(uint256 offset) private pure returns (uint256 value) {
         /// @solidity memory-safe-assembly
         assembly {
             value := calldataload(offset)
+        }
+    }
+
+    /// @dev Returns if `a` has bytecode of non-zero length.
+    function _hasCode(address a) private view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := extcodesize(a) // Can handle dirty upper bits.
+        }
+    }
+
+    /// @dev Perform a call to invoke {IERC721Receiver-onERC721Received} on `to`.
+    /// Reverts if the target does not support the function correctly.
+    function _checkOnERC721Received(address from, address to, uint256 id, bytes memory data)
+        private
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Prepare the calldata.
+            let m := mload(0x40)
+            let onERC721ReceivedSelector := 0x150b7a02
+            mstore(m, onERC721ReceivedSelector)
+            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
+            mstore(add(m, 0x40), shr(96, shl(96, from)))
+            mstore(add(m, 0x60), id)
+            mstore(add(m, 0x80), 0x80)
+            let n := mload(data)
+            mstore(add(m, 0xa0), n)
+            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xc0), n)) }
+            // Revert if the call reverts.
+            if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
+                if returndatasize() {
+                    // Bubble up the revert if the call reverts.
+                    returndatacopy(m, 0x00, returndatasize())
+                    revert(m, returndatasize())
+                }
+            }
+            // Load the returndata and compare it.
+            if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
+                mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
+                revert(0x1c, 0x04)
+            }
         }
     }
 }

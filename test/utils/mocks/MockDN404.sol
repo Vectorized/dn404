@@ -58,4 +58,16 @@ contract MockDN404 is DN404 {
     function ownerAt(uint256 id) public view returns (address) {
         return _ownerAt(id);
     }
+
+    function getAddressDataInitialized(address target) public view returns (bool) {
+        return _getDN404Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
+    }
+
+    function setAux(address target, uint88 value) public {
+        _setAux(target, value);
+    }
+
+    function getAux(address target) public view returns (uint88) {
+        return _getAux(target);
+    }
 }

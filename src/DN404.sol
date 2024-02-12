@@ -86,16 +86,22 @@ abstract contract DN404 {
     /// @dev The maximum tokenId allowed for an NFT.
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
 
+    /// @dev The flag to denote that the address data is initialized.
+    uint8 internal constant _ADDRESS_DATA_INITIALIZED_FLAG = 1 << 0;
+
+    /// @dev The flag to denote that the address should skip NFTs.
+    uint8 internal constant _ADDRESS_DATA_SKIP_NFT_FLAG = 1 << 1;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                          STORAGE                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Struct containing an address's token data and settings.
     struct AddressData {
-        // Set true when address data storage has been initialized.
-        bool initialized;
-        // If the account should skip NFT minting.
-        bool skipNFT;
+        // Auxiliary data.
+        uint88 aux;
+        // Flags for `initialized` and `skipNFT`.
+        uint8 flags;
         // The alias for the address. Zero means absence of an alias.
         uint32 addressAlias;
         // The number of NFT tokens.
@@ -277,71 +283,6 @@ abstract contract DN404 {
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
-    /*                 SHARED TRANSFER OPERATIONS                 */
-    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
-
-    /// @dev Struct containing packed log data for `Transfer` events to be
-    /// emitted by the mirror NFT contract.
-    struct _PackedLogs {
-        uint256[] logs;
-        uint256 offset;
-    }
-
-    /// @dev Initiates memory allocation for packed logs with `n` log items.
-    function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let logs := add(mload(0x40), 0x40) // Offset by 2 words for `_packedLogsSend`.
-            mstore(logs, n)
-            let offset := add(0x20, logs)
-            mstore(0x40, add(offset, shl(5, n)))
-            mstore(p, logs)
-            mstore(add(0x20, p), offset)
-        }
-    }
-
-    /// @dev Adds a packed log item to `p` with address `a`, tokenId `id` and burn flag `burnBit`.
-    function _packedLogsAppend(_PackedLogs memory p, address a, uint256 id, uint256 burnBit)
-        private
-        pure
-    {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let offset := mload(add(0x20, p))
-            mstore(offset, or(or(shl(96, a), shl(8, id)), burnBit))
-            mstore(add(0x20, p), add(offset, 0x20))
-        }
-    }
-
-    /// @dev Calls the `mirror` NFT contract to emit Transfer events for packed logs `p`.
-    function _packedLogsSend(_PackedLogs memory p, address mirror) private {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let logs := mload(p)
-            let o := sub(logs, 0x40) // Start of calldata to send.
-            mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
-            mstore(add(o, 0x20), 0x20) // Offset of `logs` in the calldata to send.
-            let n := add(0x44, shl(5, mload(logs))) // Length of calldata to send.
-            if iszero(
-                and(
-                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), mirror, 0, add(o, 0x1c), n, 0x00, 0x20)
-                )
-            ) { revert(0x00, 0x00) }
-        }
-    }
-
-    /// @dev Struct of temporary variables for transfers.
-    struct _TransferTemps {
-        uint256 nftAmountToBurn;
-        uint256 nftAmountToMint;
-        uint256 fromBalance;
-        uint256 toBalance;
-        uint256 fromOwnedLength;
-        uint256 toOwnedLength;
-    }
-
-    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                  INTERNAL MINT FUNCTIONS                   */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
@@ -367,7 +308,7 @@ abstract contract DN404 {
             uint256 toBalance = toAddressData.balance + amount;
             toAddressData.balance = uint96(toBalance);
 
-            if (!toAddressData.skipNFT) {
+            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 LibMap.Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
                 uint256 toEnd = toBalance / _WAD;
@@ -486,7 +427,7 @@ abstract contract DN404 {
 
             t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
 
-            if (!toAddressData.skipNFT) {
+            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
@@ -593,6 +534,24 @@ abstract contract DN404 {
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                 DATA HITCHHIKING FUNCTIONS                 */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns the auxiliary data for `owner`.
+    /// Minting, transferring, burning the tokens of `owner` will not change the auxiliary data.
+    /// Auxiliary data can be set for any address, even if it does not have any tokens.
+    function _getAux(address owner) internal view virtual returns (uint88) {
+        return _getDN404Storage().addressData[owner].aux;
+    }
+
+    /// @dev Set the auxiliary data for `owner` to `value`.
+    /// Minting, transferring, burning the tokens of `owner` will not change the auxiliary data.
+    /// Auxiliary data can be set for any address, even if it does not have any tokens.
+    function _setAux(address owner, uint88 value) internal virtual {
+        _getDN404Storage().addressData[owner].aux = value;
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                     SKIP NFT FUNCTIONS                     */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
@@ -600,7 +559,8 @@ abstract contract DN404 {
     /// Returns false if account `a` will mint NFTs on token mints and transfers.
     function getSkipNFT(address a) public view virtual returns (bool) {
         AddressData storage d = _getDN404Storage().addressData[a];
-        return d.initialized ? d.skipNFT : _hasCode(a);
+        if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) return _hasCode(a);
+        return d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0;
     }
 
     /// @dev Sets the caller's skipNFT flag to `skipNFT`
@@ -616,7 +576,10 @@ abstract contract DN404 {
     ///
     /// Emits a {SkipNFTSet} event.
     function _setSkipNFT(address a, bool state) internal {
-        _addressData(a).skipNFT = state;
+        AddressData storage d = _addressData(a);
+        if ((d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0) != state) {
+            d.flags ^= _ADDRESS_DATA_SKIP_NFT_FLAG;
+        }
         emit SkipNFTSet(a, state);
     }
 
@@ -627,9 +590,10 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
         d = $.addressData[a];
 
-        if (!d.initialized) {
-            d.initialized = true;
-            if (_hasCode(a)) d.skipNFT = true;
+        if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
+            uint8 flags = _ADDRESS_DATA_INITIALIZED_FLAG;
+            if (_hasCode(a)) flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
+            d.flags = flags;
         }
     }
 
@@ -766,12 +730,7 @@ abstract contract DN404 {
         assembly {
             mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
             mstore(0x20, caller())
-            if iszero(
-                and(
-                    and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
-                    call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20)
-                )
-            ) {
+            if iszero(and(eq(mload(0x00), 1), call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20))) {
                 mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
                 revert(0x1c, 0x04)
             }
@@ -876,6 +835,68 @@ abstract contract DN404 {
     fallback() external payable virtual dn404Fallback {}
 
     receive() external payable virtual {}
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                      PRIVATE HELPERS                       */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Struct containing packed log data for `Transfer` events to be
+    /// emitted by the mirror NFT contract.
+    struct _PackedLogs {
+        uint256[] logs;
+        uint256 offset;
+    }
+
+    /// @dev Initiates memory allocation for packed logs with `n` log items.
+    function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let logs := add(mload(0x40), 0x40) // Offset by 2 words for `_packedLogsSend`.
+            mstore(logs, n)
+            let offset := add(0x20, logs)
+            mstore(0x40, add(offset, shl(5, n)))
+            mstore(p, logs)
+            mstore(add(0x20, p), offset)
+        }
+    }
+
+    /// @dev Adds a packed log item to `p` with address `a`, tokenId `id` and burn flag `burnBit`.
+    function _packedLogsAppend(_PackedLogs memory p, address a, uint256 id, uint256 burnBit)
+        private
+        pure
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let offset := mload(add(0x20, p))
+            mstore(offset, or(or(shl(96, a), shl(8, id)), burnBit))
+            mstore(add(0x20, p), add(offset, 0x20))
+        }
+    }
+
+    /// @dev Calls the `mirror` NFT contract to emit Transfer events for packed logs `p`.
+    function _packedLogsSend(_PackedLogs memory p, address mirror) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let logs := mload(p)
+            let o := sub(logs, 0x40) // Start of calldata to send.
+            mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
+            mstore(add(o, 0x20), 0x20) // Offset of `logs` in the calldata to send.
+            let n := add(0x44, shl(5, mload(logs))) // Length of calldata to send.
+            if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
+                revert(o, 0x00)
+            }
+        }
+    }
+
+    /// @dev Struct of temporary variables for transfers.
+    struct _TransferTemps {
+        uint256 nftAmountToBurn;
+        uint256 nftAmountToMint;
+        uint256 fromBalance;
+        uint256 toBalance;
+        uint256 fromOwnedLength;
+        uint256 toOwnedLength;
+    }
 
     /// @dev Returns the calldata value at `offset`.
     function _calldataload(uint256 offset) private pure returns (uint256 value) {
