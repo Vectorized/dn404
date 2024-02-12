@@ -382,62 +382,48 @@ contract BenchTest is SoladyTest {
         dn.initializeDN404(10000 * 10 ** 18, address(this), address(mirror));
     }
 
-    function _mintTokens(address a, uint256 amount) internal {
+    modifier mint(address a, uint256 amount) {
         unchecked {
             address alice = address(111);
             IERC20(a).transfer(alice, amount * 10 ** 18);
         }
+        _;
     }
 
-    function testMintTokensPandora_01() public {
-        _mintTokens(address(pandora), 1);
-    }
+    function testMintPandora_01() public mint(address(pandora), 1) {}
+    function testMintDN404_01() public mint(address(dn), 1) {}
+    function testMintPandora_02() public mint(address(pandora), 2) {}
+    function testMintDN404_02() public mint(address(dn), 2) {}
+    function testMintPandora_03() public mint(address(pandora), 3) {}
+    function testMintDN404_03() public mint(address(dn), 3) {}
+    function testMintPandora_04() public mint(address(pandora), 4) {}
+    function testMintDN404_04() public mint(address(dn), 4) {}
+    function testMintPandora_05() public mint(address(pandora), 5) {}
+    function testMintDN404_05() public mint(address(dn), 5) {}
+    function testMintPandora_06() public mint(address(pandora), 6) {}
+    function testMintDN404_06() public mint(address(dn), 6) {}
+    function testMintPandora_07() public mint(address(pandora), 7) {}
+    function testMintDN404_07() public mint(address(dn), 7) {}
+    function testMintPandora_08() public mint(address(pandora), 8) {}
+    function testMintDN404_08() public mint(address(dn), 8) {}
+    function testMintPandora_09() public mint(address(pandora), 9) {}
+    function testMintDN404_09() public mint(address(dn), 9) {}
+    function testMintPandora_10() public mint(address(pandora), 10) {}
+    function testMintDN404_10() public mint(address(dn), 10) {}
+    function testMintPandora_11() public mint(address(pandora), 11) {}
+    function testMintDN404_11() public mint(address(dn), 11) {}
+    function testMintPandora_12() public mint(address(pandora), 12) {}
+    function testMintDN404_12() public mint(address(dn), 12) {}
+    function testMintPandora_13() public mint(address(pandora), 13) {}
+    function testMintDN404_13() public mint(address(dn), 13) {}
+    function testMintPandora_14() public mint(address(pandora), 14) {}
+    function testMintDN404_14() public mint(address(dn), 14) {}
+    function testMintPandora_15() public mint(address(pandora), 15) {}
+    function testMintDN404_15() public mint(address(dn), 15) {}
+    function testMintPandora_16() public mint(address(pandora), 16) {}
+    function testMintDN404_16() public mint(address(dn), 16) {}
 
-    function testMintTokensDN404_01() public {
-        _mintTokens(address(dn), 1);
-    }
-
-    function testMintTokensPandora_02() public {
-        _mintTokens(address(pandora), 2);
-    }
-
-    function testMintTokensDN404_02() public {
-        _mintTokens(address(dn), 2);
-    }
-
-    function testMintTokensPandora_04() public {
-        _mintTokens(address(pandora), 4);
-    }
-
-    function testMintTokensDN404_04() public {
-        _mintTokens(address(dn), 4);
-    }
-
-    function testMintTokensPandora_08() public {
-        _mintTokens(address(pandora), 8);
-    }
-
-    function testMintTokensDN404_08() public {
-        _mintTokens(address(dn), 8);
-    }
-
-    function testMintTokensPandora_16() public {
-        _mintTokens(address(pandora), 16);
-    }
-
-    function testMintTokensDN404_16() public {
-        _mintTokens(address(dn), 16);
-    }
-
-    function testMintTokensPandora_32() public {
-        _mintTokens(address(pandora), 32);
-    }
-
-    function testMintTokensDN404_32() public {
-        _mintTokens(address(dn), 32);
-    }
-
-    function _mintAndTransferTokens(address a, uint256 amount) internal {
+    modifier mintAndTransfer(address a, uint256 amount) {
         unchecked {
             address alice = address(111);
             address bob = address(222);
@@ -445,53 +431,39 @@ contract BenchTest is SoladyTest {
             vm.prank(alice);
             IERC20(a).transfer(bob, amount * 10 ** 18);
         }
+        _;
     }
 
-    function testMintAndTransferTokensPandora_01() public {
-        _mintAndTransferTokens(address(pandora), 1);
-    }
-
-    function testMintAndTransferTokensDN404_01() public {
-        _mintAndTransferTokens(address(dn), 1);
-    }
-
-    function testMintAndTransferTokensPandora_02() public {
-        _mintAndTransferTokens(address(pandora), 2);
-    }
-
-    function testMintAndTransferTokensDN404_02() public {
-        _mintAndTransferTokens(address(dn), 2);
-    }
-
-    function testMintAndTransferTokensPandora_04() public {
-        _mintAndTransferTokens(address(pandora), 4);
-    }
-
-    function testMintAndTransferTokensDN404_04() public {
-        _mintAndTransferTokens(address(dn), 4);
-    }
-
-    function testMintAndTransferTokensPandora_08() public {
-        _mintAndTransferTokens(address(pandora), 8);
-    }
-
-    function testMintAndTransferTokensDN404_08() public {
-        _mintAndTransferTokens(address(dn), 8);
-    }
-
-    function testMintAndTransferTokensPandora_16() public {
-        _mintAndTransferTokens(address(pandora), 16);
-    }
-
-    function testMintAndTransferTokensDN404_16() public {
-        _mintAndTransferTokens(address(dn), 16);
-    }
-
-    function testMintAndTransferTokensPandora_32() public {
-        _mintAndTransferTokens(address(pandora), 32);
-    }
-
-    function testMintAndTransferTokensDN404_32() public {
-        _mintAndTransferTokens(address(dn), 32);
-    }
+    function testMintAndTransferPandora_01() public mintAndTransfer(address(pandora), 1) {}
+    function testMintAndTransferDN404_01() public mintAndTransfer(address(dn), 1) {}
+    function testMintAndTransferPandora_02() public mintAndTransfer(address(pandora), 2) {}
+    function testMintAndTransferDN404_02() public mintAndTransfer(address(dn), 2) {}
+    function testMintAndTransferPandora_03() public mintAndTransfer(address(pandora), 3) {}
+    function testMintAndTransferDN404_03() public mintAndTransfer(address(dn), 3) {}
+    function testMintAndTransferPandora_04() public mintAndTransfer(address(pandora), 4) {}
+    function testMintAndTransferDN404_04() public mintAndTransfer(address(dn), 4) {}
+    function testMintAndTransferPandora_05() public mintAndTransfer(address(pandora), 5) {}
+    function testMintAndTransferDN404_05() public mintAndTransfer(address(dn), 5) {}
+    function testMintAndTransferPandora_06() public mintAndTransfer(address(pandora), 6) {}
+    function testMintAndTransferDN404_06() public mintAndTransfer(address(dn), 6) {}
+    function testMintAndTransferPandora_07() public mintAndTransfer(address(pandora), 7) {}
+    function testMintAndTransferDN404_07() public mintAndTransfer(address(dn), 7) {}
+    function testMintAndTransferPandora_08() public mintAndTransfer(address(pandora), 8) {}
+    function testMintAndTransferDN404_08() public mintAndTransfer(address(dn), 8) {}
+    function testMintAndTransferPandora_09() public mintAndTransfer(address(pandora), 9) {}
+    function testMintAndTransferDN404_09() public mintAndTransfer(address(dn), 9) {}
+    function testMintAndTransferPandora_10() public mintAndTransfer(address(pandora), 10) {}
+    function testMintAndTransferDN404_10() public mintAndTransfer(address(dn), 10) {}
+    function testMintAndTransferPandora_11() public mintAndTransfer(address(pandora), 11) {}
+    function testMintAndTransferDN404_11() public mintAndTransfer(address(dn), 11) {}
+    function testMintAndTransferPandora_12() public mintAndTransfer(address(pandora), 12) {}
+    function testMintAndTransferDN404_12() public mintAndTransfer(address(dn), 12) {}
+    function testMintAndTransferPandora_13() public mintAndTransfer(address(pandora), 13) {}
+    function testMintAndTransferDN404_13() public mintAndTransfer(address(dn), 13) {}
+    function testMintAndTransferPandora_14() public mintAndTransfer(address(pandora), 14) {}
+    function testMintAndTransferDN404_14() public mintAndTransfer(address(dn), 14) {}
+    function testMintAndTransferPandora_15() public mintAndTransfer(address(pandora), 15) {}
+    function testMintAndTransferDN404_15() public mintAndTransfer(address(dn), 15) {}
+    function testMintAndTransferPandora_16() public mintAndTransfer(address(pandora), 16) {}
+    function testMintAndTransferDN404_16() public mintAndTransfer(address(dn), 16) {}
 }
