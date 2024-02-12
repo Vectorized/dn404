@@ -19,3 +19,9 @@ line_length = 100 # While we allow up to 120, we lint at 100 for readability.
 
 [profile.default.fuzz]
 runs = 256
+
+[invariant]
+runs = 30
+depth = 15
+fail_on_revert = true
+dictionary_weight = 80

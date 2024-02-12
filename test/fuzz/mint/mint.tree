@@ -1,0 +1,31 @@
+mint.t.sol
+├── when recipient is address 0
+│   └── it should revert with custom error TransferToZeroAddress()
+└── when recipient is not address 0
+    ├── when amount is greater than _MAX_SUPPLY or mint makes NFT total supply exceed _MAX_SUPPLY
+    │   └── it should revert with custom error TotalSupplyOverflow()
+    └── when amount is NOT greater than _MAX_SUPPLY and mint DOES NOT make NFT total supply exceed _MAX_SUPPLY
+        ├── when recipient address has skipNFT enabled
+        │   ├── it should increment token totalSupply by amount
+        │   ├── it should increment recipient address balance by amount
+        │   ├── it should NOT increment NFT totalSupply
+        │   ├── it should NOT increment recipient NFT balance
+        │   └── it should emit ERC20 transfer event
+        └── when recipient address has skipNFT disabled
+            ├── when recipients balance difference is not up to 1e18
+            │   ├── it should increment token totalSupply by amount
+            │   ├── it should increment recipient address balance by amount
+            │   ├── it should NOT increment NFT totalSupply
+            │   ├── it should NOT increment recipient NFT balance
+            │   └── it should emit ERC20 transfer event
+            └── when recipients balance difference is up to 1e18 or above
+                ├── it should increment token totalSupply by amount
+                ├── it should increment recipient address balance by amount
+                ├── it should increment recipient address balance by the NFT equivalent of amount
+                ├── it should increment NFT totalSupply by the NFT equivalent of amount
+                ├── it should set ownership alias of each new id minted to recipient's alias
+                ├── it should set owned index of each new id minted to its id in the recipient's owned array
+                ├── it should set increase the length of the recipient's owned array by the NFT equivalent of amount
+                ├── it should update the nextTokenId to the last assigned token id + 1
+                ├── it should emit erc721 transfer events for each id minted to recipient
+                └── it should emit ERC20 transfer event
