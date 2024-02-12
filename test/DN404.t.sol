@@ -262,10 +262,6 @@ contract DN404Test is SoladyTest {
         assertEq(dn.ownerAt(1), alice);
     }
 
-    function testZZZ() public {
-        this.testMixed(212551126129891498461575056980278234450070200505);
-    }
-
     function testMixed(uint256) public {
         address initialSupplyOwner = address(1111);
         dn.initializeDN404(10 * _WAD, initialSupplyOwner, address(mirror));
@@ -332,6 +328,28 @@ contract DN404Test is SoladyTest {
             assertEq(numOwned, nftBalanceSum);
             assertEq(dn.ownerAt(0), address(0));
             assertEq(dn.ownerAt(11), address(0));
+        }
+
+        for (uint256 i; i != 3; ++i) {
+            address a = addresses[i];
+            vm.prank(a);
+            dn.setSkipNFT(false);
+            uint256 amount = dn.balanceOf(a);
+            vm.prank(a);
+            dn.transfer(a, amount);
+            assertEq(mirror.balanceOf(a), dn.balanceOf(a) / _WAD);
+        }
+
+        if (_random() % 32 == 0) {
+            for (uint256 i; i != 3; ++i) {
+                address a = addresses[i];
+                vm.prank(a);
+                dn.setSkipNFT(true);
+                uint256 amount = dn.balanceOf(a);
+                vm.prank(a);
+                dn.transfer(a, amount);
+                assertEq(mirror.balanceOf(a), 0);
+            }
         }
     }
 
