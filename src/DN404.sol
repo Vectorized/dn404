@@ -827,14 +827,13 @@ abstract contract DN404 {
 
     /// @dev Initiates memory allocation for packed logs with `n` log items.
     function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
-        /// @solidity memory-safe-assembly
         assembly {
-            let logs := add(mload(0x40), 0x40) // Offset by 2 words for `_packedLogsSend`.
+            let logs := mload(0x40)
             mstore(logs, n)
-            let offset := add(0x20, logs)
-            mstore(0x40, add(offset, shl(5, n)))
+            let offset := add(logs, 0x20)
+            mstore(0x40, add(offset, mul(n, 0x20)))
             mstore(p, logs)
-            mstore(add(0x20, p), offset)
+            mstore(add(p, 0x20), offset)
         }
     }
 
