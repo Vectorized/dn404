@@ -306,7 +306,7 @@ abstract contract DN404 {
 
         unchecked {
             uint256 currentTokenSupply = uint256($.totalSupply) + amount;
-            if (_or(amount > _MAX_SUPPLY, currentTokenSupply > _MAX_SUPPLY)) {
+            if (amount > _MAX_SUPPLY || currentTokenSupply > _MAX_SUPPLY) {
                 revert TotalSupplyOverflow();
             }
             $.totalSupply = uint96(currentTokenSupply);
@@ -906,14 +906,6 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             z := mul(gt(x, y), sub(x, y))
-        }
-    }
-
-    /// @dev Returns `a | b`.
-    function _or(bool x, bool y) private pure returns (bool z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := or(iszero(iszero(x)), iszero(iszero(y)))
         }
     }
 
