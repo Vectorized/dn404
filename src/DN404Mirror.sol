@@ -78,7 +78,7 @@ contract DN404Mirror {
     }
 
     /// @dev Returns a storage pointer for DN404NFTStorage.
-    function _getDN404NFTStorage() internal pure returns (DN404NFTStorage storage $) {
+    function _getDN404NFTStorage() internal pure virtual returns (DN404NFTStorage storage $) {
         /// @solidity memory-safe-assembly
         assembly {
             // `uint72(bytes9(keccak256("DN404_MIRROR_STORAGE")))`.
@@ -399,7 +399,7 @@ contract DN404Mirror {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Returns the address of the base DN404 contract.
-    function baseERC20() public view returns (address base) {
+    function baseERC20() public view virtual returns (address base) {
         base = _getDN404NFTStorage().baseERC20;
         if (base == address(0)) revert NotLinked();
     }
