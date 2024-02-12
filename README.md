@@ -1,24 +1,26 @@
-# <img src="logo.svg" alt="soledge" height="70"/>
+# DN404 🥜
 
 [![NPM][npm-shield]][npm-url]
 [![CI][ci-shield]][ci-url]
 
-Solidity snippets too edgy to be in [**Solady**](https://github.com/Vectorized/solady). 
+DN404 is an implementation of a co-joined ERC20 and ERC721 pair.
 
-For a future of EVMs fragmentation, where the latest opcodes are not supported on most L2s for years even after their inception on mainnet.
+- Full compliance with the ERC20 and ERC721 specifications.
+- Transfers on one side will be reflected on the other side.
+- Pretty optimized.
 
 ## Installation
 
 To install with [**Foundry**](https://github.com/gakonst/foundry):
 
 ```sh
-forge install vectorized/soledge
+forge install vectorized/dn404
 ```
 
 To install with [**Hardhat**](https://github.com/nomiclabs/hardhat):
 
 ```sh
-npm install soledge
+npm install dn404
 ```
 
 ## Contracts
@@ -26,17 +28,11 @@ npm install soledge
 The Solidity smart contracts are located in the `src` directory.
 
 ```ml
-utils
-├─ LibT — "Transient storage helper"
-├─ ReentrancyGuard — "Reentrancy guard mixin"
-└─ LibString - "Library for converting numbers into strings and other string operations"
-```
-
-## Directories
-
-```ml
-src — "Solidity smart contracts"
-test — "Foundry Forge tests"
+src
+├─ DN404 — "ERC20 contract for DN404"
+├─ DN404Mirror — "ERC721 contract for DN404"
+└─ example
+   └─ SimpleDN404 — "Simple DN404 example."
 ```
 
 ## Contributing
@@ -51,35 +47,26 @@ This is **experimental software** and is provided on an "as is" and "as availabl
 
 We **do not give any warranties** and **will not be liable for any loss** incurred through any use of this codebase.
 
-While Soledge has been heavily tested, there may be parts that may exhibit unexpected emergent behavior when used with other code, or may break in future Solidity versions.  
+While DN404 has been heavily tested, there may be parts that may exhibit unexpected emergent behavior when used with other code, or may break in future Solidity versions.  
 
-Please always include your own thorough tests when using Soledge to make sure it works correctly with your code.  
+Please always include your own thorough tests when using DN404 to make sure it works correctly with your code.  
 
 ## Upgradability
 
-Most contracts in Soledge are compatible with both upgradeable and non-upgradeable (i.e. regular) contracts. 
+Most contracts in DN404 are compatible with both upgradeable and non-upgradeable (i.e. regular) contracts. 
 
 Please call any required internal initialization methods accordingly.
 
-## EVM Compatibility
-
-Some parts of Soledge may not be compatible with chains with partial EVM equivalence.
-
-Please always check and test for compatibility accordingly.
-
 ## Acknowledgements
 
-This repository is inspired by or directly modified from many sources, primarily:
+This repository is inspired by various sources:
 
-- [Solmate](https://github.com/transmissions11/solmate)
-- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts)
+- [Serec](https://twitter.com/SerecThunderson)
+- [Solady](https://github.com/vectorized/solady)
 - [ERC721A](https://github.com/chiru-labs/ERC721A)
-- [Zolidity](https://github.com/z0r0z/zolidity)
-- [🐍 Snekmate](https://github.com/pcaversaccio/snekmate)
-- [Femplate](https://github.com/abigger87/femplate)
 
-[npm-shield]: https://img.shields.io/npm/v/soledge.svg
-[npm-url]: https://www.npmjs.com/package/soledge
+[npm-shield]: https://img.shields.io/npm/v/dn404.svg
+[npm-url]: https://www.npmjs.com/package/dn404
 
-[ci-shield]: https://img.shields.io/github/actions/workflow/status/vectorized/soledge/ci.yml?branch=main&label=build
-[ci-url]: https://github.com/vectorized/soledge/actions/workflows/ci.yml
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/vectorized/dn404/ci.yml?branch=main&label=build
+[ci-url]: https://github.com/vectorized/dn404/actions/workflows/ci.yml
