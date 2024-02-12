@@ -50,7 +50,7 @@ contract BaseInvariantTest is Test {
         targetContract(address(dn404MirrorHandler));
     }
 
-    function invariant_nftTotalSupplyMulWad_IsNeverGreaterThan_TokenTotalSupply() external {
+    function invariantMirror721BalanceSum() external {
         assertLe(
             dn404Mirror.totalSupply() * _WAD,
             dn404.totalSupply(),
@@ -63,8 +63,9 @@ contract BaseInvariantTest is Test {
         assertEq(total, dn404Mirror.totalSupply(), "all users nfts exceed total supply");
     }
 
-    function invariantBalanceSum() public {
+    function invariantDN404BalanceSum() public {
         assertEq(dn404.totalSupply(), dn404Handler.sum());
+
         uint256 total = dn404.balanceOf(user0) + dn404.balanceOf(user1) + dn404.balanceOf(user2)
             + dn404.balanceOf(user3) + dn404.balanceOf(user4) + dn404.balanceOf(user5);
         assertEq(dn404.totalSupply(), total);
