@@ -143,7 +143,7 @@ abstract contract DN404 {
     }
 
     /// @dev Returns a storage pointer for DN404Storage.
-    function _getDN404Storage() internal pure returns (DN404Storage storage $) {
+    function _getDN404Storage() internal pure virtual returns (DN404Storage storage $) {
         /// @solidity memory-safe-assembly
         assembly {
             // `uint72(bytes9(keccak256("DN404_STORAGE")))`.
@@ -203,7 +203,7 @@ abstract contract DN404 {
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns the decimals places of the token.
+    /// @dev Returns the decimals places of the token. Always 18.
     function decimals() public pure returns (uint8) {
         return 18;
     }
@@ -298,7 +298,7 @@ abstract contract DN404 {
     /// set to false.
     ///
     /// Emits a {Transfer} event.
-    function _mint(address to, uint256 amount) internal {
+    function _mint(address to, uint256 amount) internal virtual {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
@@ -355,7 +355,7 @@ abstract contract DN404 {
     /// the amount required to support the current NFT balance.
     ///
     /// Emits a {Transfer} event.
-    function _burn(address from, uint256 amount) internal {
+    function _burn(address from, uint256 amount) internal virtual {
         DN404Storage storage $ = _getDN404Storage();
 
         AddressData storage fromAddressData = _addressData(from);
@@ -410,7 +410,7 @@ abstract contract DN404 {
     /// set to false.
     ///
     /// Emits a {Transfer} event.
-    function _transfer(address from, address to, uint256 amount) internal {
+    function _transfer(address from, address to, uint256 amount) internal virtual {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
@@ -570,7 +570,7 @@ abstract contract DN404 {
     /// @dev Sets the caller's skipNFT flag to `skipNFT`
     ///
     /// Emits a {SkipNFTSet} event.
-    function setSkipNFT(bool skipNFT) public {
+    function setSkipNFT(bool skipNFT) public virtual {
         _setSkipNFT(msg.sender, skipNFT);
     }
 
@@ -606,6 +606,7 @@ abstract contract DN404 {
     /// Assigns and registers the next alias if `to` alias was not previously registered.
     function _registerAndResolveAlias(AddressData storage toAddressData, address to)
         internal
+        virtual
         returns (uint32 addressAlias)
     {
         DN404Storage storage $ = _getDN404Storage();
@@ -622,7 +623,7 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Returns the address of the mirror NFT contract.
-    function mirrorERC721() public view returns (address) {
+    function mirrorERC721() public view virtual returns (address) {
         return _getDN404Storage().mirrorERC721;
     }
 
@@ -661,7 +662,7 @@ abstract contract DN404 {
     ///
     /// Requirements:
     /// - Token `id` must exist.
-    function _getApproved(uint256 id) internal view returns (address) {
+    function _getApproved(uint256 id) internal view virtual returns (address) {
         if (!_exists(id)) revert TokenDoesNotExist();
         return _getDN404Storage().tokenApprovals[id];
     }
@@ -672,6 +673,7 @@ abstract contract DN404 {
     /// - `msgSender` must be the owner or an approved operator for the token owner.
     function _approveNFT(address spender, uint256 id, address msgSender)
         internal
+        virtual
         returns (address)
     {
         DN404Storage storage $ = _getDN404Storage();
@@ -701,7 +703,7 @@ abstract contract DN404 {
     /// @dev Calls the mirror contract to link it to this contract.
     ///
     /// Reverts if the call to the mirror contract reverts.
-    function _linkMirrorContract(address mirror) internal {
+    function _linkMirrorContract(address mirror) internal virtual {
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
