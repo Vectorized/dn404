@@ -426,7 +426,7 @@ abstract contract DN404 {
 
         if (amount > t.fromBalance) revert InsufficientBalance();
 
-        {
+        unchecked {
             t.fromBalance -= amount;
             fromAddressData.balance = uint96(t.fromBalance);
             toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
