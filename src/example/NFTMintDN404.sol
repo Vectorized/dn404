@@ -8,7 +8,12 @@ import {LibString} from "solady/utils/LibString.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {MerkleProofLib} from "solady/utils/MerkleProofLib.sol";
 
-contract AllowlistMintDN404 is DN404, Ownable {
+/**
+ * @title NFTMintDN404
+ * @notice Sample DN404 contract that demonstrates the owner selling NFTs rather than the fungible token.
+ * The underlying call still mints ERC20 tokens, but to the end user it'll appear as a standard NFT mint.
+ */
+contract NFTMintDN404 is DN404, Ownable {
     string private _name;
     string private _symbol;
     string private _baseURI;
@@ -75,7 +80,7 @@ contract AllowlistMintDN404 is DN404, Ownable {
         unchecked {
             ++numMinted;
         }
-        _mint(msg.sender, amount);
+        _mint(msg.sender, amount * _WAD);
     }
 
     function allowlistMint(uint256 amount, bytes32[] calldata proof)
@@ -95,7 +100,7 @@ contract AllowlistMintDN404 is DN404, Ownable {
         unchecked {
             ++numMinted;
         }
-        _mint(msg.sender, amount);
+        _mint(msg.sender, amount * _WAD);
     }
 
     function setBaseURI(string calldata baseURI_) public onlyOwner {
