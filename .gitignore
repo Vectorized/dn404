@@ -10,6 +10,9 @@ artifacts
 
 cache/
 out/
+.tmp
+create2
+deployments.txt
 
 # Ignore Environment Variables!
 .env
