@@ -8,6 +8,12 @@ import {DN404Mirror} from "../src/DN404Mirror.sol";
 contract Invalid721Receiver {}
 
 contract DN404MirrorTest is SoladyTest {
+    event Transfer(address indexed from, address indexed to, uint256 indexed id);
+
+    event Approval(address indexed owner, address indexed account, uint256 indexed id);
+
+    event ApprovalForAll(address indexed owner, address indexed operator, bool isApproved);
+
     uint256 private constant _WAD = 1000000000000000000;
 
     MockDN404 dn;
@@ -64,6 +70,8 @@ contract DN404MirrorTest is SoladyTest {
         mirror.transferFrom(alice, bob, 1);
 
         vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit Approval(alice, bob, 1);
         mirror.approve(bob, 1);
         assertEq(mirror.getApproved(1), bob);
 
@@ -86,11 +94,19 @@ contract DN404MirrorTest is SoladyTest {
         assertEq(mirror.isApprovedForAll(alice, bob), false);
 
         vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit ApprovalForAll(alice, bob, true);
         mirror.setApprovalForAll(bob, true);
         assertEq(mirror.isApprovedForAll(alice, bob), true);
 
         vm.prank(bob);
         mirror.transferFrom(alice, bob, 1);
+
+        vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit ApprovalForAll(alice, bob, false);
+        mirror.setApprovalForAll(bob, false);
+        assertEq(mirror.isApprovedForAll(alice, bob), false);
     }
 
     function testTransferFrom(uint32 totalNFTSupply) public {
@@ -104,6 +120,8 @@ contract DN404MirrorTest is SoladyTest {
         assertEq(mirror.balanceOf(bob), 0);
 
         vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(alice, bob, 1);
         mirror.transferFrom(alice, bob, 1);
         assertEq(mirror.balanceOf(alice), 4);
         assertEq(mirror.balanceOf(bob), 1);
@@ -133,7 +151,7 @@ contract DN404MirrorTest is SoladyTest {
     function testLinkMirrorContract() public {
         (bool success, bytes memory data) =
             address(mirror).call(abi.encodeWithSignature("linkMirrorContract(address)", address(1)));
-        assertEq(data, abi.encodePacked(DN404Mirror.SenderNotBase.selector));
+        assertEq(data, abi.encodePacked(DN404Mirror.SenderNotDeployer.selector));
 
         vm.prank(address(dn));
         (success, data) = address(mirror).call(
