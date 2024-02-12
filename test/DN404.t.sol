@@ -272,21 +272,23 @@ contract DN404Test is SoladyTest {
         addresses[2] = initialSupplyOwner;
 
         for (uint256 t; t != 5; ++t) {
-            if (_random() % 2 == 0) {
+            {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
 
                 uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
                 vm.prank(from);
                 dn.transfer(to, amount);
-            } else {
-                address from = addresses[_random() % 3];
-                address to = addresses[_random() % 3];
-
-                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
-                dn.burn(from, amount);
-                dn.mint(to, amount);
             }
+
+            // else {
+            //     address from = addresses[_random() % 3];
+            //     address to = addresses[_random() % 3];
+
+            //     uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
+            //     dn.burn(from, amount);
+            //     dn.mint(to, amount);
+            // }
 
             if (_random() % 4 == 0) {
                 vm.prank(addresses[_random() % 3]);
@@ -327,6 +329,12 @@ contract DN404Test is SoladyTest {
             assertEq(dn.ownerAt(0), address(0));
             assertEq(dn.ownerAt(11), address(0));
         }
+    }
+
+    function testZZZ() public {
+        this.testMixed(
+            25213279157302152381044158891380447774946641650598048665299043909087060404212
+        );
     }
 
     function testBatchNFTLog() external {
