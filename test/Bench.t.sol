@@ -135,7 +135,7 @@ abstract contract ERC404 is Ownable {
         name = _name;
         symbol = _symbol;
         decimals = _decimals;
-        totalSupply = _totalNativeSupply * (10 ** decimals);
+        totalSupply = _totalNativeSupply * (10 ** _decimals);
     }
 
     /// @notice Initialization function to set pairs / etc
