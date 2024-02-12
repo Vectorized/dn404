@@ -262,7 +262,100 @@ contract DN404Test is SoladyTest {
         assertEq(dn.ownerAt(1), alice);
     }
 
-    // for viewing gas
+    function testMixed(uint256) public {
+        address initialSupplyOwner = address(1111);
+        uint256 n = _bound(_random(), 0, 16);
+        dn.initializeDN404(n * _WAD, initialSupplyOwner, address(mirror));
+
+        address[] memory addresses = new address[](3);
+        addresses[0] = address(111);
+        addresses[1] = address(222);
+        addresses[2] = initialSupplyOwner;
+
+        for (uint256 t; t != 5; ++t) {
+            {
+                address from = addresses[_random() % 3];
+                address to = addresses[_random() % 3];
+
+                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
+                vm.prank(from);
+                dn.transfer(to, amount);
+            }
+
+            if (_random() % 4 == 0) {
+                address from = addresses[_random() % 3];
+                address to = addresses[_random() % 3];
+
+                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
+                dn.burn(from, amount);
+                dn.mint(to, amount);
+            }
+
+            if (_random() % 4 == 0) {
+                vm.prank(addresses[_random() % 3]);
+                dn.setSkipNFT(_random() & 1 == 0);
+            }
+
+            if (_random() % 4 == 0) {
+                address from = addresses[_random() % 3];
+                address to = addresses[_random() % 3];
+
+                for (uint256 id = 1; id <= n; ++id) {
+                    if (dn.ownerAt(id) == from && _random() % 2 == 0) {
+                        vm.prank(from);
+                        mirror.transferFrom(from, to, id);
+                        break;
+                    }
+                }
+            }
+
+            uint256 balanceSum;
+            uint256 nftBalanceSum;
+            for (uint256 i; i != 3; ++i) {
+                address a = addresses[i];
+                uint256 balance = dn.balanceOf(a);
+                balanceSum += balance;
+                uint256 nftBalance = mirror.balanceOf(a);
+                assertLe(nftBalance, balance / _WAD);
+                nftBalanceSum += nftBalance;
+            }
+            assertEq(balanceSum, dn.totalSupply());
+            assertEq(nftBalanceSum, mirror.totalSupply());
+
+            uint256 numOwned;
+            for (uint256 i = 1; i <= n; ++i) {
+                if (dn.ownerAt(i) != address(0)) numOwned++;
+            }
+            assertEq(numOwned, nftBalanceSum);
+            assertEq(dn.ownerAt(0), address(0));
+            assertEq(dn.ownerAt(n + 1), address(0));
+        }
+
+        if (_random() % 4 == 0) {
+            for (uint256 i; i != 3; ++i) {
+                address a = addresses[i];
+                vm.prank(a);
+                dn.setSkipNFT(false);
+                uint256 amount = dn.balanceOf(a);
+                vm.prank(a);
+                dn.transfer(a, amount);
+                assertEq(mirror.balanceOf(a), dn.balanceOf(a) / _WAD);
+            }
+        }
+
+        if (_random() % 32 == 0) {
+            for (uint256 i; i != 3; ++i) {
+                address a = addresses[i];
+                vm.prank(a);
+                dn.setSkipNFT(true);
+                uint256 amount = dn.balanceOf(a);
+                vm.prank(a);
+                dn.transfer(a, amount);
+                assertEq(mirror.balanceOf(a), 0);
+            }
+        }
+    }
+
     function testBatchNFTLog() external {
         uint32 totalNFTSupply = 10;
         address initialSupplyOwner = address(1111);

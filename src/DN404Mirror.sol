@@ -180,8 +180,8 @@ contract DN404Mirror {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x2c, shl(96, owner))
-            mstore(0x0c, 0xf5b100ea000000000000000000000000) // `balanceOfNFT(address)`.
+            mstore(0x20, shr(96, shl(96, owner)))
+            mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
             ) {

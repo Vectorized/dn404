@@ -434,6 +434,7 @@ abstract contract DN404 {
             t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                if (from == to) t.toOwnedLength = t.fromOwnedLength - t.nftAmountToBurn;
                 t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
@@ -444,6 +445,7 @@ abstract contract DN404 {
                 uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.nftAmountToBurn;
                 $.totalNFTSupply -= uint32(t.nftAmountToBurn);
+                fromAddressData.ownedLength = uint32(fromEnd);
                 // Burn loop.
                 do {
                     uint256 id = fromOwned.get(--fromIndex);
@@ -452,7 +454,6 @@ abstract contract DN404 {
                     delete $.tokenApprovals[id];
                     _packedLogsAppend(packedLogs, from, id, 1);
                 } while (fromIndex != fromEnd);
-                fromAddressData.ownedLength = uint32(fromIndex);
             }
 
             if (t.nftAmountToMint != 0) {
