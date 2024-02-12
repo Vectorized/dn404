@@ -271,18 +271,32 @@ contract DN404Test is SoladyTest {
         addresses[1] = address(222);
         addresses[2] = initialSupplyOwner;
 
-        for (uint256 t; t != 3; ++t) {
-            address from = addresses[_random() % 3];
-            address to = addresses[_random() % 3];
-            // if (from == to) continue;
+        for (uint256 t; t != 5; ++t) {
+            {
+                address from = addresses[_random() % 3];
+                address to = addresses[_random() % 3];
 
-            uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
-            vm.prank(from);
-            dn.transfer(to, amount);
+                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
+                vm.prank(from);
+                dn.transfer(to, amount);
+            }
 
-            if (_random() & 3 == 0) {
+            if (_random() % 4 == 0) {
                 vm.prank(addresses[_random() % 3]);
                 dn.setSkipNFT(_random() & 1 == 0);
+            }
+
+            if (_random() % 4 == 0) {
+                address from = addresses[_random() % 3];
+                address to = addresses[_random() % 3];
+
+                for (uint256 id = 1; id <= 10; ++id) {
+                    if (dn.ownerAt(id) == from && _random() % 2 == 0) {
+                        vm.prank(from);
+                        mirror.transferFrom(from, to, id);
+                        break;
+                    }
+                }
             }
 
             uint256 balanceSum;
@@ -306,10 +320,6 @@ contract DN404Test is SoladyTest {
             assertEq(dn.ownerAt(0), address(0));
             assertEq(dn.ownerAt(11), address(0));
         }
-    }
-
-    function testZZZ() public {
-        this.testMixed(121055617467906463573683197337191);
     }
 
     function testBatchNFTLog() external {
