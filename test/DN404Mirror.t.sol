@@ -59,13 +59,38 @@ contract DN404MirrorTest is SoladyTest {
 
         assertEq(mirror.getApproved(1), address(0));
 
+        vm.expectRevert(DN404.TransferCallerNotOwnerNorApproved.selector);
+        vm.prank(bob);
+        mirror.transferFrom(alice, bob, 1);
+
         vm.prank(alice);
         mirror.approve(bob, 1);
         assertEq(mirror.getApproved(1), bob);
 
-        vm.prank(alice);
+        vm.prank(bob);
         mirror.transferFrom(alice, bob, 1);
         assertEq(mirror.getApproved(1), address(0));
+    }
+
+    function testSetAndGetApprovalForAll() public {
+        dn.initializeDN404(uint96(10 * _WAD), address(this), address(mirror));
+        address alice = address(111);
+        address bob = address(222);
+
+        dn.transfer(alice, _WAD * uint256(1));
+
+        vm.expectRevert(DN404.TransferCallerNotOwnerNorApproved.selector);
+        vm.prank(bob);
+        mirror.transferFrom(alice, bob, 1);
+
+        assertEq(mirror.isApprovedForAll(alice, bob), false);
+
+        vm.prank(alice);
+        mirror.setApprovalForAll(bob, true);
+        assertEq(mirror.isApprovedForAll(alice, bob), true);
+
+        vm.prank(bob);
+        mirror.transferFrom(alice, bob, 1);
     }
 
     function testTransferFrom(uint32 totalNFTSupply) public {
@@ -108,7 +133,7 @@ contract DN404MirrorTest is SoladyTest {
     function testLinkMirrorContract() public {
         (bool success, bytes memory data) =
             address(mirror).call(abi.encodeWithSignature("linkMirrorContract(address)", address(1)));
-        assertEq(data, abi.encodePacked(DN404Mirror.Unauthorized.selector));
+        assertEq(data, abi.encodePacked(DN404Mirror.SenderNotBase.selector));
 
         vm.prank(address(dn));
         (success, data) = address(mirror).call(

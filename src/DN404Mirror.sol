@@ -35,7 +35,7 @@ contract DN404Mirror {
 
     /// @dev Thrown when a call for an NFT function did not originate
     /// from the base DN404 contract.
-    error Unauthorized();
+    error SenderNotBase();
 
     /// @dev Thrown when transferring an NFT to a contract address that
     /// does not implement ERC721Receiver.
@@ -441,7 +441,7 @@ contract DN404Mirror {
 
         // `logTransfer(uint256[])`.
         if (fnSelector == 0x263c69d6) {
-            if (msg.sender != $.baseERC20) revert Unauthorized();
+            if (msg.sender != $.baseERC20) revert SenderNotBase();
             /// @solidity memory-safe-assembly
             assembly {
                 // When returndatacopy copies 1 or more out-of-bounds bytes, it reverts.
@@ -472,7 +472,7 @@ contract DN404Mirror {
         if (fnSelector == 0x0f4599e5) {
             if ($.deployer != address(0)) {
                 if (address(uint160(_calldataload(0x04))) != $.deployer) {
-                    revert Unauthorized();
+                    revert SenderNotBase();
                 }
             }
             if ($.baseERC20 != address(0)) revert AlreadyLinked();
