@@ -157,7 +157,7 @@ contract DN404Mirror {
     }
 
     /// @dev Returns the total NFT supply from the base DN404 contract.
-    function totalSupply() public view returns (uint256 result) {
+    function totalSupply() public view virtual returns (uint256 result) {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
