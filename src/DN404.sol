@@ -38,7 +38,7 @@ abstract contract DN404 {
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Thrown when attempt to initialize the contract when it has already been initialized.
+    /// @dev Thrown when attempting to double-initialize the contract.
     error DNAlreadyInitialized();
 
     /// @dev Thrown when attempting to transfer or burn more tokens than sender's balance.
@@ -50,28 +50,30 @@ abstract contract DN404 {
     /// @dev Thrown when minting an amount of tokens that would overflow the max tokens.
     error InvalidTotalNFTSupply();
 
-    /// @dev Thrown when a call for an NFT function did not originate from the mirror contract.
-    error UnauthorizedSender();
+    /// @dev Thrown when the caller for a fallback NFT function is not the mirror contract.
+    error SenderNotMirror();
 
     /// @dev Thrown when attempting to transfer tokens to the zero address.
     error TransferToZeroAddress();
 
-    /// @dev Thrown when initializing the contract and mirror address is provided as the zero address.
+    /// @dev Thrown when the mirror address provided for initialization is the zero address.
     error MirrorAddressIsZero();
 
     /// @dev Thrown when the link call to the mirror contract reverts.
     error LinkMirrorContractFailed();
 
-    /// @dev Thrown when setting an NFT token approval and the caller is not the owner or an approved operator.
+    /// @dev Thrown when setting an NFT token approval
+    /// and the caller is not the owner or an approved operator.
     error ApprovalCallerNotOwnerNorApproved();
 
-    /// @dev Thrown when transferring an NFT and the caller is not the owner or an approved operator.
+    /// @dev Thrown when transferring an NFT
+    /// and the caller is not the owner or an approved operator.
     error TransferCallerNotOwnerNorApproved();
 
     /// @dev Thrown when transferring an NFT and the from address is not the current owner.
     error TransferFromIncorrectOwner();
 
-    /// @dev Thrown when checking the owner or approved address for an NFT that does not exist.
+    /// @dev Thrown when checking the owner or approved address for an non-existent NFT.
     error TokenDoesNotExist();
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -143,7 +145,8 @@ abstract contract DN404 {
     /*                         INITIALIZER                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Initializes the DN404 contract with an `initialTokenSupply`, `initialTokenOwner` and `mirror` NFT contract address.
+    /// @dev Initializes the DN404 contract with an
+    /// `initialTokenSupply`, `initialTokenOwner` and `mirror` NFT contract address.
     function _initializeDN404(uint96 initialTokenSupply, address initialSupplyOwner, address mirror)
         internal
         virtual
@@ -277,7 +280,8 @@ abstract contract DN404 {
     /*                 SHARED TRANSFER OPERATIONS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Struct containing packed log data for Transfer events to be emitted by the mirror NFT contract.
+    /// @dev Struct containing packed log data for `Transfer` events to be
+    /// emitted by the mirror NFT contract.
     struct _PackedLogs {
         uint256[] logs;
         uint256 offset;
@@ -296,7 +300,7 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Adds a packed log item to `p` with address `a`, tokenId `id` and burn flag `burnBit`
+    /// @dev Adds a packed log item to `p` with address `a`, tokenId `id` and burn flag `burnBit`.
     function _packedLogsAppend(_PackedLogs memory p, address a, uint256 id, uint256 burnBit)
         private
         pure
@@ -309,7 +313,7 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Calls the `mirror` NFT contract to emit Transfer events for packed logs `p`
+    /// @dev Calls the `mirror` NFT contract to emit Transfer events for packed logs `p`.
     function _packedLogsSend(_PackedLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
@@ -337,15 +341,9 @@ abstract contract DN404 {
         uint256 toOwnedLength;
     }
 
-    /// @dev You can override to return a pseudorandom value to skip
-    /// taking token IDs from the burned stack probabilistically.
-    function _skipBurnedStack(uint256) internal pure virtual returns (bool) {
-        return false;
-    }
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                  INTERNAL MINT FUNCTIONS                   */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Mints `amount` tokens to `to`, increasing the total supply.
     ///
@@ -400,9 +398,9 @@ abstract contract DN404 {
         emit Transfer(address(0), to, amount);
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                  INTERNAL BURN FUNCTIONS                   */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Burns `amount` tokens from `from`, reducing the total supply.
     ///
@@ -452,9 +450,9 @@ abstract contract DN404 {
         emit Transfer(from, address(0), amount);
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                INTERNAL TRANSFER FUNCTIONS                 */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Moves `amount` of tokens from `from` to `to`.
     ///
@@ -594,9 +592,9 @@ abstract contract DN404 {
         emit Transfer(from, to, _WAD);
     }
 
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                     SKIP NFT FUNCTIONS                     */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Returns true if account `a` will skip NFT minting on token mints and transfers.
     /// Returns false if account `a` will mint NFTs on token mints and transfers.
@@ -789,7 +787,7 @@ abstract contract DN404 {
 
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x44) revert();
 
             address owner = address(uint160(_calldataload(0x04)));
@@ -799,7 +797,7 @@ abstract contract DN404 {
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
@@ -808,7 +806,7 @@ abstract contract DN404 {
         }
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x84) revert();
 
             address from = address(uint160(_calldataload(0x04)));
@@ -821,7 +819,7 @@ abstract contract DN404 {
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x64) revert();
 
             address spender = address(uint160(_calldataload(0x04)));
@@ -833,7 +831,7 @@ abstract contract DN404 {
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x64) revert();
 
             address spender = address(uint160(_calldataload(0x04)));
@@ -844,7 +842,7 @@ abstract contract DN404 {
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x24) revert();
 
             uint256 id = _calldataload(0x04);
@@ -853,7 +851,7 @@ abstract contract DN404 {
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x24) revert();
 
             address owner = address(uint160(_calldataload(0x04)));
@@ -862,7 +860,7 @@ abstract contract DN404 {
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != $.mirrorERC721) revert UnauthorizedSender();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             if (msg.data.length < 0x04) revert();
 
             _return(_totalNFTSupply());

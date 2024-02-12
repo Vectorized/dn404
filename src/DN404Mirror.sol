@@ -35,7 +35,7 @@ contract DN404Mirror {
 
     /// @dev Thrown when a call for an NFT function did not originate
     /// from the base DN404 contract.
-    error Unauthorized();
+    error SenderNotBase();
 
     /// @dev Thrown when transferring an NFT to a contract address that
     /// does not implement ERC721Receiver.
@@ -49,7 +49,7 @@ contract DN404Mirror {
     /// NFT mirror contract has already been linked to a DN404 base contract.
     error AlreadyLinked();
 
-    /// @dev Thrown when retrieving the rootERC20 address when a link has not
+    /// @dev Thrown when retrieving the base DN404 address when a link has not
     /// been established.
     error NotLinked();
 
@@ -59,7 +59,7 @@ contract DN404Mirror {
 
     /// @dev Struct contain the NFT mirror contract storage.
     struct DN404NFTStorage {
-        address rootERC20;
+        address baseERC20;
         address deployer;
     }
 
@@ -78,7 +78,7 @@ contract DN404Mirror {
 
     constructor(address deployer) {
         // For non-proxies, we will store the deployer so that only the deployer can
-        // link the root contract.
+        // link the base contract.
         _getDN404NFTStorage().deployer = deployer;
     }
 
@@ -88,12 +88,12 @@ contract DN404Mirror {
 
     /// @dev Returns the token collection name from the base DN404 contract.
     function name() public view virtual returns (string memory result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             result := mload(0x40)
             mstore(result, 0x06fdde03) // `name()`.
-            if iszero(staticcall(gas(), root, add(result, 0x1c), 0x04, 0x00, 0x00)) {
+            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x04, 0x00, 0x00)) {
                 returndatacopy(result, 0x00, returndatasize())
                 revert(result, returndatasize())
             }
@@ -106,12 +106,12 @@ contract DN404Mirror {
 
     /// @dev Returns the token collection symbol from the base DN404 contract.
     function symbol() public view virtual returns (string memory result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             result := mload(0x40)
             mstore(result, 0x95d89b41) // `symbol()`.
-            if iszero(staticcall(gas(), root, add(result, 0x1c), 0x04, 0x00, 0x00)) {
+            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x04, 0x00, 0x00)) {
                 returndatacopy(result, 0x00, returndatasize())
                 revert(result, returndatasize())
             }
@@ -122,15 +122,16 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from the base DN404 contract.
+    /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from
+    /// the base DN404 contract.
     function tokenURI(uint256 id) public view virtual returns (string memory result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             result := mload(0x40)
             mstore(result, 0xc87b56dd) // `tokenURI()`.
             mstore(add(result, 0x20), id)
-            if iszero(staticcall(gas(), root, add(result, 0x1c), 0x24, 0x00, 0x00)) {
+            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x24, 0x00, 0x00)) {
                 returndatacopy(result, 0x00, returndatasize())
                 revert(result, returndatasize())
             }
@@ -143,12 +144,12 @@ contract DN404Mirror {
 
     /// @dev Returns the total NFT supply from the base DN404 contract.
     function totalSupply() public view returns (uint256 result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0xe2c79281) // `totalNFTSupply()`.
             if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x04, 0x00, 0x20))
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -162,13 +163,13 @@ contract DN404Mirror {
     /// Requirements:
     /// - `owner` must not be the zero address.
     function balanceOf(address owner) public view virtual returns (uint256 result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
             mstore(0x20, shr(96, shl(96, owner)))
             if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x24, 0x00, 0x20))
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -182,13 +183,13 @@ contract DN404Mirror {
     /// Requirements:
     /// - Token `id` must exist.
     function ownerOf(uint256 id) public view virtual returns (address result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0x6352211e) // `ownerOf(uint256)`.
             mstore(0x20, id)
             if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x24, 0x00, 0x20))
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -197,7 +198,8 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Sets `spender` as the approved account to manage token `id` in the base DN404 contract.
+    /// @dev Sets `spender` as the approved account to manage token `id` in
+    /// the base DN404 contract.
     ///
     /// Requirements:
     /// - Token `id` must exist.
@@ -206,7 +208,7 @@ contract DN404Mirror {
     ///
     /// Emits an {Approval} event.
     function approve(address spender, uint256 id) public virtual {
-        address root = rootERC20();
+        address base = baseERC20();
         address owner;
         /// @solidity memory-safe-assembly
         assembly {
@@ -218,7 +220,7 @@ contract DN404Mirror {
             if iszero(
                 and(
                     gt(returndatasize(), 0x1f),
-                    call(gas(), root, callvalue(), 0x1c, 0x64, 0x00, 0x20)
+                    call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -231,18 +233,19 @@ contract DN404Mirror {
         emit Approval(owner, spender, id);
     }
 
-    /// @dev Returns the account approved to manage token `id` from the base DN404 contract.
+    /// @dev Returns the account approved to manage token `id` from
+    /// the base DN404 contract.
     ///
     /// Requirements:
     /// - Token `id` must exist.
     function getApproved(uint256 id) public view virtual returns (address result) {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0x081812fc) // `getApproved(uint256)`.
             mstore(0x20, id)
             if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x24, 0x00, 0x20))
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
             ) {
                 returndatacopy(mload(0x40), 0x00, returndatasize())
                 revert(mload(0x40), returndatasize())
@@ -251,11 +254,12 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Sets whether `operator` is approved to manage the tokens of the caller in the base DN404 contract.
+    /// @dev Sets whether `operator` is approved to manage the tokens of the caller in
+    /// the base DN404 contract.
     ///
     /// Emits an {ApprovalForAll} event.
     function setApprovalForAll(address operator, bool approved) public virtual {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
@@ -266,7 +270,7 @@ contract DN404Mirror {
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), root, callvalue(), 0x1c, 0x64, 0x00, 0x20)
+                    call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -278,14 +282,15 @@ contract DN404Mirror {
         emit ApprovalForAll(msg.sender, operator, approved);
     }
 
-    /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from the base DN404 contract.
+    /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from
+    /// the base DN404 contract.
     function isApprovedForAll(address owner, address operator)
         public
         view
         virtual
         returns (bool result)
     {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
@@ -293,7 +298,7 @@ contract DN404Mirror {
             mstore(0x20, shr(96, shl(96, owner)))
             mstore(0x40, shr(96, shl(96, operator)))
             if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), root, 0x1c, 0x44, 0x00, 0x20))
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
@@ -314,7 +319,7 @@ contract DN404Mirror {
     ///
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 id) public virtual {
-        address root = rootERC20();
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
@@ -326,7 +331,7 @@ contract DN404Mirror {
             if iszero(
                 and(
                     and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), root, callvalue(), add(m, 0x1c), 0x84, 0x00, 0x20)
+                    call(gas(), base, callvalue(), add(m, 0x1c), 0x84, 0x00, 0x20)
                 )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
@@ -423,9 +428,9 @@ contract DN404Mirror {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Returns the address of the base DN404 contract.
-    function rootERC20() public view returns (address root) {
-        root = _getDN404NFTStorage().rootERC20;
-        if (root == address(0)) revert NotLinked();
+    function baseERC20() public view returns (address base) {
+        base = _getDN404NFTStorage().baseERC20;
+        if (base == address(0)) revert NotLinked();
     }
 
     /// @dev Fallback modifier to execute calls from the base DN404 contract.
@@ -436,7 +441,7 @@ contract DN404Mirror {
 
         // `logTransfer(uint256[])`.
         if (fnSelector == 0x263c69d6) {
-            if (msg.sender != $.rootERC20) revert Unauthorized();
+            if (msg.sender != $.baseERC20) revert SenderNotBase();
             /// @solidity memory-safe-assembly
             assembly {
                 // When returndatacopy copies 1 or more out-of-bounds bytes, it reverts.
@@ -467,11 +472,11 @@ contract DN404Mirror {
         if (fnSelector == 0x0f4599e5) {
             if ($.deployer != address(0)) {
                 if (address(uint160(_calldataload(0x04))) != $.deployer) {
-                    revert Unauthorized();
+                    revert SenderNotBase();
                 }
             }
-            if ($.rootERC20 != address(0)) revert AlreadyLinked();
-            $.rootERC20 = msg.sender;
+            if ($.baseERC20 != address(0)) revert AlreadyLinked();
+            $.baseERC20 = msg.sender;
             /// @solidity memory-safe-assembly
             assembly {
                 mstore(0x00, 0x01)
