@@ -434,6 +434,7 @@ abstract contract DN404 {
             t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                if (from == to) t.toOwnedLength = t.fromOwnedLength - t.nftAmountToBurn;
                 t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
@@ -463,7 +464,7 @@ abstract contract DN404 {
                 uint256 maxNFTId = $.totalSupply / _WAD;
                 uint256 id = $.nextTokenId;
                 $.totalNFTSupply += uint32(t.nftAmountToMint);
-                toAddressData.ownedLength += uint32(t.nftAmountToMint);
+                toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
                     while ($.oo.get(_ownershipIndex(id)) != 0) {
