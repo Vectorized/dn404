@@ -426,7 +426,7 @@ abstract contract DN404 {
 
         if (amount > t.fromBalance) revert InsufficientBalance();
 
-        unchecked {
+        {
             t.fromBalance -= amount;
             fromAddressData.balance = uint96(t.fromBalance);
             toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
@@ -444,6 +444,7 @@ abstract contract DN404 {
                 uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.nftAmountToBurn;
                 $.totalNFTSupply -= uint32(t.nftAmountToBurn);
+                fromAddressData.ownedLength -= uint32(t.nftAmountToBurn);
                 // Burn loop.
                 do {
                     uint256 id = fromOwned.get(--fromIndex);
@@ -452,7 +453,6 @@ abstract contract DN404 {
                     delete $.tokenApprovals[id];
                     _packedLogsAppend(packedLogs, from, id, 1);
                 } while (fromIndex != fromEnd);
-                fromAddressData.ownedLength = uint32(fromIndex);
             }
 
             if (t.nftAmountToMint != 0) {
@@ -463,7 +463,7 @@ abstract contract DN404 {
                 uint256 maxNFTId = $.totalSupply / _WAD;
                 uint256 id = $.nextTokenId;
                 $.totalNFTSupply += uint32(t.nftAmountToMint);
-                toAddressData.ownedLength = uint32(toEnd);
+                toAddressData.ownedLength += uint32(t.nftAmountToMint);
                 // Mint loop.
                 do {
                     while ($.oo.get(_ownershipIndex(id)) != 0) {
