@@ -190,6 +190,40 @@ contract DN404Test is SoladyTest {
         assertEq(count, 2);
     }
 
+    function testSetAndGetSkipNFT() public {
+        assertEq(dn.getAddressDataInitialized(address(111)), false);
+        vm.startPrank(address(111));
+        dn.setSkipNFT(false);
+        assertEq(dn.getSkipNFT(address(111)), false);
+        assertEq(dn.getAddressDataInitialized(address(111)), true);
+        dn.setSkipNFT(true);
+        assertEq(dn.getSkipNFT(address(111)), true);
+        assertEq(dn.getAddressDataInitialized(address(111)), true);
+        dn.setSkipNFT(false);
+        assertEq(dn.getSkipNFT(address(111)), false);
+        assertEq(dn.getAddressDataInitialized(address(111)), true);
+        vm.stopPrank();
+
+        assertEq(dn.getAddressDataInitialized(address(this)), false);
+        dn.setSkipNFT(false);
+        assertEq(dn.getSkipNFT(address(this)), false);
+        assertEq(dn.getAddressDataInitialized(address(this)), true);
+        dn.setSkipNFT(true);
+        assertEq(dn.getSkipNFT(address(this)), true);
+        assertEq(dn.getAddressDataInitialized(address(this)), true);
+        dn.setSkipNFT(false);
+        assertEq(dn.getSkipNFT(address(this)), false);
+        assertEq(dn.getAddressDataInitialized(address(this)), true);
+    }
+
+    function testSetAndGetAux(address a, uint88 aux) public {
+        assertEq(dn.getAux(a), 0);
+        dn.setAux(a, aux);
+        assertEq(dn.getAux(a), aux);
+        dn.setAux(a, 0);
+        assertEq(dn.getAux(a), 0);
+    }
+
     function testTransfersAndBurns() public {
         address initialSupplyOwner = address(1111);
         address alice = address(111);
