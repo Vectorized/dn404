@@ -151,7 +151,7 @@ contract DN404MirrorTest is SoladyTest {
     function testLinkMirrorContract() public {
         (bool success, bytes memory data) =
             address(mirror).call(abi.encodeWithSignature("linkMirrorContract(address)", address(1)));
-        assertEq(data, abi.encodePacked(DN404Mirror.SenderNotBase.selector));
+        assertEq(data, abi.encodePacked(DN404Mirror.SenderNotDeployer.selector));
 
         vm.prank(address(dn));
         (success, data) = address(mirror).call(
