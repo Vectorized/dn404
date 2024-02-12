@@ -26,6 +26,7 @@ contract SimpleAllowlistDN404Test is SoladyTest {
         dn = new SimpleAllowlistDN404(
             "DN404", "DN", allowlistRoot, 10, publicPrice, allowlistPrice, 1000, address(this)
         );
+        dn.toggleLive();
         payable(bob).transfer(10 ether);
         payable(alice).transfer(10 ether);
     }

@@ -27,6 +27,9 @@ contract SimpleAllowlistDN404 is DN404, Ownable {
     error NotLive();
 
     modifier isValidMint(uint256 price, uint256 amount) {
+        if (!live) {
+            revert NotLive();
+        }
         if (price * amount != msg.value) {
             revert InvalidPrice();
         }
