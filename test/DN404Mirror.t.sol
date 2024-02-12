@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
@@ -174,9 +174,9 @@ contract DN404MirrorTest is SoladyTest {
 
         vm.prank(address(dn));
         vm.expectEmit(true, true, true, true);
-        emit DN404Mirror.Transfer(address(0), to, id);
+        emit Transfer(address(0), to, id);
         vm.expectEmit(true, true, true, true);
-        emit DN404Mirror.Transfer(from, address(0), id);
+        emit Transfer(from, address(0), id);
         (bool success,) =
             address(mirror).call(abi.encodeWithSignature("logTransfer(uint256[])", packedLogs));
         assertTrue(success);
