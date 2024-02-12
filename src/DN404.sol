@@ -322,12 +322,9 @@ abstract contract DN404 {
             mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
             mstore(add(o, 0x20), 0x20) // Offset of `logs` in the calldata to send.
             let n := add(0x44, shl(5, mload(logs))) // Length of calldata to send.
-            if iszero(
-                and(
-                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), mirror, 0, add(o, 0x1c), n, 0x00, 0x20)
-                )
-            ) { revert(0x00, 0x00) }
+            if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
+                revert(o, 0x00)
+            }
         }
     }
 
@@ -766,12 +763,7 @@ abstract contract DN404 {
         assembly {
             mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
             mstore(0x20, caller())
-            if iszero(
-                and(
-                    and(eq(mload(0x00), 1), eq(returndatasize(), 0x20)),
-                    call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20)
-                )
-            ) {
+            if iszero(and(eq(mload(0x00), 1), call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20))) {
                 mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
                 revert(0x1c, 0x04)
             }

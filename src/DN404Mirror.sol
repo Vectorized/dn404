@@ -268,10 +268,7 @@ contract DN404Mirror {
             mstore(0x40, iszero(iszero(approved)))
             mstore(0x60, caller())
             if iszero(
-                and(
-                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20)
-                )
+                and(eq(mload(0x00), 1), call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
@@ -329,10 +326,7 @@ contract DN404Mirror {
             mstore(add(m, 0x60), id)
             mstore(add(m, 0x80), caller())
             if iszero(
-                and(
-                    and(eq(mload(0x00), 1), gt(returndatasize(), 0x1f)),
-                    call(gas(), base, callvalue(), add(m, 0x1c), 0x84, 0x00, 0x20)
-                )
+                and(eq(mload(m), 1), call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20))
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
