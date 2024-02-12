@@ -32,7 +32,7 @@ src
 ├─ DN404 — "ERC20 contract for DN404"
 ├─ DN404Mirror — "ERC721 contract for DN404"
 └─ example
-   └─ SimpleDN404 — "Simple DN404 example."
+   └─ SimpleDN404 — "Simple DN404 example"
 ```
 
 ## Contributing
