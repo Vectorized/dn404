@@ -2,8 +2,10 @@
 pragma solidity ^0.8.24;
 
 import "./utils/SoladyTest.sol";
+import {ERC20, MockERC20} from "lib/solady/test/utils/mocks/MockERC20.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
+import {InvariantTest} from "./utils/InvariantTest.sol";
 
 contract DN404Test is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
@@ -275,5 +277,370 @@ contract DN404Test is SoladyTest {
 
         vm.startPrank(address(2222));
         dn.transfer(address(1111), 10e18);
+    }
+
+    // ERC20 base tests
+    MockERC20 token;
+
+    bytes32 constant PERMIT_TYPEHASH = keccak256(
+        "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+    );
+
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+
+    event Approval(address indexed owner, address indexed spender, uint256 amount);
+
+    struct _TestTemps {
+        address owner;
+        address to;
+        uint256 amount;
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        uint256 privateKey;
+        uint256 nonce;
+    }
+
+    function _testTemps() internal returns (_TestTemps memory t) {
+        (t.owner, t.privateKey) = _randomSigner();
+        t.to = _randomNonZeroAddress();
+        t.amount = _random();
+        t.deadline = _random();
+    }
+
+    function testMint() public {
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), address(0xBEEF), 1e18);
+        dn.initializeDN404(1e18, address(0xBEEF), address(mirror));
+
+        assertEq(dn.totalSupply(), 1e18);
+        assertEq(dn.balanceOf(address(0xBEEF)), 1e18);
+    }
+
+    function testBurn() public {
+        dn.initializeDN404(uint96(1e18), address(0xBEEF), address(mirror));
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0xBEEF), address(0), 0.9e18);
+        dn.burn(address(0xBEEF), 0.9e18);
+
+        assertEq(dn.totalSupply(), 1e18 - 0.9e18);
+        assertEq(dn.balanceOf(address(0xBEEF)), 0.1e18);
+    }
+
+    function testApprove() public {
+        vm.expectEmit(true, true, true, true);
+        emit Approval(address(this), address(0xBEEF), 1e18);
+        assertTrue(dn.approve(address(0xBEEF), 1e18));
+
+        assertEq(dn.allowance(address(this), address(0xBEEF)), 1e18);
+    }
+
+    function testTransfer() public {
+        dn.initializeDN404(uint96(1e18), address(this), address(mirror));
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(this), address(0xBEEF), 1e18);
+        assertTrue(dn.transfer(address(0xBEEF), 1e18));
+        assertEq(dn.totalSupply(), 1e18);
+
+        assertEq(dn.balanceOf(address(this)), 0);
+        assertEq(dn.balanceOf(address(0xBEEF)), 1e18);
+    }
+
+    function testTransferFrom() public {
+        address from = address(0xABCD);
+
+        dn.initializeDN404(uint96(1e18), from, address(mirror));
+
+        vm.prank(from);
+        dn.approve(address(this), 1e18);
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(from, address(0xBEEF), 1e18);
+        assertTrue(dn.transferFrom(from, address(0xBEEF), 1e18));
+        assertEq(dn.totalSupply(), 1e18);
+
+        assertEq(dn.allowance(from, address(this)), 0);
+
+        assertEq(dn.balanceOf(from), 0);
+        assertEq(dn.balanceOf(address(0xBEEF)), 1e18);
+    }
+
+    function testInfiniteApproveTransferFrom() public {
+        address from = address(0xABCD);
+
+        dn.initializeDN404(uint96(1e18), from, address(mirror));
+
+        vm.prank(from);
+        dn.approve(address(this), type(uint256).max);
+
+        assertTrue(dn.transferFrom(from, address(0xBEEF), 1e18));
+        assertEq(dn.totalSupply(), 1e18);
+
+        assertEq(dn.allowance(from, address(this)), type(uint256).max);
+
+        assertEq(dn.balanceOf(from), 0);
+        assertEq(dn.balanceOf(address(0xBEEF)), 1e18);
+    }
+
+    function testMintOverMaxUintReverts() public {
+        dn.initializeDN404(uint96(0xffffffff * _WAD - 1), address(this), address(mirror));
+        vm.expectRevert(DN404.InvalidTotalNFTSupply.selector);
+        dn.mint(address(this), 1 * _WAD);
+    }
+
+    function testTransferInsufficientBalanceReverts() public {
+        dn.mint(address(this), 0.9e18);
+        vm.expectRevert(ERC20.InsufficientBalance.selector);
+        dn.transfer(address(0xBEEF), 1e18);
+    }
+
+    function testTransferFromInsufficientAllowanceReverts() public {
+        address from = address(0xABCD);
+
+        dn.initializeDN404(uint96(1e18), from, address(mirror));
+
+        vm.prank(from);
+        dn.approve(address(this), 0.9e18);
+
+        vm.expectRevert(ERC20.InsufficientAllowance.selector);
+        dn.transferFrom(from, address(0xBEEF), 1e18);
+    }
+
+    function testTransferFromInsufficientBalanceReverts() public {
+        address from = address(0xABCD);
+
+        dn.initializeDN404(uint96(.9e18), from, address(mirror));
+
+        vm.prank(from);
+        dn.approve(address(this), 1e18);
+
+        vm.expectRevert(ERC20.InsufficientBalance.selector);
+        dn.transferFrom(from, address(0xBEEF), 1e18);
+    }
+
+    function testMint(address to, uint256 amount) public {
+        vm.assume(amount < 0xffffffff * _WAD);
+        vm.assume(to != address(0));
+
+        if (amount > 0) {
+            vm.expectEmit(true, true, true, true);
+            emit Transfer(address(0), to, amount);
+            dn.initializeDN404(uint96(amount), to, address(mirror));
+        }
+
+        assertEq(dn.totalSupply(), amount);
+        assertEq(dn.balanceOf(to), amount);
+    }
+
+    function testBurn(address from, uint256 mintAmount, uint256 burnAmount) public {
+        vm.assume(mintAmount < 0xffffffff);
+        vm.assume(from != address(0));
+        dn.initializeDN404(uint96(mintAmount), from, address(mirror));
+        burnAmount = _bound(burnAmount, 0, mintAmount);
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(from, address(0), burnAmount);
+        dn.burn(from, burnAmount);
+
+        assertEq(dn.totalSupply(), mintAmount - burnAmount);
+        assertEq(dn.balanceOf(from), mintAmount - burnAmount);
+    }
+
+    function testApprove(address to, uint256 amount) public {
+        assertTrue(dn.approve(to, amount));
+
+        assertEq(dn.allowance(address(this), to), amount);
+    }
+
+    function testTransferWorks(address to, uint256 amount) public {
+        vm.assume(amount < 8313000000000000000000);
+        vm.assume(to != address(0));
+
+        dn.initializeDN404(uint96(amount), address(this), address(mirror));
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(this), to, amount);
+        assertTrue(dn.transfer(to, amount));
+        assertEq(dn.totalSupply(), amount);
+
+        if (address(this) == to) {
+            assertEq(dn.balanceOf(address(this)), amount);
+        } else {
+            assertEq(dn.balanceOf(address(this)), 0);
+            assertEq(dn.balanceOf(to), amount);
+        }
+    }
+
+    function testTransferBroken(address to, uint256 amount) public {
+        vm.assume(amount >= 8313000000000000000000);
+        vm.assume(to != address(0));
+
+        dn.initializeDN404(uint96(amount), address(this), address(mirror));
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(this), to, amount);
+        assertTrue(dn.transfer(to, amount));
+        assertEq(dn.totalSupply(), amount);
+
+        if (address(this) == to) {
+            assertEq(dn.balanceOf(address(this)), amount);
+        } else {
+            assertEq(dn.balanceOf(address(this)), 0);
+            assertEq(dn.balanceOf(to), amount);
+        }
+    }
+
+    function testTransferFrom(
+        address spender,
+        address from,
+        address to,
+        uint256 approval,
+        uint256 amount
+    ) public {
+        vm.assume(amount < 0xffffffff * _WAD);
+        vm.assume(from != address(0) && to != address(0));
+        amount = _bound(amount, 0, approval);
+
+        dn.initializeDN404(uint96(amount), from, address(mirror));
+        assertEq(dn.balanceOf(from), amount);
+
+        vm.prank(from);
+        dn.approve(spender, approval);
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(from, to, amount);
+        vm.prank(spender);
+        assertTrue(dn.transferFrom(from, to, amount));
+        assertEq(dn.totalSupply(), amount);
+
+        if (approval == type(uint256).max) {
+            assertEq(dn.allowance(from, spender), approval);
+        } else {
+            assertEq(dn.allowance(from, spender), approval - amount);
+        }
+
+        if (from == to) {
+            assertEq(dn.balanceOf(from), amount);
+        } else {
+            assertEq(dn.balanceOf(from), 0);
+            assertEq(dn.balanceOf(to), amount);
+        }
+    }
+
+    function _checkAllowanceAndNonce(_TestTemps memory t) internal {
+        assertEq(dn.allowance(t.owner, t.to), t.amount);
+    }
+
+    function testBurnInsufficientBalanceReverts(address to, uint256 mintAmount, uint256 burnAmount)
+        public
+    {
+        vm.assume(to != address(0));
+        vm.assume(mintAmount < 0xffffffff);
+        if (mintAmount == type(uint256).max) mintAmount--;
+        burnAmount = _bound(burnAmount, mintAmount + 1, type(uint256).max);
+
+        dn.initializeDN404(uint96(mintAmount), to, address(mirror));
+        vm.expectRevert(ERC20.InsufficientBalance.selector);
+        dn.burn(to, burnAmount);
+    }
+
+    function testTransferInsufficientBalanceReverts(
+        address to,
+        uint256 mintAmount,
+        uint256 sendAmount
+    ) public {
+        if (mintAmount == type(uint256).max) mintAmount--;
+        sendAmount = _bound(sendAmount, mintAmount + 1, type(uint256).max);
+
+        dn.initializeDN404(uint96(mintAmount), address(this), address(mirror));
+        vm.expectRevert(ERC20.InsufficientBalance.selector);
+        dn.transfer(to, sendAmount);
+    }
+
+    function testTransferFromInsufficientAllowanceReverts(
+        address to,
+        uint256 approval,
+        uint256 amount
+    ) public {
+        if (approval == type(uint256).max) approval--;
+        amount = _bound(amount, approval + 1, type(uint256).max);
+
+        address from = address(0xABCD);
+
+        dn.initializeDN404(uint96(amount), from, address(mirror));
+
+        vm.prank(from);
+        dn.approve(address(this), approval);
+
+        vm.expectRevert(ERC20.InsufficientAllowance.selector);
+        dn.transferFrom(from, to, amount);
+    }
+
+    function testTransferFromInsufficientBalanceReverts(
+        address to,
+        uint256 mintAmount,
+        uint256 sendAmount
+    ) public {
+        if (mintAmount == type(uint256).max) mintAmount--;
+        sendAmount = _bound(sendAmount, mintAmount + 1, type(uint256).max);
+
+        address from = address(0xABCD);
+
+        dn.initializeDN404(uint96(mintAmount), from, address(mirror));
+
+        vm.prank(from);
+        dn.approve(address(this), sendAmount);
+
+        vm.expectRevert(ERC20.InsufficientBalance.selector);
+        dn.transferFrom(from, to, sendAmount);
+    }
+}
+
+contract ERC20Invariants is SoladyTest, InvariantTest {
+    BalanceSum balanceSum;
+    MockERC20 token;
+
+    function setUp() public {
+        token = new MockERC20("Token", "TKN", 18);
+        balanceSum = new BalanceSum(token);
+        _addTargetContract(address(balanceSum));
+    }
+
+    function invariantBalanceSum() public {
+        assertEq(token.totalSupply(), balanceSum.sum());
+    }
+}
+
+contract BalanceSum {
+    MockERC20 token;
+    uint256 public sum;
+
+    constructor(MockERC20 _token) {
+        token = _token;
+    }
+
+    function mint(address from, uint256 amount) public {
+        token.mint(from, amount);
+        sum += amount;
+    }
+
+    function burn(address from, uint256 amount) public {
+        token.burn(from, amount);
+        sum -= amount;
+    }
+
+    function approve(address to, uint256 amount) public {
+        token.approve(to, amount);
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public {
+        token.transferFrom(from, to, amount);
+    }
+
+    function transfer(address to, uint256 amount) public {
+        token.transfer(to, amount);
     }
 }
