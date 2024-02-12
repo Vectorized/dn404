@@ -426,11 +426,6 @@ abstract contract DN404 {
 
         if (amount > t.fromBalance) revert InsufficientBalance();
 
-        if (from == to) {
-            emit Transfer(from, to, amount);
-            return;
-        }
-
         unchecked {
             t.fromBalance -= amount;
             fromAddressData.balance = uint96(t.fromBalance);
@@ -468,7 +463,7 @@ abstract contract DN404 {
                 uint256 maxNFTId = $.totalSupply / _WAD;
                 uint256 id = $.nextTokenId;
                 $.totalNFTSupply += uint32(t.nftAmountToMint);
-                toAddressData.ownedLength = uint32(toEnd);
+                toAddressData.ownedLength += uint32(t.nftAmountToMint);
                 // Mint loop.
                 do {
                     while ($.oo.get(_ownershipIndex(id)) != 0) {
