@@ -81,13 +81,13 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Amount of token balance that is equal to one NFT.
-    uint256 internal constant _WAD = 1000000000000000000;
+    uint256 internal constant _WAD = 10 ** 18;
 
     /// @dev The maximum token ID allowed for an NFT.
     uint256 internal constant _MAX_TOKEN_ID = 0xffffffff;
 
     /// @dev The maximum possible token supply.
-    uint256 internal constant _MAX_SUPPLY = _WAD * _MAX_TOKEN_ID - 1;
+    uint256 internal constant _MAX_SUPPLY = 10 ** 18 * 0xffffffff - 1;
 
     /// @dev The flag to denote that the address data is initialized.
     uint8 internal constant _ADDRESS_DATA_INITIALIZED_FLAG = 1 << 0;
