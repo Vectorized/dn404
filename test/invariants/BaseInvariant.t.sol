@@ -87,4 +87,8 @@ contract BaseInvariantTest is Test {
             + dn404Handler.balanceOf(user4) + dn404Handler.balanceOf(user5);
         assertEq(total, dn404Mirror.totalSupply(), "all users nfts exceed total supply");
     }
+
+    function invariantBalanceSum() public {
+        assertEq(dn404.totalSupply(), dn404Handler.sum());
+    }
 }

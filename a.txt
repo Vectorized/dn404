@@ -1,0 +1,245 @@
+Compiling 3 files with 0.8.24
+Solc 0.8.24 finished in 2.52s
+Compiler run [32msuccessful![0m
+
+Running 1 test for test/invariants/BaseInvariant.t.sol:BaseInvariantTest
+[32m[PASS][0m invariant_nftTotalSupplyMulWad_IsNeverGreaterThan_TokenTotalSupply() (runs: 1000, calls: 100000, reverts: 0)
+Logs:
+  Bound Result 1
+  Bound Result 4
+  Bound Result 3
+  Bound Result 3
+  Bound Result 1
+  Bound Result 5
+  Bound Result 0
+  Bound Result 4
+  Bound Result 2
+  Bound Result 84019192727680537065
+  Bound Result 1
+  Bound Result 5
+  Bound Result 0
+  Bound Result 5
+  Bound Result 2
+  Bound Result 0
+  Bound Result 4
+  Bound Result 3
+  Bound Result 3
+  Bound Result 2
+  Bound Result 4
+  Bound Result 1
+  Bound Result 0
+  Bound Result 2
+  Bound Result 99999999999999999997
+  Bound Result 3
+  Bound Result 0
+  Bound Result 1
+  Bound Result 3
+  Bound Result 99999999999999999999
+  Bound Result 4
+  Bound Result 0
+  Bound Result 0
+  Bound Result 3
+  Bound Result 62269324569334533400
+  Bound Result 1
+  Bound Result 0
+  Bound Result 3
+  Bound Result 2
+  Bound Result 162269324569334533396
+  Bound Result 2
+  Bound Result 2
+  Bound Result 4
+  Bound Result 4
+  Bound Result 0
+  Bound Result 2
+  Bound Result 18332742074159157665
+  Bound Result 5
+  Bound Result 2
+  Bound Result 5
+  Bound Result 2
+  Bound Result 4
+  Bound Result 5
+  Bound Result 2
+  Bound Result 0
+  Bound Result 3
+  Bound Result 2
+  Bound Result 0
+  Bound Result 3
+  Bound Result 1
+  Bound Result 5
+  Bound Result 0
+  Bound Result 3
+  Bound Result 0
+  Bound Result 1
+  Bound Result 2
+  Bound Result 0
+  Bound Result 3
+  Bound Result 1
+  Bound Result 1
+  Bound Result 1
+  Bound Result 0
+  Bound Result 3
+  Bound Result 2
+  Bound Result 3
+  Bound Result 0
+  Bound Result 0
+  Bound Result 1
+  Bound Result 0
+  Bound Result 2
+  Bound Result 3
+  Bound Result 2
+  Bound Result 5
+  Bound Result 0
+  Bound Result 0
+  Bound Result 5
+  Bound Result 1
+  Bound Result 0
+  Bound Result 1
+  Bound Result 1
+  Bound Result 0
+  Bound Result 5
+  Bound Result 5
+  Bound Result 1
+  Bound Result 2
+  Bound Result 12937948654202350964
+  Bound Result 1
+  Bound Result 0
+  Bound Result 5
+  Bound Result 5
+  Bound Result 1
+  Bound Result 2
+  Bound Result 99999999999999999999
+  Bound Result 1
+  Bound Result 1
+  Bound Result 5
+  Bound Result 1
+  Bound Result 3
+  Bound Result 0
+  Bound Result 3
+  Bound Result 0
+  Bound Result 1
+  Bound Result 0
+  Bound Result 2
+  Bound Result 3
+  Bound Result 2
+  Bound Result 1
+  Bound Result 1
+  Bound Result 3
+  Bound Result 4
+  Bound Result 2
+  Bound Result 3
+  Bound Result 3
+  Bound Result 3
+  Bound Result 0
+  Bound Result 5
+  Bound Result 1
+  Bound Result 4
+  Bound Result 1
+  Bound Result 1
+  Bound Result 3
+  Bound Result 1
+  Bound Result 3
+  Bound Result 7997742159088919054
+  Bound Result 5
+  Bound Result 0
+  Bound Result 1
+  Bound Result 4
+  Bound Result 3
+  Bound Result 0
+  Bound Result 0
+  Bound Result 1
+  Bound Result 2
+  Bound Result 3
+  Bound Result 477559208025376579086
+  Bound Result 4
+  Bound Result 1
+  Bound Result 1
+  Bound Result 3
+  Bound Result 4
+  Bound Result 5
+  Bound Result 3
+  Bound Result 0
+  Bound Result 3
+  Bound Result 0
+  Bound Result 2
+  Bound Result 3
+  Bound Result 0
+  Bound Result 2
+  Bound Result 1
+  Bound Result 1
+  Bound Result 1
+  Bound Result 0
+  Bound Result 3
+  Bound Result 1
+  Bound Result 379323488209546730203
+  Bound Result 0
+  Bound Result 3
+  Bound Result 99999999999999999997
+  Bound Result 3
+  Bound Result 5
+  Bound Result 5
+  Bound Result 0
+  Bound Result 4
+  Bound Result 2
+  Bound Result 3
+  Bound Result 5
+  Bound Result 0
+  Bound Result 5
+  Bound Result 0
+  Bound Result 5
+  Bound Result 4
+  Bound Result 28239589435189083927
+  Bound Result 3
+  Bound Result 99999999999999999997
+  Bound Result 1
+  Bound Result 99999999999999999999
+  Bound Result 5
+  Bound Result 0
+  Bound Result 2
+  Bound Result 95306812900007257787
+
+Test result: [32mok[0m. [32m1[0m passed; [31m0[0m failed; [33m0[0m skipped; finished in 139.44s
+| src/DN404Mirror.sol:DN404Mirror contract |                 |      |        |      |         |
+|------------------------------------------|-----------------|------|--------|------|---------|
+| Deployment Cost                          | Deployment Size |      |        |      |         |
+| 671232                                   | 3428            |      |        |      |         |
+| Function Name                            | min             | avg  | median | max  | # calls |
+| balanceOf                                | 1581            | 3150 | 1581   | 5581 | 130     |
+| totalSupply                              | 1306            | 5556 | 5556   | 9806 | 200     |
+
+
+| test/invariants/handlers/DN404Handler.sol:DN404Handler contract |                 |         |        |          |         |
+|-----------------------------------------------------------------|-----------------|---------|--------|----------|---------|
+| Deployment Cost                                                 | Deployment Size |         |        |          |         |
+| 3737336                                                         | 19108           |         |        |          |         |
+| Function Name                                                   | min             | avg     | median | max      | # calls |
+| approve                                                         | 7350            | 34882   | 42412  | 43220    | 11      |
+| balanceOf                                                       | 2604            | 2604    | 2604   | 2604     | 600     |
+| burn                                                            | 45210           | 49271   | 46439  | 66712    | 15      |
+| failed                                                          | 6294            | 6294    | 6294   | 6294     | 15      |
+| mint                                                            | 53140           | 2090549 | 55154  | 6508760  | 17      |
+| setSkipNFT                                                      | 18824           | 24072   | 22015  | 39215    | 16      |
+| transfer                                                        | 55718           | 2580778 | 66277  | 23623625 | 15      |
+| transferFrom                                                    | 60936           | 70864   | 73223  | 81305    | 11      |
+
+
+| test/utils/mocks/MockDN404.sol:MockDN404 contract |                 |        |        |         |         |
+|---------------------------------------------------|-----------------|--------|--------|---------|---------|
+| Deployment Cost                                   | Deployment Size |        |        |         |         |
+| 2065592                                           | 10349           |        |        |         |         |
+| Function Name                                     | min             | avg    | median | max     | # calls |
+| allowance                                         | 2792            | 2792   | 2792   | 2792    | 11      |
+| approve                                           | 7472            | 23432  | 24572  | 24572   | 15      |
+| balanceOf                                         | 640             | 1199   | 640    | 2640    | 279     |
+| burn                                              | 5758            | 8229   | 5758   | 26031   | 15      |
+| initializeDN404                                   | 68082           | 68082  | 68082  | 68082   | 1       |
+| mint                                              | 9024            | 400253 | 9507   | 1323581 | 17      |
+| mirrorERC721                                      | 376             | 376    | 376    | 376     | 1       |
+| setSkipNFT                                        | 4301            | 9446   | 7374   | 24574   | 16      |
+| totalSupply                                       | 407             | 1008   | 407    | 2407    | 143     |
+| transfer                                          | 4546            | 682177 | 7534   | 5476185 | 15      |
+| transferFrom                                      | 5133            | 6756   | 5405   | 13650   | 11      |
+
+
+
+ 
+Ran 1 test suites: [32m1[0m tests passed, [31m0[0m failed, [33m0[0m skipped (1 total tests)

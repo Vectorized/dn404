@@ -14,8 +14,7 @@ contract DN404Handler is Test {
     MockDN404 dn404;
     DN404Mirror mirror;
 
-    uint256 public transferRuns;
-    uint256 public transferFromRuns;
+    uint256 public sum;
 
     address user0 = vm.addr(uint256(keccak256("OWNER")));
     address user1 = vm.addr(uint256(keccak256("User1")));
@@ -288,6 +287,8 @@ contract DN404Handler is Test {
 
         assertEq(mirror.balanceOf(to), owned[to].length);
         assertEq(dn404.balanceOf(to), toInitialTokenBalance + amount);
+
+        sum += amount;
     }
 
     function burn(uint256 fromIndexSeed, uint256 amount) external {
@@ -324,6 +325,8 @@ contract DN404Handler is Test {
 
         assertEq(mirror.balanceOf(from), owned[from].length);
         assertEq(dn404.balanceOf(from), fromInitialTokenBalance - amount);
+
+        sum -= amount;
     }
 
     function setSkipNFT(uint256 actorIndexSeed, bool status) external {
