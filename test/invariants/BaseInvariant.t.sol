@@ -50,32 +50,7 @@ contract BaseInvariantTest is Test {
         targetContract(address(dn404MirrorHandler));
     }
 
-    modifier allSelectors() {
-        bytes4[] memory dn404Selectors = new bytes4[](5);
-        dn404Selectors[0] = DN404Handler.transfer.selector;
-        dn404Selectors[1] = DN404Handler.transferFrom.selector;
-        dn404Selectors[2] = DN404Handler.approve.selector;
-        dn404Selectors[3] = DN404Handler.mint.selector;
-        dn404Selectors[4] = DN404Handler.burn.selector;
-
-        // bytes4[] memory dn404MirrorSelectors = new bytes4[](4);
-        // dn404MirrorSelectors[0] = 0x42842e0e; // DN404Mirror.safeTransferFrom.selector;
-        // dn404MirrorSelectors[1] = DN404Mirror.transferFrom.selector;
-        // dn404MirrorSelectors[2] = DN404Mirror.approve.selector;
-        // dn404MirrorSelectors[3] = DN404Mirror.setApprovalForAll.selector;
-
-        // target selectors of handlers
-        targetSelector(FuzzSelector({addr: address(dn404Handler), selectors: dn404Selectors}));
-        // targetSelector(
-        //     FuzzSelector({addr: address(dn404MirrorHandler), selectors: dn404MirrorSelectors})
-        // );
-        _;
-    }
-
-    function invariant_nftTotalSupplyMulWad_IsNeverGreaterThan_TokenTotalSupply()
-        external
-        allSelectors
-    {
+    function invariant_nftTotalSupplyMulWad_IsNeverGreaterThan_TokenTotalSupply() external {
         assertLe(
             dn404Mirror.totalSupply() * _WAD,
             dn404.totalSupply(),
@@ -90,5 +65,8 @@ contract BaseInvariantTest is Test {
 
     function invariantBalanceSum() public {
         assertEq(dn404.totalSupply(), dn404Handler.sum());
+        uint256 total = dn404.balanceOf(user0) + dn404.balanceOf(user1) + dn404.balanceOf(user2)
+            + dn404.balanceOf(user3) + dn404.balanceOf(user4) + dn404.balanceOf(user5);
+        assertEq(dn404.totalSupply(), total);
     }
 }
