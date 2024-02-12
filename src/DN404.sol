@@ -947,16 +947,16 @@ abstract contract DN404 {
         uint32 ownership,
         uint32 ownedIndex
     ) private {
-        /// @solidity memory-safe-assembly
         assembly {
-            let value := or(shl(32, ownedIndex), and(0xffffffff, ownership))
+            let combinedValue := or(shl(32, ownedIndex), ownership)
             mstore(0x20, map.slot)
             mstore(0x00, shr(2, id))
-            let s := keccak256(0x00, 0x40) // Storage slot.
-            let o := shl(6, and(id, 3)) // Storage slot offset (bits).
-            let v := sload(s) // Storage slot value.
-            let m := 0xffffffffffffffff // Value mask.
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), value)))))
+            let slot := keccak256(0x00, 0x40)
+            let offset := shl(6, and(id, 3))
+            let currentValue := sload(slot)
+            let mask := not(shl(offset, 0xffffffffffffffff))
+            let newValue := or(and(currentValue, mask), shl(offset, combinedValue))
+            sstore(slot, newValue)
         }
     }
 }
