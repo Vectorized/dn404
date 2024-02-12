@@ -222,7 +222,7 @@ contract MintTests is SoladyTest {
     //     result = uint32(map.map[index >> 3] >> ((index & 7) << 5));
     // }
 
-    // This should work for emitting overloaded events but foundry fails sometimes and passes sometimes saying log != expected log when the logs shown are infact the same
+    // This should work for emitting overloaded events but foundry fails sometimes and passes sometimes saying log != expected log when the logs shown are in fact the same
     // function emitERC20TransferEvent(address from, address to, uint256 amount) private {
     //     assembly {
     //         // log erc20 transfer using assembly because nft transfer is already defined
