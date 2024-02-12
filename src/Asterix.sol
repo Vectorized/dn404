@@ -35,8 +35,6 @@ contract Asterix is DN404, OwnableRoles {
 
     string internal _baseURI;
 
-    bool public mintLocked;
-
     bool public baseURILocked;
 
     bool public nameAndSymbolLocked;
@@ -149,15 +147,6 @@ contract Asterix is DN404, OwnableRoles {
         address initialSupplyOwner = msg.sender;
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
         _setWhitelisted(initialSupplyOwner, true);
-    }
-
-    function lockMint() public onlyOwnerOrRoles(ADMIN_ROLE) {
-        mintLocked = true;
-    }
-
-    function mint(address to, uint256 amount) public onlyOwnerOrRoles(ADMIN_ROLE) {
-        if (mintLocked) revert Locked();
-        _mint(to, amount);
     }
 
     function lockMaxBalanceLimit() public onlyOwnerOrRoles(ADMIN_ROLE) {
