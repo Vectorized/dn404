@@ -83,7 +83,7 @@ abstract contract DN404 {
     /// @dev Amount of token balance that is equal to one NFT.
     uint256 private constant _WAD = 1000000000000000000;
 
-    /// @dev The maximum tokenId allowed for an NFT.
+    /// @dev The maximum token ID allowed for an NFT.
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
 
     /// @dev The flag to denote that the address data is initialized.
@@ -114,7 +114,7 @@ abstract contract DN404 {
     struct DN404Storage {
         // Current number of address aliases assigned.
         uint32 numAliases;
-        // Next tokenId to assign for an NFT mint.
+        // Next token ID to assign for an NFT mint.
         uint32 nextTokenId;
         // Total supply of minted NFTs.
         uint32 totalNFTSupply;
@@ -130,7 +130,7 @@ abstract contract DN404 {
         mapping(uint256 => address) tokenApprovals;
         // Mapping of user allowances for token spenders.
         mapping(address => mapping(address => uint256)) allowance;
-        // Mapping of NFT tokenIds owned by an address.
+        // Mapping of NFT token IDs owned by an address.
         mapping(address => LibMap.Uint32Map) owned;
         // Even indices: owner aliases. Odd indices: owned indices.
         LibMap.Uint32Map oo;
@@ -832,7 +832,7 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Adds a packed log item to `p` with address `a`, tokenId `id` and burn flag `burnBit`.
+    /// @dev Adds a packed log item to `p` with address `a`, token `id` and burn flag `burnBit`.
     function _packedLogsAppend(_PackedLogs memory p, address a, uint256 id, uint256 burnBit)
         private
         pure

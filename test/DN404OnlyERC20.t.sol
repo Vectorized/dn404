@@ -11,7 +11,9 @@ contract DN404OnlyERC20Test is SoladyTest {
 
     uint256 private constant _WAD = 1000000000000000000;
 
-    uint256 private constant _MAX_SUPPLY = _WAD * type(uint32).max - 1;
+    uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
+
+    uint256 private constant _MAX_SUPPLY = _WAD * _MAX_TOKEN_ID - 1;
 
     event Transfer(address indexed from, address indexed to, uint256 amount);
 
@@ -19,6 +21,12 @@ contract DN404OnlyERC20Test is SoladyTest {
 
     function setUp() public {
         token = new MockDN404OnlyERC20();
+    }
+
+    function testMaxSupplyTrick(uint256 amount) public {
+        bool expected = amount / _WAD > _MAX_TOKEN_ID - 1;
+        bool computed = amount > _MAX_SUPPLY;
+        assertEq(computed, expected);
     }
 
     function testMetadata() public {
