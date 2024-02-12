@@ -8,15 +8,18 @@ import {LibString} from "solady/utils/LibString.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 import {MerkleProofLib} from "solady/utils/MerkleProofLib.sol";
 
-contract SimpleAllowlistDN404 is DN404, Ownable {
+contract AllowlistMintDN404 is DN404, Ownable {
     string private _name;
     string private _symbol;
     string private _baseURI;
     bytes32 private allowlistRoot;
     uint120 public publicPrice;
     uint120 public allowlistPrice;
-    uint256 public maxMint;
     bool public live;
+    uint256 public maxMint;
+    uint256 public numMinted;
+
+    uint256 public constant MAX_SUPPLY = 5000;
 
     mapping(address => bool) public minted;
 
@@ -24,6 +27,7 @@ contract SimpleAllowlistDN404 is DN404, Ownable {
     error InvalidMint();
     error InvalidPrice();
     error ExceedsMaxMint();
+    error TotalSupplyReached();
     error NotLive();
 
     modifier isValidMint(uint256 price, uint256 amount) {
@@ -35,6 +39,9 @@ contract SimpleAllowlistDN404 is DN404, Ownable {
         }
         if (amount > maxMint) {
             revert ExceedsMaxMint();
+        }
+        if (numMinted + amount > MAX_SUPPLY) {
+            revert TotalSupplyReached();
         }
         _;
     }
@@ -65,6 +72,9 @@ contract SimpleAllowlistDN404 is DN404, Ownable {
     function mint(uint256 amount) public payable isValidMint(publicPrice, amount) {
         if (minted[msg.sender]) revert InvalidMint();
         minted[msg.sender] = true;
+        unchecked {
+            ++numMinted;
+        }
         _mint(msg.sender, amount);
     }
 
@@ -82,6 +92,9 @@ contract SimpleAllowlistDN404 is DN404, Ownable {
         }
         if (minted[msg.sender]) revert InvalidMint();
         minted[msg.sender] = true;
+        unchecked {
+            ++numMinted;
+        }
         _mint(msg.sender, amount);
     }
 
