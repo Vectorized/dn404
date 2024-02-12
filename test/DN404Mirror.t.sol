@@ -42,12 +42,12 @@ contract DN404MirrorTest is SoladyTest {
         assertEq(mirror.supportsInterface(0x5b5e139f), true);
     }
 
-    function testRootERC20() public {
+    function testBaseERC20() public {
         vm.expectRevert(DN404Mirror.NotLinked.selector);
-        mirror.rootERC20();
+        mirror.baseERC20();
 
         dn.initializeDN404(1000, address(this), address(mirror));
-        assertEq(mirror.rootERC20(), address(dn));
+        assertEq(mirror.baseERC20(), address(dn));
     }
 
     function testTransferFrom(uint32 totalNFTSupply) public {
