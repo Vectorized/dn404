@@ -30,6 +30,7 @@ contract AsterixTest is SoladyTest {
     }
 
     function testWhitelist(address a, bool status) public {
+        vm.assume(a != address(this));
         assertEq(asterix.isWhitelisted(a), false);
         asterix.setWhitelist(a, status);
         assertEq(asterix.isWhitelisted(a), status);
@@ -108,7 +109,7 @@ contract AsterixTest is SoladyTest {
 
         asterix.setBaseURI("https://abcdefg.com/{id}.json");
 
-        assertEq(asterix.tokenURI(1), "https://abcdefg.com/1.json");
-        assertEq(asterix.tokenURI(10), "https://abcdefg.com/10.json");
+        assertEq(asterixMirror.tokenURI(1), "https://abcdefg.com/1.json");
+        assertEq(asterixMirror.tokenURI(10), "https://abcdefg.com/10.json");
     }
 }
