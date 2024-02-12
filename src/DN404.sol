@@ -48,7 +48,7 @@ abstract contract DN404 {
     error InsufficientAllowance();
 
     /// @dev Thrown when minting an amount of tokens that would overflow the max tokens.
-    error InvalidTotalNFTSupply();
+    error TotalSupplyOverflow();
 
     /// @dev Thrown when the caller for a fallback NFT function is not the mirror contract.
     error SenderNotMirror();
@@ -169,7 +169,7 @@ abstract contract DN404 {
 
         if (initialTokenSupply > 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
+            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert TotalSupplyOverflow();
 
             $.totalTokenSupply = initialTokenSupply;
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
@@ -302,7 +302,7 @@ abstract contract DN404 {
 
         unchecked {
             uint256 currentTokenSupply = uint256($.totalTokenSupply) + amount;
-            if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert InvalidTotalNFTSupply();
+            if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert TotalSupplyOverflow();
             $.totalTokenSupply = uint96(currentTokenSupply);
 
             uint256 toBalance = toAddressData.balance + amount;
@@ -575,7 +575,7 @@ abstract contract DN404 {
     /// Initializes account `a` AddressData if it is not currently initialized.
     ///
     /// Emits a {SkipNFTSet} event.
-    function _setSkipNFT(address a, bool state) internal {
+    function _setSkipNFT(address a, bool state) internal virtual {
         AddressData storage d = _addressData(a);
         if ((d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0) != state) {
             d.flags ^= _ADDRESS_DATA_SKIP_NFT_FLAG;
@@ -586,7 +586,7 @@ abstract contract DN404 {
     /// @dev Returns a storage data pointer for account `a` AddressData
     ///
     /// Initializes account `a` AddressData if it is not currently initialized.
-    function _addressData(address a) internal returns (AddressData storage d) {
+    function _addressData(address a) internal virtual returns (AddressData storage d) {
         DN404Storage storage $ = _getDN404Storage();
         d = $.addressData[a];
 
@@ -594,14 +594,6 @@ abstract contract DN404 {
             uint8 flags = _ADDRESS_DATA_INITIALIZED_FLAG;
             if (_hasCode(a)) flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
             d.flags = flags;
-        }
-    }
-
-    /// @dev Returns if `a` has bytecode of non-zero length.
-    function _hasCode(address a) private view returns (bool result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := extcodesize(a) // Can handle dirty upper bits.
         }
     }
 
@@ -618,26 +610,6 @@ abstract contract DN404 {
             addressAlias = ++$.numAliases;
             toAddressData.addressAlias = addressAlias;
             $.aliasToAddress[addressAlias] = to;
-        }
-    }
-
-    /// @dev Returns `max(0, x - y)`.
-    function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(gt(x, y), sub(x, y))
-        }
-    }
-
-    /// @dev Returns `i << 1`.
-    function _ownershipIndex(uint256 i) private pure returns (uint256) {
-        return i << 1;
-    }
-
-    /// @dev Returns `(i << 1) + 1`.
-    function _ownedIndex(uint256 i) private pure returns (uint256) {
-        unchecked {
-            return (i << 1) + 1;
         }
     }
 
@@ -898,6 +870,14 @@ abstract contract DN404 {
         uint256 toOwnedLength;
     }
 
+    /// @dev Returns if `a` has bytecode of non-zero length.
+    function _hasCode(address a) private view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := extcodesize(a) // Can handle dirty upper bits.
+        }
+    }
+
     /// @dev Returns the calldata value at `offset`.
     function _calldataload(uint256 offset) private pure returns (uint256 value) {
         /// @solidity memory-safe-assembly
@@ -912,6 +892,26 @@ abstract contract DN404 {
         assembly {
             mstore(0x00, x)
             return(0x00, 0x20)
+        }
+    }
+
+    /// @dev Returns `max(0, x - y)`.
+    function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := mul(gt(x, y), sub(x, y))
+        }
+    }
+
+    /// @dev Returns `i << 1`.
+    function _ownershipIndex(uint256 i) private pure returns (uint256) {
+        return i << 1;
+    }
+
+    /// @dev Returns `(i << 1) + 1`.
+    function _ownedIndex(uint256 i) private pure returns (uint256) {
+        unchecked {
+            return (i << 1) + 1;
         }
     }
 }
