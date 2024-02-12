@@ -4,11 +4,8 @@ pragma solidity ^0.8.4;
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
-import {LibMap} from "solady/utils/LibMap.sol";
 
 contract DN404Test is SoladyTest {
-    using LibMap for *;
-
     uint256 private constant _WAD = 1000000000000000000;
 
     MockDN404 dn;
