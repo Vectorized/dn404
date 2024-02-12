@@ -81,13 +81,13 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Amount of token balance that is equal to one NFT.
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 internal constant _WAD = 1000000000000000000;
 
     /// @dev The maximum token ID allowed for an NFT.
-    uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
+    uint256 internal constant _MAX_TOKEN_ID = 0xffffffff;
 
     /// @dev The maximum possible token supply.
-    uint256 private constant _MAX_SUPPLY = _WAD * _MAX_TOKEN_ID - 1;
+    uint256 internal constant _MAX_SUPPLY = _WAD * _MAX_TOKEN_ID - 1;
 
     /// @dev The flag to denote that the address data is initialized.
     uint8 internal constant _ADDRESS_DATA_INITIALIZED_FLAG = 1 << 0;
@@ -122,7 +122,7 @@ abstract contract DN404 {
         // Total supply of minted NFTs.
         uint32 totalNFTSupply;
         // Total supply of tokens.
-        uint96 totalTokenSupply;
+        uint96 totalSupply;
         // Address of the NFT mirror contract.
         address mirrorERC721;
         // Mapping of a user alias number to their address.
@@ -175,7 +175,7 @@ abstract contract DN404 {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
             if (initialTokenSupply > _MAX_SUPPLY) revert TotalSupplyOverflow();
 
-            $.totalTokenSupply = uint96(initialTokenSupply);
+            $.totalSupply = uint96(initialTokenSupply);
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
             initialOwnerAddressData.balance = uint96(initialTokenSupply);
 
@@ -209,7 +209,7 @@ abstract contract DN404 {
 
     /// @dev Returns the amount of tokens in existence.
     function totalSupply() public view virtual returns (uint256) {
-        return uint256(_getDN404Storage().totalTokenSupply);
+        return uint256(_getDN404Storage().totalSupply);
     }
 
     /// @dev Returns the amount of tokens owned by `owner`.
@@ -305,11 +305,11 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         unchecked {
-            uint256 currentTokenSupply = uint256($.totalTokenSupply) + amount;
+            uint256 currentTokenSupply = uint256($.totalSupply) + amount;
             if (amount > _MAX_SUPPLY || currentTokenSupply > _MAX_SUPPLY) {
                 revert TotalSupplyOverflow();
             }
-            $.totalTokenSupply = uint96(currentTokenSupply);
+            $.totalSupply = uint96(currentTokenSupply);
 
             uint256 toBalance = toAddressData.balance + amount;
             toAddressData.balance = uint96(toBalance);
@@ -321,7 +321,7 @@ abstract contract DN404 {
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
 
                 if (packedLogs.logs.length != 0) {
-                    uint256 maxNFTId = $.totalTokenSupply / _WAD;
+                    uint256 maxNFTId = $.totalSupply / _WAD;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint256 id = $.nextTokenId;
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
@@ -363,13 +363,13 @@ abstract contract DN404 {
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
 
-        uint256 currentTokenSupply = $.totalTokenSupply;
+        uint256 currentTokenSupply = $.totalSupply;
 
         unchecked {
             fromBalance -= amount;
             fromAddressData.balance = uint96(fromBalance);
             currentTokenSupply -= amount;
-            $.totalTokenSupply = uint96(currentTokenSupply);
+            $.totalSupply = uint96(currentTokenSupply);
 
             LibMap.Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
@@ -460,7 +460,7 @@ abstract contract DN404 {
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.nftAmountToMint;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxNFTId = $.totalTokenSupply / _WAD;
+                uint256 maxNFTId = $.totalSupply / _WAD;
                 uint256 id = $.nextTokenId;
                 $.totalNFTSupply += uint32(t.nftAmountToMint);
                 toAddressData.ownedLength = uint32(toEnd);
