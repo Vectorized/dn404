@@ -5,14 +5,12 @@ import "../DN404.sol";
 import "../DN404Mirror.sol";
 import {Ownable} from "../../lib/solady/src/auth/Ownable.sol";
 import {LibString} from "../../lib/solady/src/utils/LibString.sol";
+import {SafeTransferLib} from "../../lib/solady/src/utils/SafeTransferLib.sol";
 
 contract SimpleDN404 is DN404, Ownable {
     string private _name;
     string private _symbol;
     string private _baseURI;
-    DN404Mirror private _mirror;
-
-    error TransferFailed();
 
     constructor(
         string memory name_,
@@ -25,12 +23,12 @@ contract SimpleDN404 is DN404, Ownable {
         _name = name_;
         _symbol = symbol_;
 
-        _mirror = new DN404Mirror(owner());
-        _initializeDN404(initialTokenSupply, initialSupplyOwner, address(_mirror));
+        address mirror = address(new DN404Mirror(msg.sender));
+        _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
     }
 
-    // This allows anyone to mint more ERC20 tokens
-    function mint(address to, uint256 amount) external {
+    // This allows the owner of the contract to mint more tokens.
+    function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
     }
 
@@ -52,8 +50,7 @@ contract SimpleDN404 is DN404, Ownable {
             : "";
     }
 
-    function withdraw() external onlyOwner {
-        (bool success,) = msg.sender.call{value: address(this).balance}("");
-        if (!success) revert TransferFailed();
+    function withdraw() public onlyOwner {
+        SafeTransferLib.safeTransferAllETH(msg.sender);
     }
 }

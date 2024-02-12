@@ -14,6 +14,7 @@ contract SimpleDN404Test is SoladyTest {
     }
 
     function testMint() public {
+        vm.prank(dn.owner());
         dn.mint(alice, 100);
         assertEq(dn.totalSupply(), 1100);
     }
