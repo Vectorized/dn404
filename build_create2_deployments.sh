@@ -1,6 +1,9 @@
 # Download the libs if they aren't yet downloaded.
 forge install;
 
+# Format the files.
+forge fmt;
+
 # Create the create2 deployments directory.
 mkdir create2 > /dev/null 2>&1;
 
@@ -55,8 +58,12 @@ generateDeployment() {
     rm -rf "../create2/$1" > /dev/null 2>&1;
     cp -r "create2/$1" "../create2/$1";
     rm -rf "create2/$1" > /dev/null 2>&1;
+    echo "$1 initcodehash:";
+    cat "../create2/$1/initcodehash.txt";
+    echo "";
 }
 
 # Generate the deployments.
-generateDeployment "Asterix";
 generateDeployment "AsterixMirror";
+generateDeployment "Asterix";
+
