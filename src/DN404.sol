@@ -86,6 +86,9 @@ abstract contract DN404 {
     /// @dev The maximum token ID allowed for an NFT.
     uint256 private constant _MAX_TOKEN_ID = 0xffffffff;
 
+    /// @dev The maximum possible token supply.
+    uint256 private constant _MAX_SUPPLY = _WAD * _MAX_TOKEN_ID - 1;
+
     /// @dev The flag to denote that the address data is initialized.
     uint8 internal constant _ADDRESS_DATA_INITIALIZED_FLAG = 1 << 0;
 
@@ -153,10 +156,11 @@ abstract contract DN404 {
 
     /// @dev Initializes the DN404 contract with an
     /// `initialTokenSupply`, `initialTokenOwner` and `mirror` NFT contract address.
-    function _initializeDN404(uint96 initialTokenSupply, address initialSupplyOwner, address mirror)
-        internal
-        virtual
-    {
+    function _initializeDN404(
+        uint256 initialTokenSupply,
+        address initialSupplyOwner,
+        address mirror
+    ) internal virtual {
         DN404Storage storage $ = _getDN404Storage();
 
         if ($.nextTokenId != 0) revert DNAlreadyInitialized();
@@ -169,11 +173,11 @@ abstract contract DN404 {
 
         if (initialTokenSupply > 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (initialTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert TotalSupplyOverflow();
+            if (initialTokenSupply > _MAX_SUPPLY) revert TotalSupplyOverflow();
 
-            $.totalTokenSupply = initialTokenSupply;
+            $.totalTokenSupply = uint96(initialTokenSupply);
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
-            initialOwnerAddressData.balance = initialTokenSupply;
+            initialOwnerAddressData.balance = uint96(initialTokenSupply);
 
             emit Transfer(address(0), initialSupplyOwner, initialTokenSupply);
 
@@ -302,7 +306,9 @@ abstract contract DN404 {
 
         unchecked {
             uint256 currentTokenSupply = uint256($.totalTokenSupply) + amount;
-            if (currentTokenSupply / _WAD > _MAX_TOKEN_ID - 1) revert TotalSupplyOverflow();
+            if (amount > _MAX_SUPPLY || currentTokenSupply > _MAX_SUPPLY) {
+                revert TotalSupplyOverflow();
+            }
             $.totalTokenSupply = uint96(currentTokenSupply);
 
             uint256 toBalance = toAddressData.balance + amount;
@@ -900,6 +906,14 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             z := mul(gt(x, y), sub(x, y))
+        }
+    }
+
+    /// @dev Returns `a | b`.
+    function _or(bool x, bool y) private pure returns (bool z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := or(iszero(iszero(x)), iszero(iszero(y)))
         }
     }
 
