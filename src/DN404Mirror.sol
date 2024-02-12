@@ -111,7 +111,7 @@ contract DN404Mirror {
         assembly {
             result := mload(0x40)
             mstore(result, 0x95d89b41) // `symbol()`.
-            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x04, 0x00, 0x00)) {
+            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x04, codesize(), 0x00)) {
                 returndatacopy(result, 0x00, returndatasize())
                 revert(result, returndatasize())
             }
@@ -131,7 +131,7 @@ contract DN404Mirror {
             result := mload(0x40)
             mstore(result, 0xc87b56dd) // `tokenURI()`.
             mstore(add(result, 0x20), id)
-            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x24, 0x00, 0x00)) {
+            if iszero(staticcall(gas(), base, add(result, 0x1c), 0x24, codesize(), 0x00)) {
                 returndatacopy(result, 0x00, returndatasize())
                 revert(result, returndatasize())
             }
@@ -166,8 +166,8 @@ contract DN404Mirror {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
-            mstore(0x20, shr(96, shl(96, owner)))
+            mstore(0x20, owner)
+            mstore(0x0c, shl(96, 0xf5b100ea)) // `balanceOfNFT(address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
             ) {
@@ -213,8 +213,8 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
-            mstore(0x00, 0xd10b6e0c) // `approveNFT(address,uint256,address)`.
-            mstore(0x20, shr(96, shl(96, spender)))
+            mstore(0x20, spender)
+            mstore(0x0c, shl(96, 0xd10b6e0c)) // `approveNFT(address,uint256,address)`.
             mstore(0x40, id)
             mstore(0x60, caller())
             if iszero(
@@ -263,8 +263,8 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             let m := mload(0x40)
-            mstore(0x00, 0x813500fc) // `setApprovalForAll(address,bool,address)`.
-            mstore(0x20, shr(96, shl(96, operator)))
+            mstore(0x20, operator)
+            mstore(0x0c, shl(96, 0x813500fc)) // `setApprovalForAll(address,bool,address)`.
             mstore(0x40, iszero(iszero(approved)))
             mstore(0x60, caller())
             if iszero(
@@ -292,8 +292,8 @@ contract DN404Mirror {
         assembly {
             let m := mload(0x40)
             mstore(0x00, 0xe985e9c5) // `isApprovedForAll(address,address)`.
-            mstore(0x20, shr(96, shl(96, owner)))
-            mstore(0x40, shr(96, shl(96, operator)))
+            mstore(0x40, operator)
+            mstore(0x2c, shl(96, owner))
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
             ) {
@@ -321,14 +321,14 @@ contract DN404Mirror {
         assembly {
             let m := mload(0x40)
             mstore(m, 0xe5eb36c8) // `transferFromNFT(address,address,uint256,address)`.
-            mstore(add(m, 0x20), shr(96, shl(96, from)))
-            mstore(add(m, 0x40), shr(96, shl(96, to)))
+            mstore(add(m, 0x40), to)
+            mstore(add(m, 0x2c), shl(96, from))
             mstore(add(m, 0x60), id)
             mstore(add(m, 0x80), caller())
             if iszero(
                 and(eq(mload(m), 1), call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20))
             ) {
-                returndatacopy(m, 0x00, returndatasize())
+                returndatacopy(0x00, 0x00, returndatasize())
                 revert(m, returndatasize())
             }
         }
@@ -474,8 +474,8 @@ contract DN404Mirror {
             let m := mload(0x40)
             let onERC721ReceivedSelector := 0x150b7a02
             mstore(m, onERC721ReceivedSelector)
-            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
-            mstore(add(m, 0x40), shr(96, shl(96, from)))
+            mstore(add(m, 0x40), from)
+            mstore(add(m, 0x2c), shl(96, caller())) // The `operator`, which is always `msg.sender`.
             mstore(add(m, 0x60), id)
             mstore(add(m, 0x80), 0x80)
             let n := mload(data)
