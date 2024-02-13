@@ -96,6 +96,11 @@ contract DN404Mirror {
         _getDN404NFTStorage().deployer = deployer;
     }
 
+    // Need to add deployer to be retuned so collection can be managed
+    function owner() external view returns (address result) {
+        return _getDN404NFTStorage().deployer;
+    }
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                     ERC721 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -176,11 +181,11 @@ contract DN404Mirror {
     ///
     /// Requirements:
     /// - `owner` must not be the zero address.
-    function balanceOf(address owner) public view virtual returns (uint256 result) {
+    function balanceOf(address user) public view virtual returns (uint256 result) {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x20, shr(96, shl(96, owner)))
+            mstore(0x20, shr(96, shl(96, user)))
             mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
@@ -297,7 +302,7 @@ contract DN404Mirror {
 
     /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from
     /// the base DN404 contract.
-    function isApprovedForAll(address owner, address operator)
+    function isApprovedForAll(address user, address operator)
         public
         view
         virtual
@@ -308,7 +313,7 @@ contract DN404Mirror {
         assembly {
             let m := mload(0x40)
             mstore(0x40, operator)
-            mstore(0x2c, shl(96, owner))
+            mstore(0x2c, shl(96, user))
             mstore(0x0c, 0xe985e9c5000000000000000000000000) // `isApprovedForAll(address,address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
