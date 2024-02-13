@@ -412,18 +412,19 @@ contract DN404Mirror {
     /// @dev Permissionless function to pull the owner from the base DN404 contract
     /// if it implements ownable, for marketplace signaling purposes.
     function pullOwner() public virtual {
-        uint256 latestOwner;
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        address newOwner;
+        address base = $.baseERC20;
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0x8da5cb5b) // `owner()`.
             if and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)) {
-                latestOwner := shr(96, mload(0x0c))
+                newOwner := shr(96, mload(0x0c))
             }
         }
-        DN404NFTStorage storage $ = _getDN404NFTStorage();
         address oldOwner = $.owner;
-        if (oldOwner != latestOwner) {
-            $.owner = latestOwner;
+        if (oldOwner != newOwner) {
+            $.owner = newOwner;
             emit OwnershipTransferred(oldOwner, newOwner);
         }
     }
