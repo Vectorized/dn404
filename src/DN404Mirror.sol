@@ -28,6 +28,11 @@ contract DN404Mirror {
     /// @dev Emitted when `owner` enables or disables `operator` to manage all of their tokens.
     event ApprovalForAll(address indexed owner, address indexed operator, bool isApproved);
 
+    /// @dev The ownership is transferred from `oldOwner` to `newOwner`.
+    /// This is for marketplace signaling purposes. This contract has a `pullOwner()`
+    /// function that will sync the owner from the base contract.
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
+
     /// @dev `keccak256(bytes("Transfer(address,address,uint256)"))`.
     uint256 private constant _TRANSFER_EVENT_SIGNATURE =
         0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef;
@@ -38,7 +43,7 @@ contract DN404Mirror {
 
     /// @dev `keccak256(bytes("ApprovalForAll(address,address,bool)"))`.
     uint256 private constant _APPROVAL_FOR_ALL_EVENT_SIGNATURE =
-        0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31;
+        0x17307eab39ab6107e8899845ad3d59bd9653f200f22092048b9ca2b5937696c31;
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
@@ -75,6 +80,7 @@ contract DN404Mirror {
     struct DN404NFTStorage {
         address baseERC20;
         address deployer;
+        address owner;
     }
 
     /// @dev Returns a storage pointer for DN404NFTStorage.
@@ -391,6 +397,34 @@ contract DN404Mirror {
             let s := shr(224, interfaceId)
             // ERC165: 0x01ffc9a7, ERC721: 0x80ac58cd, ERC721Metadata: 0x5b5e139f.
             result := or(or(eq(s, 0x01ffc9a7), eq(s, 0x80ac58cd)), eq(s, 0x5b5e139f))
+        }
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                  OWNER SYNCING OPERATIONS                  */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns the `owner` of the contract, for marketplace signaling purposes.
+    function owner() public view virtual returns (address) {
+        return _getDN404NFTStorage().owner;
+    }
+
+    /// @dev Permissionless function to pull the owner from the base DN404 contract
+    /// if it implements ownable, for marketplace signaling purposes.
+    function pullOwner() public virtual {
+        uint256 latestOwner;
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, 0x8da5cb5b) // `owner()`.
+            if and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)) {
+                latestOwner := shr(96, mload(0x0c))
+            }
+        }
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        address oldOwner = $.owner;
+        if (oldOwner != latestOwner) {
+            $.owner = latestOwner;
+            emit OwnershipTransferred(oldOwner, newOwner);
         }
     }
 
