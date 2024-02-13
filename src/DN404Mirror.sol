@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import {Ownable} from "solady/auth/Ownable.sol";
+
 /// @title DN404Mirror
 /// @notice DN404Mirror provides an interface for interacting with the
 /// NFT tokens in a DN404 implementation.
@@ -14,7 +16,7 @@ pragma solidity ^0.8.4;
 ///
 /// @dev Note:
 /// - The ERC721 data is stored in the base DN404 contract.
-contract DN404Mirror {
+contract DN404Mirror, Ownable {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -94,6 +96,7 @@ contract DN404Mirror {
         // For non-proxies, we will store the deployer so that only the deployer can
         // link the base contract.
         _getDN404NFTStorage().deployer = deployer;
+        _initializeOwner(deployer);
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
