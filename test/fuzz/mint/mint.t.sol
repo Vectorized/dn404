@@ -11,7 +11,7 @@ contract MintTests is SoladyTest {
 
     event Transfer(address indexed from, address indexed to, uint256 indexed id);
 
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 private constant _WAD = 10 ** 18;
     uint256 private constant _MAX_SUPPLY = 10 ** 18 * 0xffffffff - 1;
     uint256 private constant START_SLOT =
         0x0000000000000000000000000000000000000000000000a20d6e21d0e5255308;

@@ -14,7 +14,7 @@ contract DN404MirrorTest is SoladyTest {
 
     event ApprovalForAll(address indexed owner, address indexed operator, bool isApproved);
 
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 private constant _WAD = 10 ** 18;
 
     MockDN404 dn;
     MockDN404Mirror mirror;

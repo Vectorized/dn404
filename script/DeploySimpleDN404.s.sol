@@ -5,7 +5,7 @@ import {SimpleDN404} from "../src/example/SimpleDN404.sol";
 import "forge-std/Script.sol";
 
 contract SimpleDN404Script is Script {
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 private constant _WAD = 10 ** 18;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

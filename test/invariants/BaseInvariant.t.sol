@@ -26,7 +26,7 @@ contract BaseInvariantTest is Test {
     address user3 = vm.addr(uint256(keccak256("User3")));
     address user4 = vm.addr(uint256(keccak256("User4")));
     address user5 = vm.addr(uint256(keccak256("User5")));
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 private constant _WAD = 10 ** 18;
 
     MockDN404 dn404;
     DN404Mirror dn404Mirror;

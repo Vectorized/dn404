@@ -6,7 +6,7 @@ import {MockDN404} from "../../utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../../../src/DN404Mirror.sol";
 
 contract DN404Handler is Test {
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 private constant _WAD = 10 ** 18;
     uint256 private constant START_SLOT =
         0x0000000000000000000000000000000000000000000000a20d6e21d0e5255308;
     uint8 internal constant _ADDRESS_DATA_SKIP_NFT_FLAG = 1 << 1;

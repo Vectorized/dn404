@@ -6,7 +6,7 @@ import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
 
 contract DN404Test is SoladyTest {
-    uint256 private constant _WAD = 1000000000000000000;
+    uint256 private constant _WAD = 10 ** 18;
 
     MockDN404 dn;
     DN404Mirror mirror;
