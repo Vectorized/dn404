@@ -14,6 +14,8 @@ contract DN404MirrorTest is SoladyTest {
 
     event ApprovalForAll(address indexed owner, address indexed operator, bool isApproved);
 
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
+
     uint256 private constant _WAD = 1000000000000000000;
 
     MockDN404 dn;
@@ -180,5 +182,17 @@ contract DN404MirrorTest is SoladyTest {
         (bool success,) =
             address(mirror).call(abi.encodeWithSignature("logTransfer(uint256[])", packedLogs));
         assertTrue(success);
+    }
+
+    function testPullOwner() public {
+        dn.initializeDN404(1000, address(this), address(mirror));
+        address newOwner = address(123);
+        dn.setOwner(newOwner);
+
+        assertEq(mirror.owner(), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit OwnershipTransferred(address(0), newOwner);
+        mirror.pullOwner();
+        assertEq(mirror.owner(), newOwner);
     }
 }

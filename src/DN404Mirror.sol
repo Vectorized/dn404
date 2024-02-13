@@ -178,15 +178,15 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Returns the number of NFT tokens owned by `owner` from the base DN404 contract.
+    /// @dev Returns the number of NFT tokens owned by `nftOwner` from the base DN404 contract.
     ///
     /// Requirements:
-    /// - `owner` must not be the zero address.
-    function balanceOf(address owner) public view virtual returns (uint256 result) {
+    /// - `nftOwner` must not be the zero address.
+    function balanceOf(address nftOwner) public view virtual returns (uint256 result) {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x20, shr(96, shl(96, owner)))
+            mstore(0x20, shr(96, shl(96, nftOwner)))
             mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
@@ -301,9 +301,9 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from
+    /// @dev Returns whether `operator` is approved to manage the tokens of `nftOwner` from
     /// the base DN404 contract.
-    function isApprovedForAll(address owner, address operator)
+    function isApprovedForAll(address nftOwner, address operator)
         public
         view
         virtual
@@ -314,7 +314,7 @@ contract DN404Mirror {
         assembly {
             let m := mload(0x40)
             mstore(0x40, operator)
-            mstore(0x2c, shl(96, owner))
+            mstore(0x2c, shl(96, nftOwner))
             mstore(0x0c, 0xe985e9c5000000000000000000000000) // `isApprovedForAll(address,address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
@@ -412,9 +412,8 @@ contract DN404Mirror {
     /// @dev Permissionless function to pull the owner from the base DN404 contract
     /// if it implements ownable, for marketplace signaling purposes.
     function pullOwner() public virtual {
-        DN404NFTStorage storage $ = _getDN404NFTStorage();
         address newOwner;
-        address base = $.baseERC20;
+        address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0x8da5cb5b) // `owner()`.
@@ -422,6 +421,7 @@ contract DN404Mirror {
                 newOwner := shr(96, mload(0x0c))
             }
         }
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
         address oldOwner = $.owner;
         if (oldOwner != newOwner) {
             $.owner = newOwner;

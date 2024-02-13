@@ -10,6 +10,12 @@ contract MockDN404 is DN404 {
 
     string private _baseURI;
 
+    address public owner;
+
+    function setOwner(address newOwner) public {
+        owner = newOwner;
+    }
+
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
         _name = name_;
         _symbol = symbol_;
