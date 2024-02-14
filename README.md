@@ -51,7 +51,7 @@ src
 
 Contributions to DN404 are highly encouraged! 
 To contribute, please adhere to the guidelines outlined [here](https://github.com/Vectorized/solady/issues/19). 
-You can contribute by submitting pull requests for new features, enhancements, or bug fixes.
+You can contribute by submitting pull requests for new features, enhancements, or bug fixes, or any other areas of improvement that you may find.
 
 
 ## Safety
