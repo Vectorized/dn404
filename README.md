@@ -32,7 +32,8 @@ src
 ├─ DN404 — "ERC20 contract for DN404"
 ├─ DN404Mirror — "ERC721 contract for DN404"
 └─ example
-   └─ SimpleDN404 — "Simple DN404 example"
+   ├─ SimpleDN404 — "Simple DN404 example as ERC20"
+   └─ NFTMintDN404 — "Simple DN404 example as ERC721"
 ```
 
 ## Contributing
@@ -47,13 +48,13 @@ This is **experimental software** and is provided on an "as is" and "as availabl
 
 We **do not give any warranties** and **will not be liable for any loss** incurred through any use of this codebase.
 
-While DN404 has been heavily tested, there may be parts that may exhibit unexpected emergent behavior when used with other code, or may break in future Solidity versions.  
+While DN404 has been heavily tested, there may be parts that exhibit unexpected emergent behavior when used with other code, or break in future Solidity versions.
 
-Please always include your own thorough tests when using DN404 to make sure it works correctly with your code.  
+Please always include your own thorough tests when using DN404 to make sure it works correctly with your code.
 
 ## Upgradability
 
-Most contracts in DN404 are compatible with both upgradeable and non-upgradeable (i.e. regular) contracts. 
+Most contracts in DN404 are compatible with both upgradeable and non-upgradeable (i.e. regular) contracts.
 
 Please call any required internal initialization methods accordingly.
 

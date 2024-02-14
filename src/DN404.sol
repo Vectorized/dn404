@@ -322,7 +322,7 @@ abstract contract DN404 {
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
 
                 if (packedLogs.logs.length != 0) {
-                    uint256 maxNFTId = $.totalSupply / _WAD;
+                    uint256 maxNFTId = currentTokenSupply / _WAD;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint256 id = $.nextTokenId;
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
