@@ -979,13 +979,15 @@ abstract contract DN404 {
 
     /// @dev Returns `i << 1`.
     function _ownershipIndex(uint256 i) private pure returns (uint256) {
-        return i << 1;
+        unchecked {
+            return (i - 1) << 1;
+        }
     }
 
-    /// @dev Returns `(i << 1) + 1`.
+    /// @dev Returns `((i - 1) << 1) + 1`.
     function _ownedIndex(uint256 i) private pure returns (uint256) {
         unchecked {
-            return (i << 1) + 1;
+            return ((i - 1) << 1) + 1;
         }
     }
 
@@ -1027,8 +1029,9 @@ abstract contract DN404 {
     ) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let s := add(shl(96, map.slot), shr(2, id)) // Storage slot.
-            let o := shl(6, and(id, 3)) // Storage slot offset (bits).
+            let i := sub(id, 1)
+            let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
+            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
             let m := 0xffffffffffffffff // Value mask.
             let combined := or(shl(32, ownedIndex), and(0xffffffff, ownership))
