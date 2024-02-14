@@ -28,6 +28,11 @@ contract DN404Mirror {
     /// @dev Emitted when `owner` enables or disables `operator` to manage all of their tokens.
     event ApprovalForAll(address indexed owner, address indexed operator, bool isApproved);
 
+    /// @dev The ownership is transferred from `oldOwner` to `newOwner`.
+    /// This is for marketplace signaling purposes. This contract has a `pullOwner()`
+    /// function that will sync the owner from the base contract.
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
+
     /// @dev `keccak256(bytes("Transfer(address,address,uint256)"))`.
     uint256 private constant _TRANSFER_EVENT_SIGNATURE =
         0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef;
@@ -75,6 +80,7 @@ contract DN404Mirror {
     struct DN404NFTStorage {
         address baseERC20;
         address deployer;
+        address owner;
     }
 
     /// @dev Returns a storage pointer for DN404NFTStorage.
@@ -172,15 +178,15 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Returns the number of NFT tokens owned by `owner` from the base DN404 contract.
+    /// @dev Returns the number of NFT tokens owned by `nftOwner` from the base DN404 contract.
     ///
     /// Requirements:
-    /// - `owner` must not be the zero address.
-    function balanceOf(address owner) public view virtual returns (uint256 result) {
+    /// - `nftOwner` must not be the zero address.
+    function balanceOf(address nftOwner) public view virtual returns (uint256 result) {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x20, shr(96, shl(96, owner)))
+            mstore(0x20, shr(96, shl(96, nftOwner)))
             mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
@@ -295,9 +301,9 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Returns whether `operator` is approved to manage the tokens of `owner` from
+    /// @dev Returns whether `operator` is approved to manage the tokens of `nftOwner` from
     /// the base DN404 contract.
-    function isApprovedForAll(address owner, address operator)
+    function isApprovedForAll(address nftOwner, address operator)
         public
         view
         virtual
@@ -308,7 +314,7 @@ contract DN404Mirror {
         assembly {
             let m := mload(0x40)
             mstore(0x40, operator)
-            mstore(0x2c, shl(96, owner))
+            mstore(0x2c, shl(96, nftOwner))
             mstore(0x0c, 0xe985e9c5000000000000000000000000) // `isApprovedForAll(address,address)`.
             if iszero(
                 and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
@@ -391,6 +397,35 @@ contract DN404Mirror {
             let s := shr(224, interfaceId)
             // ERC165: 0x01ffc9a7, ERC721: 0x80ac58cd, ERC721Metadata: 0x5b5e139f.
             result := or(or(eq(s, 0x01ffc9a7), eq(s, 0x80ac58cd)), eq(s, 0x5b5e139f))
+        }
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                  OWNER SYNCING OPERATIONS                  */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns the `owner` of the contract, for marketplace signaling purposes.
+    function owner() public view virtual returns (address) {
+        return _getDN404NFTStorage().owner;
+    }
+
+    /// @dev Permissionless function to pull the owner from the base DN404 contract
+    /// if it implements ownable, for marketplace signaling purposes.
+    function pullOwner() public virtual {
+        address newOwner;
+        address base = baseERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, 0x8da5cb5b) // `owner()`.
+            if and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)) {
+                newOwner := shr(96, mload(0x0c))
+            }
+        }
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        address oldOwner = $.owner;
+        if (oldOwner != newOwner) {
+            $.owner = newOwner;
+            emit OwnershipTransferred(oldOwner, newOwner);
         }
     }
 
