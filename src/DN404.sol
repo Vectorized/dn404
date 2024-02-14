@@ -30,6 +30,14 @@ abstract contract DN404 {
     /// @dev Emitted when `target` sets their skipNFT flag to `status`.
     event SkipNFTSet(address indexed target, bool status);
 
+    /// @dev `keccak256(bytes("Transfer(address,address,uint256)"))`.
+    uint256 private constant _TRANSFER_EVENT_SIGNATURE =
+        0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef;
+
+    /// @dev `keccak256(bytes("Approval(address,address,uint256)"))`.
+    uint256 private constant _APPROVAL_EVENT_SIGNATURE =
+        0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -172,12 +180,22 @@ abstract contract DN404 {
         if ($.nextTokenId != 0) revert DNAlreadyInitialized();
 
         if (mirror == address(0)) revert MirrorAddressIsZero();
-        _linkMirrorContract(mirror);
+
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Make the call to link the mirror contract.
+            mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
+            mstore(0x20, caller())
+            if iszero(and(eq(mload(0x00), 1), call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20))) {
+                mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
+                revert(0x1c, 0x04)
+            }
+        }
 
         $.nextTokenId = 1;
         $.mirrorERC721 = mirror;
 
-        if (initialTokenSupply > 0) {
+        if (initialTokenSupply != 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
             if (initialTokenSupply > _MAX_SUPPLY) revert TotalSupplyOverflow();
 
@@ -185,7 +203,12 @@ abstract contract DN404 {
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
             initialOwnerAddressData.balance = uint96(initialTokenSupply);
 
-            emit Transfer(address(0), initialSupplyOwner, initialTokenSupply);
+            /// @solidity memory-safe-assembly
+            assembly {
+                // Emit the {Transfer} event.
+                mstore(0x00, initialTokenSupply)
+                log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, initialSupplyOwner)))
+            }
 
             _setSkipNFT(initialSupplyOwner, true);
         }
@@ -232,12 +255,13 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function approve(address spender, uint256 amount) public virtual returns (bool) {
-        DN404Storage storage $ = _getDN404Storage();
-
-        $.allowance[msg.sender][spender].value = amount;
-
-        emit Approval(msg.sender, spender, amount);
-
+        _getDN404Storage().allowance[msg.sender][spender].value = amount;
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Approval} event.
+            mstore(0x00, amount)
+            log3(0x00, 0x20, _APPROVAL_EVENT_SIGNATURE, caller(), shr(96, shl(96, spender)))
+        }
         return true;
     }
 
@@ -276,9 +300,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
-        DN404Storage storage $ = _getDN404Storage();
-
-        Uint256Ref storage a = $.allowance[from][msg.sender];
+        Uint256Ref storage a = _getDN404Storage().allowance[from][msg.sender];
         uint256 allowed = a.value;
 
         if (allowed != type(uint256).max) {
@@ -287,9 +309,7 @@ abstract contract DN404 {
                 a.value = allowed - amount;
             }
         }
-
         _transfer(from, to, amount);
-
         return true;
     }
 
@@ -348,7 +368,12 @@ abstract contract DN404 {
                 }
             }
         }
-        emit Transfer(address(0), to, amount);
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, amount)
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, to)))
+        }
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -399,7 +424,12 @@ abstract contract DN404 {
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
-        emit Transfer(from, address(0), amount);
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, amount)
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), 0)
+        }
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -487,7 +517,13 @@ abstract contract DN404 {
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
-        emit Transfer(from, to, amount);
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, amount)
+            // forgefmt: disable-next-item
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
@@ -545,8 +581,13 @@ abstract contract DN404 {
             _set(owned[to], n, uint32(id));
             _set(oo, _ownedIndex(id), uint32(n));
         }
-
-        emit Transfer(from, to, _WAD);
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, _WAD)
+            // forgefmt: disable-next-item
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -603,8 +644,7 @@ abstract contract DN404 {
     ///
     /// Initializes account `owner` AddressData if it is not currently initialized.
     function _addressData(address owner) internal virtual returns (AddressData storage d) {
-        DN404Storage storage $ = _getDN404Storage();
-        d = $.addressData[owner];
+        d = _getDN404Storage().addressData[owner];
 
         if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
             uint8 flags = _ADDRESS_DATA_INITIALIZED_FLAG;
@@ -686,11 +726,11 @@ abstract contract DN404 {
     function _approveNFT(address spender, uint256 id, address msgSender)
         internal
         virtual
-        returns (address)
+        returns (address owner)
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        address owner = $.aliasToAddress[_get($.oo, _ownershipIndex(id))];
+        owner = $.aliasToAddress[_get($.oo, _ownershipIndex(id))];
 
         if (msgSender != owner) {
             if (!$.operatorApprovals[owner][msgSender]) {
@@ -699,8 +739,6 @@ abstract contract DN404 {
         }
 
         $.tokenApprovals[id] = spender;
-
-        return owner;
     }
 
     /// @dev Approve or remove the `operator` as an operator for `msgSender`,
@@ -710,21 +748,6 @@ abstract contract DN404 {
         virtual
     {
         _getDN404Storage().operatorApprovals[msgSender][operator] = approved;
-    }
-
-    /// @dev Calls the mirror contract to link it to this contract.
-    ///
-    /// Reverts if the call to the mirror contract reverts.
-    function _linkMirrorContract(address mirror) internal virtual {
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
-            mstore(0x20, caller())
-            if iszero(and(eq(mload(0x00), 1), call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20))) {
-                mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
-                revert(0x1c, 0x04)
-            }
-        }
     }
 
     /// @dev Fallback modifier to dispatch calls from the mirror NFT contract
@@ -830,7 +853,7 @@ abstract contract DN404 {
     /*                      PRIVATE HELPERS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Struct containing packed log data for `Transfer` events to be
+    /// @dev Struct containing packed log data for {Transfer} events to be
     /// emitted by the mirror NFT contract.
     struct _PackedLogs {
         uint256[] logs;
@@ -863,7 +886,7 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Calls the `mirror` NFT contract to emit Transfer events for packed logs `p`.
+    /// @dev Calls the `mirror` NFT contract to emit {Transfer} events for packed logs `p`.
     function _packedLogsSend(_PackedLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
