@@ -84,9 +84,6 @@ abstract contract DN404 {
     /*                         CONSTANTS                          */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Amount of token balance that is equal to one NFT.
-    uint256 internal constant _WAD = 10 ** 18;
-
     /// @dev The maximum token ID allowed for an NFT.
     uint256 internal constant _MAX_TOKEN_ID = 0xffffffff;
 
@@ -228,6 +225,15 @@ abstract contract DN404 {
     function tokenURI(uint256 id) public view virtual returns (string memory);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*               BASE UNIT FUNCTION TO OVERRIDE               */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Amount of token balance that is equal to one NFT.
+    function _WAD() internal view virtual returns (uint256) {
+        return 10 ** 18;
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
@@ -338,12 +344,12 @@ abstract contract DN404 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
-                uint256 toEnd = toBalance / _WAD;
+                uint256 toEnd = toBalance / _WAD();
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
                 Uint32Map storage oo = $.oo;
 
                 if (packedLogs.logs.length != 0) {
-                    uint256 maxNFTId = currentTokenSupply / _WAD;
+                    uint256 maxNFTId = currentTokenSupply / _WAD();
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint256 id = $.nextTokenId;
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
@@ -399,7 +405,7 @@ abstract contract DN404 {
 
             Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
-            uint256 nftAmountToBurn = _zeroFloorSub(fromIndex, fromBalance / _WAD);
+            uint256 nftAmountToBurn = _zeroFloorSub(fromIndex, fromBalance / _WAD());
 
             if (nftAmountToBurn != 0) {
                 $.totalNFTSupply -= uint32(nftAmountToBurn);
@@ -461,11 +467,11 @@ abstract contract DN404 {
             fromAddressData.balance = uint96(t.fromBalance);
             toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
 
-            t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
+            t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD());
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 if (from == to) t.toOwnedLength = t.fromOwnedLength - t.nftAmountToBurn;
-                t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
+                t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD(), t.toOwnedLength);
             }
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.nftAmountToBurn + t.nftAmountToMint);
@@ -491,7 +497,7 @@ abstract contract DN404 {
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.nftAmountToMint;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxNFTId = $.totalSupply / _WAD;
+                uint256 maxNFTId = $.totalSupply / _WAD();
                 uint256 id = $.nextTokenId;
                 $.totalNFTSupply += uint32(t.nftAmountToMint);
                 toAddressData.ownedLength = uint32(toEnd);
@@ -557,10 +563,10 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
 
-        fromAddressData.balance -= uint96(_WAD);
+        fromAddressData.balance -= uint96(_WAD());
 
         unchecked {
-            toAddressData.balance += uint96(_WAD);
+            toAddressData.balance += uint96(_WAD());
 
             mapping(address => Uint32Map) storage owned = $.owned;
             Uint32Map storage fromOwned = owned[from];
@@ -576,10 +582,11 @@ abstract contract DN404 {
             _set(owned[to], n, uint32(id));
             _set(oo, _ownedIndex(id), uint32(n));
         }
+        uint256 wad = _WAD();
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Transfer} event.
-            mstore(0x00, _WAD)
+            mstore(0x00, wad)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
