@@ -422,8 +422,9 @@ abstract contract DN404 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, t.fromBalance / _WAD);
 
             if (numNFTBurns != 0) {
-                t.addToBurnedPool =
-                    _addToBurnedPool($.totalNFTSupply -= uint32(numNFTBurns), t.totalSupply);
+                t.totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
+                $.totalNFTSupply = uint32(t.totalNFTSupply);
+                t.addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
                 t.burnedPoolSize = $.burnedPoolSize;
 
                 _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
@@ -482,7 +483,6 @@ abstract contract DN404 {
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
         t.burnedPoolSize = $.burnedPoolSize;
-        t.nextTokenId = $.nextTokenId;
         t.totalSupply = $.totalSupply;
 
         if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
@@ -498,15 +498,14 @@ abstract contract DN404 {
                 t.numNFTMints = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
-            t.addToBurnedPool = _addToBurnedPool(
-                $.totalNFTSupply = uint32(uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns),
-                t.totalSupply
-            );
+            t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
+            $.totalNFTSupply = uint32(t.totalNFTSupply);
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
 
             if (t.numNFTBurns != 0) {
+                t.addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
                 Uint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.numNFTBurns;
@@ -527,6 +526,7 @@ abstract contract DN404 {
             }
 
             if (t.numNFTMints != 0) {
+                t.nextTokenId = $.nextTokenId;
                 Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
@@ -991,6 +991,7 @@ abstract contract DN404 {
         uint256 burnedPoolSize;
         uint256 nextTokenId;
         uint256 totalSupply;
+        uint256 totalNFTSupply;
         bool addToBurnedPool;
     }
 
