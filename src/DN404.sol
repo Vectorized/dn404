@@ -339,14 +339,12 @@ abstract contract DN404 {
         _TransferTemps memory t;
 
         unchecked {
-            uint256 currentTokenSupply = uint256($.totalSupply) + amount;
-            if (_toUint(amount > _MAX_SUPPLY) | _toUint(currentTokenSupply > _MAX_SUPPLY) != 0) {
+            $.totalSupply = uint96(t.totalSupply = uint256($.totalSupply) + amount);
+            if (_toUint(amount > _MAX_SUPPLY) | _toUint(t.totalSupply > _MAX_SUPPLY) != 0) {
                 revert TotalSupplyOverflow();
             }
-            $.totalSupply = uint96(currentTokenSupply);
 
-            t.toBalance = toAddressData.balance + amount;
-            toAddressData.balance = uint96(t.toBalance);
+            toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 Uint32Map storage toOwned = $.owned[to];
@@ -356,7 +354,7 @@ abstract contract DN404 {
                 Uint32Map storage oo = $.oo;
 
                 if (packedLogs.logs.length != 0) {
-                    uint256 maxNFTId = currentTokenSupply / _WAD;
+                    uint256 maxNFTId = t.totalSupply / _WAD;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
 
                     t.nextTokenId = $.nextTokenId;
