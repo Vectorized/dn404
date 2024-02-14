@@ -376,7 +376,7 @@ abstract contract DN404 {
                         _packedLogsAppend(packedLogs, to, id, 0);
                     } while (toIndex != toEnd);
 
-                    // Leave some spacing for more efficient open addressing.
+                    // Leave some spacing between minted batches for better open addressing.
                     $.nextTokenId += 7;
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
@@ -494,10 +494,11 @@ abstract contract DN404 {
             }
 
             {
-                uint256 supply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
-                $.totalNFTSupply = uint32(supply);
+                uint256 n = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
+                $.totalNFTSupply = uint32(n);
+                // Add to burned pool if the load factor > 50%, and collection is not small.
                 uint256 thres = (t.totalSupply / _WAD) >> 1;
-                t.shouldAddToBurnedPool = _toUint(supply > thres) & _toUint(thres > 128) != 0;
+                t.shouldAddToBurnedPool = _toUint(n > thres) & _toUint(thres > 128) != 0;
             }
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
@@ -550,7 +551,7 @@ abstract contract DN404 {
             }
 
             if (packedLogs.logs.length != 0) {
-                // Leave some spacing for more efficient open addressing.
+                // Leave some spacing between minted batches for better open addressing.
                 $.nextTokenId = uint32(t.nextTokenId + 7);
                 $.burnedPoolSize = uint32(t.burnedPoolSize);
                 _packedLogsSend(packedLogs, $.mirrorERC721);
