@@ -346,6 +346,7 @@ abstract contract DN404 {
                 uint256 toIndex = toAddressData.ownedLength;
                 uint256 toEnd = toBalance / _WAD;
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
+                Uint32Map storage oo = $.oo;
 
                 if (packedLogs.logs.length != 0) {
                     uint256 maxNFTId = currentTokenSupply / _WAD;
@@ -355,11 +356,11 @@ abstract contract DN404 {
                     toAddressData.ownedLength = uint32(toEnd);
                     // Mint loop.
                     do {
-                        while (_get($.oo, _ownershipIndex(id)) != 0) {
+                        while (_get(oo, _ownershipIndex(id)) != 0) {
                             if (++id > maxNFTId) id = 1;
                         }
                         _set(toOwned, toIndex, uint32(id));
-                        _setOwnerAliasAndOwnedIndex($.oo, id, toAlias, uint32(toIndex++));
+                        _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, to, id, 0);
                         if (++id > maxNFTId) id = 1;
                     } while (toIndex != toEnd);
@@ -410,12 +411,12 @@ abstract contract DN404 {
                 $.totalNFTSupply -= uint32(nftAmountToBurn);
 
                 _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToBurn);
-
+                Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - nftAmountToBurn;
                 // Burn loop.
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
-                    _setOwnerAliasAndOwnedIndex($.oo, id, 0, 0);
+                    _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     delete $.tokenApprovals[id];
                     _packedLogsAppend(packedLogs, from, id, 1);
                 } while (fromIndex != fromEnd);
