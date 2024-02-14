@@ -498,7 +498,7 @@ abstract contract DN404 {
                 $.totalNFTSupply = uint32(n);
                 // Add to burned pool if the load factor > 50%, and collection is not small.
                 uint256 thres = (t.totalSupply / _WAD) >> 1;
-                t.shouldAddToBurnedPool = _toUint(n > thres) & _toUint(thres > 128) != 0;
+                t.shouldAddToBurnedPool = true; // _toUint(n > thres) & _toUint(thres > 128) != 0;
             }
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
