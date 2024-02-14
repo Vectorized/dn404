@@ -296,6 +296,10 @@ contract DN404Test is SoladyTest {
                 dn.setSkipNFT(_random() & 1 == 0);
             }
 
+            if (_random() % 2 == 0) {
+                dn.setAddToBurnedPool(_random() % 2 == 0);
+            }
+
             if (_random() % 4 == 0) {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];

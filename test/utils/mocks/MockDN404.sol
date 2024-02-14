@@ -10,6 +10,8 @@ contract MockDN404 is DN404 {
 
     string private _baseURI;
 
+    bool addToBurnedPool;
+
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
         _name = name_;
         _symbol = symbol_;
@@ -75,7 +77,11 @@ contract MockDN404 is DN404 {
         return _getDN404Storage().nextTokenId;
     }
 
-    function clearBurnedPool() public {
-        _getDN404Storage().burnedPoolSize = 0;
+    function _addToBurnedPool(uint256, uint256) internal view virtual override returns (bool) {
+        return addToBurnedPool;
+    }
+
+    function setAddToBurnedPool(bool value) public {
+        addToBurnedPool = value;
     }
 }

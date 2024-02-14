@@ -96,7 +96,6 @@ contract DN404Handler is Test {
         uint256 fromAfterBalance = dn404.balanceOf(from) - amount;
 
         uint256 max = dn404.totalSupply() / _WAD;
-        dn404.clearBurnedPool();
         uint256 nextId = dn404.getNextTokenId();
 
         TransferCache memory transferCache;
@@ -184,7 +183,6 @@ contract DN404Handler is Test {
         uint256 fromAfterBalance = dn404.balanceOf(from) - amount;
 
         uint256 max = dn404.totalSupply() / _WAD;
-        dn404.clearBurnedPool();
         uint256 nextId = dn404.getNextTokenId();
 
         TransferCache memory transferCache;
@@ -260,7 +258,6 @@ contract DN404Handler is Test {
         uint256 nftAmount =
             isSkipNFT ? 0 : ((dn404.balanceOf(to) + amount) / _WAD) - owned[to].length;
         uint256 max = (dn404.totalSupply() + amount) / _WAD;
-        dn404.clearBurnedPool();
         uint256 nextId = dn404.getNextTokenId();
 
         for (uint256 i; i < nftAmount; ++i) {
