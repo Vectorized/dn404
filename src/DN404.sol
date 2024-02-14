@@ -255,13 +255,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function approve(address spender, uint256 amount) public virtual returns (bool) {
-        _getDN404Storage().allowance[msg.sender][spender].value = amount;
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Emit the {Approval} event.
-            mstore(0x00, amount)
-            log3(0x00, 0x20, _APPROVAL_EVENT_SIGNATURE, caller(), shr(96, shl(96, spender)))
-        }
+        _approve(msg.sender, spender, amount);
         return true;
     }
 
@@ -588,6 +582,24 @@ abstract contract DN404 {
             mstore(0x00, _WAD)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                 INTERNAL APPROVE FUNCTIONS                 */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Sets `amount` as the allowance of `spender` over the tokens of `owner`.
+    ///
+    /// Emits a {Approval} event.
+    function _approve(address owner, address spender, uint256 amount) internal virtual {
+        _getDN404Storage().allowance[owner][spender].value = amount;
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Approval} event.
+            mstore(0x00, amount)
+            // forgefmt: disable-next-item
+            log3(0x00, 0x20, _APPROVAL_EVENT_SIGNATURE, shr(96, shl(96, owner)), shr(96, shl(96, spender)))
         }
     }
 
