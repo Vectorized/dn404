@@ -119,12 +119,12 @@ abstract contract DN404 {
 
     /// @dev A uint32 map in storage.
     struct Uint32Map {
-        mapping(uint256 => uint256) map;
+        uint256 spacer;
     }
 
     /// @dev A Bitmap map in storage.
     struct Bitmap {
-        mapping(uint256 => uint256) map;
+        uint256 spacer;
     }
 
     /// @dev A struct to wrap a uint256 in storage.
@@ -150,6 +150,8 @@ abstract contract DN404 {
         mapping(address => mapping(address => bool)) operatorApprovals;
         // Mapping of NFT token approvals to approved operators.
         mapping(uint256 => address) tokenApprovals;
+        // Bitmap of whether a token approval exists.
+        Bitmap tokenApprovalExists;
         // Mapping of user allowances for token spenders.
         mapping(address => mapping(address => Uint256Ref)) allowance;
         // Mapping of NFT token IDs owned by an address.
@@ -158,8 +160,6 @@ abstract contract DN404 {
         Uint32Map oo;
         // Mapping of user account AddressData
         mapping(address => AddressData) addressData;
-        // Bitmap of whether a token approval exists.
-        Bitmap tokenApprovalExists;
     }
 
     /// @dev Returns a storage pointer for DN404Storage.
@@ -999,16 +999,18 @@ abstract contract DN404 {
 
     /// @dev Returns the uint32 value at `index` in `map`.
     function _get(Uint32Map storage map, uint256 index) private view returns (uint32 result) {
-        result = uint32(map.map[index >> 3] >> ((index & 7) << 5));
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(128, map.slot), shr(3, index)) // Storage slot.
+            result := and(0xffffffff, shr(shl(5, and(7, index)), sload(s)))
+        }
     }
 
     /// @dev Updates the uint32 value at `index` in `map`.
     function _set(Uint32Map storage map, uint256 index, uint32 value) private {
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x20, map.slot)
-            mstore(0x00, shr(3, index))
-            let s := keccak256(0x00, 0x40) // Storage slot.
+            let s := add(shl(128, map.slot), shr(3, index)) // Storage slot.
             let o := shl(5, and(index, 7)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
             let m := 0xffffffff // Value mask.
@@ -1026,9 +1028,7 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             let value := or(shl(32, ownedIndex), and(0xffffffff, ownership))
-            mstore(0x20, map.slot)
-            mstore(0x00, shr(2, id))
-            let s := keccak256(0x00, 0x40) // Storage slot.
+            let s := add(shl(128, map.slot), shr(2, id)) // Storage slot.
             let o := shl(6, and(id, 3)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
             let m := 0xffffffffffffffff // Value mask.
@@ -1038,20 +1038,28 @@ abstract contract DN404 {
 
     /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
     function _get(Bitmap storage bitmap, uint256 index) private view returns (bool isSet) {
-        uint256 b = (bitmap.map[index >> 8] >> (index & 0xff)) & 1;
         /// @solidity memory-safe-assembly
         assembly {
-            isSet := b
+            let s := add(shl(128, bitmap.slot), shr(8, index)) // Storage slot.
+            isSet := and(1, shr(and(0xff, index), sload(s)))
         }
     }
 
     /// @dev Updates the bit at `index` in `bitmap` to true.
     function _set(Bitmap storage bitmap, uint256 index) private {
-        bitmap.map[index >> 8] |= (1 << (index & 0xff));
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(128, bitmap.slot), shr(8, index)) // Storage slot.
+            sstore(s, or(shl(and(0xff, index), 1), sload(s)))
+        }
     }
 
     /// @dev Updates the bit at `index` in `bitmap` to false.
     function _unset(Bitmap storage bitmap, uint256 index) private {
-        bitmap.map[index >> 8] &= ~(1 << (index & 0xff));
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(128, bitmap.slot), shr(8, index)) // Storage slot.
+            sstore(s, and(not(shl(and(0xff, index), 1)), sload(s)))
+        }
     }
 }
