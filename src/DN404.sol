@@ -138,6 +138,8 @@ abstract contract DN404 {
         uint32 numAliases;
         // Next token ID to assign for an NFT mint.
         uint32 nextTokenId;
+        // Total number of IDs in the burned pool.
+        uint32 burnedPoolSize;
         // Total supply of minted NFTs.
         uint32 totalNFTSupply;
         // Total supply of tokens.
@@ -156,6 +158,8 @@ abstract contract DN404 {
         mapping(address => mapping(address => Uint256Ref)) allowance;
         // Mapping of NFT token IDs owned by an address.
         mapping(address => Uint32Map) owned;
+        // The pool of burned IDs.
+        Uint32Map burnedPool;
         // Even indices: owner aliases. Odd indices: owned indices.
         Uint32Map oo;
         // Mapping of user account AddressData
@@ -352,20 +356,28 @@ abstract contract DN404 {
                 if (packedLogs.logs.length != 0) {
                     uint256 maxNFTId = currentTokenSupply / _WAD;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                    uint256 id = $.nextTokenId;
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
                     toAddressData.ownedLength = uint32(toEnd);
                     // Mint loop.
                     do {
-                        while (_get(oo, _ownershipIndex(id)) != 0) {
-                            if (++id > maxNFTId) id = 1;
+                        uint256 id;
+                        if ($.burnedPoolSize != 0) {
+                            id = _get($.burnedPool, --$.burnedPoolSize);
+                        } else {
+                            id = $.nextTokenId;
+                            if (id > maxNFTId) id = 1;
+                            while (_get(oo, _ownershipIndex(id)) != 0) {
+                                if (++id > maxNFTId) id = 1;
+                            }
+                            $.nextTokenId = uint32(id + 1);
                         }
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, to, id, 0);
-                        if (++id > maxNFTId) id = 1;
                     } while (toIndex != toEnd);
-                    $.nextTokenId = uint32(id);
+
+                    // Leave some spacing for more efficient open addressing.
+                    $.nextTokenId += 7;
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
             }
@@ -463,6 +475,9 @@ abstract contract DN404 {
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
         t.fromBalance = fromAddressData.balance;
+        t.burnedPoolSize = $.burnedPoolSize;
+        t.nextTokenId = $.nextTokenId;
+        t.totalSupply = $.totalSupply;
 
         if (amount > t.fromBalance) revert InsufficientBalance();
 
@@ -478,7 +493,13 @@ abstract contract DN404 {
                 t.numNFTMints = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
-            $.totalNFTSupply = uint32(uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns);
+            {
+                uint256 supply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
+                $.totalNFTSupply = uint32(supply);
+                uint256 thres = (t.totalSupply / _WAD) >> 1;
+                t.shouldAddToBurnedPool = _toUint(supply > thres) & _toUint(thres > 128) != 0;
+            }
+
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
 
@@ -492,6 +513,9 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, from, id, 1);
+                    if (t.shouldAddToBurnedPool) {
+                        _set($.burnedPool, t.burnedPoolSize++, uint32(id));
+                    }
                     if (_get($.tokenApprovalExists, id)) {
                         _unset($.tokenApprovalExists, id);
                         delete $.tokenApprovals[id];
@@ -504,23 +528,31 @@ abstract contract DN404 {
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxNFTId = $.totalSupply / _WAD;
-                uint256 id = $.nextTokenId;
+                uint256 maxNFTId = t.totalSupply / _WAD;
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
-                    while (_get(oo, _ownershipIndex(id)) != 0) {
-                        if (++id > maxNFTId) id = 1;
+                    uint256 id;
+                    if (t.burnedPoolSize != 0) {
+                        id = _get($.burnedPool, --t.burnedPoolSize);
+                    } else {
+                        id = t.nextTokenId;
+                        if (id > maxNFTId) id = 1;
+                        while (_get(oo, _ownershipIndex(id)) != 0) {
+                            if (++id > maxNFTId) id = 1;
+                        }
+                        t.nextTokenId = id + 1;
                     }
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, to, id, 0);
-                    if (++id > maxNFTId) id = 1;
                 } while (toIndex != toEnd);
-                $.nextTokenId = uint32(id);
             }
 
             if (packedLogs.logs.length != 0) {
+                // Leave some spacing for more efficient open addressing.
+                $.nextTokenId = uint32(t.nextTokenId + 7);
+                $.burnedPoolSize = uint32(t.burnedPoolSize);
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
@@ -942,6 +974,10 @@ abstract contract DN404 {
         uint256 toBalance;
         uint256 fromOwnedLength;
         uint256 toOwnedLength;
+        uint256 burnedPoolSize;
+        uint256 nextTokenId;
+        uint256 totalSupply;
+        bool shouldAddToBurnedPool;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.

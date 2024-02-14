@@ -96,7 +96,7 @@ contract DN404Handler is Test {
         uint256 fromAfterBalance = dn404.balanceOf(from) - amount;
 
         uint256 max = dn404.totalSupply() / _WAD;
-        uint256 nextId = getNextTokenId();
+        uint256 nextId = dn404.getNextTokenId();
 
         TransferCache memory transferCache;
 
@@ -119,13 +119,14 @@ contract DN404Handler is Test {
         address _to = to;
         address _from = from;
         uint256 _amount = amount;
-        uint256 toNftAmount = getSkipNFTStatusOf(to)
+        uint256 toNftAmount = dn404.getSkipNFT(to)
             ? 0
             : _to != _from
                 ? (toAfterBalance / _WAD) - owned[_to].length
                 : (transferCache.toInitialTokenBalance / _WAD) - owned[_to].length;
 
         for (uint256 i; i < toNftAmount; ++i) {
+            if (nextId > max) nextId = 1;
             while (ownerOf[nextId] != address(0)) {
                 if (++nextId > max) nextId = 1;
             }
@@ -133,7 +134,7 @@ contract DN404Handler is Test {
             emit Transfer(address(0), to, nextId);
             owned[_to].push(nextId);
             ownerOf[nextId] = _to;
-            if (++nextId > max) nextId = 1;
+            ++nextId;
         }
 
         vm.expectEmit(true, true, false, true, address(dn404));
@@ -183,7 +184,7 @@ contract DN404Handler is Test {
         uint256 fromAfterBalance = dn404.balanceOf(from) - amount;
 
         uint256 max = dn404.totalSupply() / _WAD;
-        uint256 nextId = getNextTokenId();
+        uint256 nextId = dn404.getNextTokenId();
 
         TransferCache memory transferCache;
 
@@ -206,13 +207,14 @@ contract DN404Handler is Test {
         uint256 _amount = amount;
         address _to = to;
         address _from = from;
-        uint256 toNftAmount = getSkipNFTStatusOf(to)
+        uint256 toNftAmount = dn404.getSkipNFT(to)
             ? 0
             : _to != _from
                 ? (toAfterBalance / _WAD) - owned[_to].length
                 : (transferCache.toInitialTokenBalance / _WAD) - owned[_to].length;
 
         for (uint256 i; i < toNftAmount; ++i) {
+            if (nextId > max) nextId = 1;
             while (ownerOf[nextId] != address(0)) {
                 if (++nextId > max) nextId = 1;
             }
@@ -220,7 +222,7 @@ contract DN404Handler is Test {
             emit Transfer(address(0), to, nextId);
             owned[_to].push(nextId);
             ownerOf[nextId] = _to;
-            if (++nextId > max) nextId = 1;
+            ++nextId;
         }
 
         vm.expectEmit(true, true, false, true, address(dn404));
@@ -254,12 +256,14 @@ contract DN404Handler is Test {
         amount = bound(amount, 0, 100e18);
         uint256 toInitialTokenBalance = dn404.balanceOf(to);
 
-        bool isSkipNFT = getSkipNFTStatusOf(to);
+        bool isSkipNFT = dn404.getSkipNFT(to);
         uint256 nftAmount =
             isSkipNFT ? 0 : ((dn404.balanceOf(to) + amount) / _WAD) - owned[to].length;
         uint256 max = (dn404.totalSupply() + amount) / _WAD;
-        uint256 nextId = getNextTokenId();
+        uint256 nextId = dn404.getNextTokenId();
+
         for (uint256 i; i < nftAmount; ++i) {
+            if (nextId > max) nextId = 1;
             while (ownerOf[nextId] != address(0)) {
                 if (++nextId > max) nextId = 1;
             }
@@ -267,7 +271,7 @@ contract DN404Handler is Test {
             emit Transfer(address(0), to, nextId);
             owned[to].push(nextId);
             ownerOf[nextId] = to;
-            if (++nextId > max) nextId = 1;
+            ++nextId;
         }
 
         vm.expectEmit(true, true, false, true, address(dn404));
@@ -332,19 +336,6 @@ contract DN404Handler is Test {
     function setSkipNFT(uint256 actorIndexSeed, bool status) external {
         vm.startPrank(randomAddress(actorIndexSeed));
         dn404.setSkipNFT(status);
-    }
-
-    function getNextTokenId() private view returns (uint256) {
-        uint256 a = uint256(vm.load(address(dn404), bytes32(START_SLOT)));
-        return (a >> 32) & type(uint32).max;
-    }
-
-    function getSkipNFTStatusOf(address addr) private view returns (bool) {
-        uint256 a =
-            uint256(vm.load(address(dn404), keccak256(abi.encode(addr, bytes32(START_SLOT + 9)))));
-        a = (a >> 88) & 0xff;
-        a = a & _ADDRESS_DATA_SKIP_NFT_FLAG;
-        return a != 0;
     }
 
     function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {

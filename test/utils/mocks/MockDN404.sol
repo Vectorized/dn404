@@ -70,4 +70,8 @@ contract MockDN404 is DN404 {
     function getAux(address target) public view returns (uint88) {
         return _getAux(target);
     }
+
+    function getNextTokenId() public view returns (uint32) {
+        return _getDN404Storage().nextTokenId;
+    }
 }
