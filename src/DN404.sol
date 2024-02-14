@@ -1001,8 +1001,8 @@ abstract contract DN404 {
     function _get(Uint32Map storage map, uint256 index) private view returns (uint32 result) {
         /// @solidity memory-safe-assembly
         assembly {
-            let s := add(shl(128, map.slot), shr(3, index)) // Storage slot.
-            result := and(0xffffffff, shr(shl(5, and(7, index)), sload(s)))
+            let s := add(shl(64, map.slot), shr(3, index)) // Storage slot.
+            result := and(0xffffffff, shr(shl(5, and(index, 7)), sload(s)))
         }
     }
 
@@ -1010,7 +1010,7 @@ abstract contract DN404 {
     function _set(Uint32Map storage map, uint256 index, uint32 value) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let s := add(shl(128, map.slot), shr(3, index)) // Storage slot.
+            let s := add(shl(64, map.slot), shr(3, index)) // Storage slot.
             let o := shl(5, and(index, 7)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
             let m := 0xffffffff // Value mask.
@@ -1028,7 +1028,7 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             let value := or(shl(32, ownedIndex), and(0xffffffff, ownership))
-            let s := add(shl(128, map.slot), shr(2, id)) // Storage slot.
+            let s := add(shl(64, map.slot), shr(2, id)) // Storage slot.
             let o := shl(6, and(id, 3)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
             let m := 0xffffffffffffffff // Value mask.
@@ -1040,7 +1040,7 @@ abstract contract DN404 {
     function _get(Bitmap storage bitmap, uint256 index) private view returns (bool isSet) {
         /// @solidity memory-safe-assembly
         assembly {
-            let s := add(shl(128, bitmap.slot), shr(8, index)) // Storage slot.
+            let s := add(shl(128, bitmap.slot), shr(8, index))
             isSet := and(1, shr(and(0xff, index), sload(s)))
         }
     }
@@ -1049,7 +1049,7 @@ abstract contract DN404 {
     function _set(Bitmap storage bitmap, uint256 index) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let s := add(shl(128, bitmap.slot), shr(8, index)) // Storage slot.
+            let s := add(shl(128, bitmap.slot), shr(8, index))
             sstore(s, or(shl(and(0xff, index), 1), sload(s)))
         }
     }
@@ -1058,7 +1058,7 @@ abstract contract DN404 {
     function _unset(Bitmap storage bitmap, uint256 index) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let s := add(shl(128, bitmap.slot), shr(8, index)) // Storage slot.
+            let s := add(shl(128, bitmap.slot), shr(8, index))
             sstore(s, and(not(shl(and(0xff, index), 1)), sload(s)))
         }
     }

@@ -341,7 +341,7 @@ contract DN404Handler is Test {
 
     function getSkipNFTStatusOf(address addr) private view returns (bool) {
         uint256 a =
-            uint256(vm.load(address(dn404), keccak256(abi.encode(addr, bytes32(START_SLOT + 8)))));
+            uint256(vm.load(address(dn404), keccak256(abi.encode(addr, bytes32(START_SLOT + 9)))));
         a = (a >> 88) & 0xff;
         a = a & _ADDRESS_DATA_SKIP_NFT_FLAG;
         return a != 0;
