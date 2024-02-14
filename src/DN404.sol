@@ -869,22 +869,22 @@ abstract contract DN404 {
     /// @dev Struct containing packed log data for {Transfer} events to be
     /// emitted by the mirror NFT contract.
     struct _PackedLogs {
-        uint256[] logs;
         uint256 offset;
+        uint256[] logs;
     }
 
     /// @dev Initiates memory allocation for packed logs with `n` log items.
     function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
         /// @solidity memory-safe-assembly
         assembly {
-            // Offset forward by 2 words for `_packedLogsSend`.
-            // These two words are required to store the function signature and array offset.
-            let logs := add(mload(0x40), 0x40)
+            // Note that `p` implicitly allocates and advances the free memory pointer by
+            // 2 words, which we can safely mutate in `_packedLogsSend`.
+            let logs := mload(0x40)
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs)
             mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
-            mstore(p, logs) // Set `p.logs`.
-            mstore(add(0x20, p), offset) // Set `p.offset`.
+            mstore(add(0x20, p), logs) // Set `p.logs`.
+            mstore(p, offset) // Set `p.offset`.
         }
     }
 
@@ -895,9 +895,9 @@ abstract contract DN404 {
     {
         /// @solidity memory-safe-assembly
         assembly {
-            let offset := mload(add(0x20, p))
+            let offset := mload(p)
             mstore(offset, or(or(shl(96, a), shl(8, id)), burnBit))
-            mstore(add(0x20, p), add(offset, 0x20))
+            mstore(p, add(offset, 0x20))
         }
     }
 
@@ -905,7 +905,7 @@ abstract contract DN404 {
     function _packedLogsSend(_PackedLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := mload(p)
+            let logs := mload(add(p, 0x20))
             let o := sub(logs, 0x40) // Start of calldata to send.
             mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
             mstore(add(o, 0x20), 0x20) // Offset of `logs` in the calldata to send.
