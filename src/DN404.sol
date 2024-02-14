@@ -114,6 +114,11 @@ abstract contract DN404 {
         mapping(uint256 => uint256) map;
     }
 
+    /// @dev A struct to wrap a uint256 in storage.
+    struct Uint256Ref {
+        uint256 value;
+    }
+
     /// @dev Struct containing the base token contract storage.
     struct DN404Storage {
         // Current number of address aliases assigned.
@@ -133,7 +138,7 @@ abstract contract DN404 {
         // Mapping of NFT token approvals to approved operators.
         mapping(uint256 => address) tokenApprovals;
         // Mapping of user allowances for token spenders.
-        mapping(address => mapping(address => uint256)) allowance;
+        mapping(address => mapping(address => Uint256Ref)) allowance;
         // Mapping of NFT token IDs owned by an address.
         mapping(address => Uint32Map) owned;
         // Even indices: owner aliases. Odd indices: owned indices.
@@ -220,7 +225,7 @@ abstract contract DN404 {
 
     /// @dev Returns the amount of tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
-        return _getDN404Storage().allowance[owner][spender];
+        return _getDN404Storage().allowance[owner][spender].value;
     }
 
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -229,7 +234,7 @@ abstract contract DN404 {
     function approve(address spender, uint256 amount) public virtual returns (bool) {
         DN404Storage storage $ = _getDN404Storage();
 
-        $.allowance[msg.sender][spender] = amount;
+        $.allowance[msg.sender][spender].value = amount;
 
         emit Approval(msg.sender, spender, amount);
 
@@ -273,12 +278,13 @@ abstract contract DN404 {
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         DN404Storage storage $ = _getDN404Storage();
 
-        uint256 allowed = $.allowance[from][msg.sender];
+        Uint256Ref storage a = $.allowance[from][msg.sender];
+        uint256 allowed = a.value;
 
         if (allowed != type(uint256).max) {
             if (amount > allowed) revert InsufficientAllowance();
             unchecked {
-                $.allowance[from][msg.sender] = allowed - amount;
+                a.value = allowed - amount;
             }
         }
 
@@ -307,7 +313,7 @@ abstract contract DN404 {
 
         unchecked {
             uint256 currentTokenSupply = uint256($.totalSupply) + amount;
-            if (amount > _MAX_SUPPLY || currentTokenSupply > _MAX_SUPPLY) {
+            if (_toUint(amount > _MAX_SUPPLY) | _toUint(currentTokenSupply > _MAX_SUPPLY) != 0) {
                 revert TotalSupplyOverflow();
             }
             $.totalSupply = uint96(currentTokenSupply);
@@ -438,6 +444,7 @@ abstract contract DN404 {
             }
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.nftAmountToBurn + t.nftAmountToMint);
+            Uint32Map storage oo = $.oo;
 
             if (t.nftAmountToBurn != 0) {
                 Uint32Map storage fromOwned = $.owned[from];
@@ -448,7 +455,7 @@ abstract contract DN404 {
                 // Burn loop.
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
-                    _setOwnerAliasAndOwnedIndex($.oo, id, 0, 0);
+                    _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     delete $.tokenApprovals[id];
                     _packedLogsAppend(packedLogs, from, id, 1);
                 } while (fromIndex != fromEnd);
@@ -465,11 +472,11 @@ abstract contract DN404 {
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
-                    while (_get($.oo, _ownershipIndex(id)) != 0) {
+                    while (_get(oo, _ownershipIndex(id)) != 0) {
                         if (++id > maxNFTId) id = 1;
                     }
                     _set(toOwned, toIndex, uint32(id));
-                    _setOwnerAliasAndOwnedIndex($.oo, id, toAlias, uint32(toIndex++));
+                    _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, to, id, 0);
                     if (++id > maxNFTId) id = 1;
                 } while (toIndex != toEnd);
@@ -502,9 +509,11 @@ abstract contract DN404 {
 
         if (to == address(0)) revert TransferToZeroAddress();
 
-        address owner = $.aliasToAddress[_get($.oo, _ownershipIndex(id))];
+        Uint32Map storage oo = $.oo;
 
-        if (from != owner) revert TransferFromIncorrectOwner();
+        if (from != $.aliasToAddress[_get(oo, _ownershipIndex(id))]) {
+            revert TransferFromIncorrectOwner();
+        }
 
         if (msgSender != from) {
             if (!$.operatorApprovals[from][msgSender]) {
@@ -522,16 +531,19 @@ abstract contract DN404 {
         unchecked {
             toAddressData.balance += uint96(_WAD);
 
-            _set($.oo, _ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
+            mapping(address => Uint32Map) storage owned = $.owned;
+            Uint32Map storage fromOwned = owned[from];
+
+            _set(oo, _ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
             delete $.tokenApprovals[id];
 
-            uint256 updatedId = _get($.owned[from], --fromAddressData.ownedLength);
-            _set($.owned[from], _get($.oo, _ownedIndex(id)), uint32(updatedId));
+            uint256 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
+            _set(fromOwned, _get(oo, _ownedIndex(id)), uint32(updatedId));
 
+            _set(oo, _ownedIndex(updatedId), _get(oo, _ownedIndex(id)));
             uint256 n = toAddressData.ownedLength++;
-            _set($.oo, _ownedIndex(updatedId), _get($.oo, _ownedIndex(id)));
-            _set($.owned[to], n, uint32(id));
-            _set($.oo, _ownedIndex(id), uint32(n));
+            _set(owned[to], n, uint32(id));
+            _set(oo, _ownedIndex(id), uint32(n));
         }
 
         emit Transfer(from, to, _WAD);
@@ -559,11 +571,11 @@ abstract contract DN404 {
     /*                     SKIP NFT FUNCTIONS                     */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns true if account `a` will skip NFT minting on token mints and transfers.
-    /// Returns false if account `a` will mint NFTs on token mints and transfers.
-    function getSkipNFT(address a) public view virtual returns (bool) {
-        AddressData storage d = _getDN404Storage().addressData[a];
-        if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) return _hasCode(a);
+    /// @dev Returns true if account `owner` will skip NFT minting on token mints and transfers.
+    /// Returns false if account `owner` will mint NFTs on token mints and transfers.
+    function getSkipNFT(address owner) public view virtual returns (bool) {
+        AddressData storage d = _getDN404Storage().addressData[owner];
+        if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) return _hasCode(owner);
         return d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0;
     }
 
@@ -574,29 +586,29 @@ abstract contract DN404 {
         _setSkipNFT(msg.sender, skipNFT);
     }
 
-    /// @dev Internal function to set account `a` skipNFT flag to `state`
+    /// @dev Internal function to set account `owner` skipNFT flag to `state`
     ///
-    /// Initializes account `a` AddressData if it is not currently initialized.
+    /// Initializes account `owner` AddressData if it is not currently initialized.
     ///
     /// Emits a {SkipNFTSet} event.
-    function _setSkipNFT(address a, bool state) internal virtual {
-        AddressData storage d = _addressData(a);
+    function _setSkipNFT(address owner, bool state) internal virtual {
+        AddressData storage d = _addressData(owner);
         if ((d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0) != state) {
             d.flags ^= _ADDRESS_DATA_SKIP_NFT_FLAG;
         }
-        emit SkipNFTSet(a, state);
+        emit SkipNFTSet(owner, state);
     }
 
-    /// @dev Returns a storage data pointer for account `a` AddressData
+    /// @dev Returns a storage data pointer for account `owner` AddressData
     ///
-    /// Initializes account `a` AddressData if it is not currently initialized.
-    function _addressData(address a) internal virtual returns (AddressData storage d) {
+    /// Initializes account `owner` AddressData if it is not currently initialized.
+    function _addressData(address owner) internal virtual returns (AddressData storage d) {
         DN404Storage storage $ = _getDN404Storage();
-        d = $.addressData[a];
+        d = $.addressData[owner];
 
         if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
             uint8 flags = _ADDRESS_DATA_INITIALIZED_FLAG;
-            if (_hasCode(a)) flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
+            if (_hasCode(owner)) flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
             d.flags = flags;
         }
     }
@@ -730,7 +742,7 @@ abstract contract DN404 {
             address owner = address(uint160(_calldataload(0x04)));
             address operator = address(uint160(_calldataload(0x24)));
 
-            _return($.operatorApprovals[owner][operator] ? 1 : 0);
+            _return(_toUint($.operatorApprovals[owner][operator]));
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
@@ -918,6 +930,14 @@ abstract contract DN404 {
     function _ownedIndex(uint256 i) private pure returns (uint256) {
         unchecked {
             return (i << 1) + 1;
+        }
+    }
+
+    /// @dev Returns `b ? 1 : 0`.
+    function _toUint(bool b) private pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(b))
         }
     }
 
