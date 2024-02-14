@@ -61,6 +61,8 @@ While the contracts have undergone thorough testing, there may still be unforese
 
 **Always** conduct comprehensive testing to ensure compatibility with your codebase.
 
+We **do not give any warranties** and **will not be liable for any loss** incurred through any use of this codebase.
+
 ## Upgradability
 
 Most contracts within DN404 support both upgradeable and non-upgradeable (regular) implementations. 
