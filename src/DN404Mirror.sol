@@ -108,74 +108,23 @@ contract DN404Mirror {
 
     /// @dev Returns the token collection name from the base DN404 contract.
     function name() public view virtual returns (string memory result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := mload(0x40)
-            mstore(0x00, 0x06fdde03) // `name()`.
-            if iszero(staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x00)) {
-                returndatacopy(result, 0x00, returndatasize())
-                revert(result, returndatasize())
-            }
-            returndatacopy(0x00, 0x00, 0x20)
-            returndatacopy(result, mload(0x00), 0x20)
-            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result))
-            mstore(0x40, add(add(result, 0x20), mload(result)))
-        }
+        return _readString(0x06fdde03, 0); // `symbol()`.
     }
 
     /// @dev Returns the token collection symbol from the base DN404 contract.
     function symbol() public view virtual returns (string memory result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := mload(0x40)
-            mstore(0x00, 0x95d89b41) // `symbol()`.
-            if iszero(staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x00)) {
-                returndatacopy(result, 0x00, returndatasize())
-                revert(result, returndatasize())
-            }
-            returndatacopy(0x00, 0x00, 0x20)
-            returndatacopy(result, mload(0x00), 0x20)
-            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result))
-            mstore(0x40, add(add(result, 0x20), mload(result)))
-        }
+        return _readString(0x95d89b41, 0); // `symbol()`.
     }
 
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from
     /// the base DN404 contract.
     function tokenURI(uint256 id) public view virtual returns (string memory result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := mload(0x40)
-            mstore(0x20, id)
-            mstore(0x00, 0xc87b56dd) // `tokenURI()`.
-            if iszero(staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x00)) {
-                returndatacopy(result, 0x00, returndatasize())
-                revert(result, returndatasize())
-            }
-            returndatacopy(0x00, 0x00, 0x20)
-            returndatacopy(result, mload(0x00), 0x20)
-            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result))
-            mstore(0x40, add(add(result, 0x20), mload(result)))
-        }
+        return _readString(0xc87b56dd, id); // `tokenURI()`.
     }
 
     /// @dev Returns the total NFT supply from the base DN404 contract.
     function totalSupply() public view virtual returns (uint256 result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, 0xe2c79281) // `totalNFTSupply()`.
-            if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20))
-            ) {
-                returndatacopy(mload(0x40), 0x00, returndatasize())
-                revert(mload(0x40), returndatasize())
-            }
-            result := mload(0x00)
-        }
+        return _readWord(0xe2c79281, 0, 0); // `totalNFTSupply()`.
     }
 
     /// @dev Returns the number of NFT tokens owned by `nftOwner` from the base DN404 contract.
@@ -183,19 +132,7 @@ contract DN404Mirror {
     /// Requirements:
     /// - `nftOwner` must not be the zero address.
     function balanceOf(address nftOwner) public view virtual returns (uint256 result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x20, shr(96, shl(96, nftOwner)))
-            mstore(0x00, 0xf5b100ea) // `balanceOfNFT(address)`.
-            if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
-            ) {
-                returndatacopy(mload(0x40), 0x00, returndatasize())
-                revert(mload(0x40), returndatasize())
-            }
-            result := mload(0x00)
-        }
+        return _readWord(0xf5b100ea, uint160(nftOwner), 0); // `balanceOfNFT(address)`.
     }
 
     /// @dev Returns the owner of token `id` from the base DN404 contract.
@@ -203,19 +140,7 @@ contract DN404Mirror {
     /// Requirements:
     /// - Token `id` must exist.
     function ownerOf(uint256 id) public view virtual returns (address result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, 0x6352211e) // `ownerOf(uint256)`.
-            mstore(0x20, id)
-            if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
-            ) {
-                returndatacopy(mload(0x40), 0x00, returndatasize())
-                revert(mload(0x40), returndatasize())
-            }
-            result := shr(96, mload(0x0c))
-        }
+        return address(uint160(_readWord(0x6352211e, id, 0))); // `ownerOf(uint256)`.
     }
 
     /// @dev Sets `spender` as the approved account to manage token `id` in
@@ -258,20 +183,8 @@ contract DN404Mirror {
     ///
     /// Requirements:
     /// - Token `id` must exist.
-    function getApproved(uint256 id) public view virtual returns (address result) {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, 0x081812fc) // `getApproved(uint256)`.
-            mstore(0x20, id)
-            if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x20))
-            ) {
-                returndatacopy(mload(0x40), 0x00, returndatasize())
-                revert(mload(0x40), returndatasize())
-            }
-            result := shr(96, mload(0x0c))
-        }
+    function getApproved(uint256 id) public view virtual returns (address) {
+        return address(uint160(_readWord(0x081812fc, id, 0))); // `getApproved(uint256)`.
     }
 
     /// @dev Sets whether `operator` is approved to manage the tokens of the caller in
@@ -295,6 +208,7 @@ contract DN404Mirror {
                 revert(m, returndatasize())
             }
             // Emit the {ApprovalForAll} event.
+            // The `approved` value is already at 0x40.
             log3(0x40, 0x20, _APPROVAL_FOR_ALL_EVENT_SIGNATURE, caller(), operator)
             mstore(0x40, m) // Restore the free memory pointer.
             mstore(0x60, 0) // Restore the zero pointer.
@@ -309,22 +223,8 @@ contract DN404Mirror {
         virtual
         returns (bool result)
     {
-        address base = baseERC20();
-        /// @solidity memory-safe-assembly
-        assembly {
-            let m := mload(0x40)
-            mstore(0x40, operator)
-            mstore(0x2c, shl(96, nftOwner))
-            mstore(0x0c, 0xe985e9c5000000000000000000000000) // `isApprovedForAll(address,address)`.
-            if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
-            ) {
-                returndatacopy(m, 0x00, returndatasize())
-                revert(m, returndatasize())
-            }
-            mstore(0x40, m) // Restore the free memory pointer.
-            result := iszero(iszero(mload(0x00)))
-        }
+        // `isApprovedForAll(address,address)`.
+        return _readWord(0xe985e9c5, uint160(nftOwner), uint160(operator)) != 0;
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
@@ -500,6 +400,53 @@ contract DN404Mirror {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      PRIVATE HELPERS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Helper to read a string from the base DN404 contract.
+    function _readString(uint256 fnSelector, uint256 arg0)
+        private
+        view
+        returns (string memory result)
+    {
+        address base = baseERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            mstore(0x00, fnSelector)
+            mstore(0x20, arg0)
+            if iszero(staticcall(gas(), base, 0x1c, 0x24, 0x00, 0x00)) {
+                returndatacopy(result, 0x00, returndatasize())
+                revert(result, returndatasize())
+            }
+            returndatacopy(0x00, 0x00, 0x20) // Copy the offset of the string in returndata.
+            returndatacopy(result, mload(0x00), 0x20) // Copy the length of the string.
+            returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result)) // Copy the string.
+            mstore(0x40, add(add(result, 0x20), mload(result))) // Allocate memory.
+        }
+    }
+
+    /// @dev Helper to read a word from the base DN404 contract.
+    function _readWord(uint256 fnSelector, uint256 arg0, uint256 arg1)
+        private
+        view
+        returns (uint256 result)
+    {
+        address base = baseERC20();
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            mstore(0x00, fnSelector)
+            mstore(0x20, arg0)
+            mstore(0x40, arg1)
+            if iszero(
+                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
+            ) {
+                returndatacopy(m, 0x00, returndatasize())
+                revert(m, returndatasize())
+            }
+            mstore(0x40, m) // Restore the free memory pointer.
+            result := mload(0x00)
+        }
+    }
 
     /// @dev Returns the calldata value at `offset`.
     function _calldataload(uint256 offset) private pure returns (uint256 value) {
