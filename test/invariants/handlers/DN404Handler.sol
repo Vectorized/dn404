@@ -127,15 +127,14 @@ contract DN404Handler is Test {
                 : (transferCache.toInitialTokenBalance / _WAD) - owned[_to].length;
 
         for (uint256 i; i < toNftAmount; ++i) {
-            if (nextId > max) nextId = 1;
             while (ownerOf[nextId] != address(0)) {
-                if (++nextId > max) nextId = 1;
+                nextId = _wrapNFTId(nextId + 1, max);
             }
             vm.expectEmit(true, true, true, false, address(mirror));
             emit Transfer(address(0), to, nextId);
             owned[_to].push(nextId);
             ownerOf[nextId] = _to;
-            ++nextId;
+            nextId = _wrapNFTId(nextId + 1, max);
         }
 
         vm.expectEmit(true, true, false, true, address(dn404));
@@ -216,15 +215,14 @@ contract DN404Handler is Test {
                 : (transferCache.toInitialTokenBalance / _WAD) - owned[_to].length;
 
         for (uint256 i; i < toNftAmount; ++i) {
-            if (nextId > max) nextId = 1;
             while (ownerOf[nextId] != address(0)) {
-                if (++nextId > max) nextId = 1;
+                nextId = _wrapNFTId(nextId + 1, max);
             }
             vm.expectEmit(true, true, true, false, address(mirror));
             emit Transfer(address(0), to, nextId);
             owned[_to].push(nextId);
             ownerOf[nextId] = _to;
-            ++nextId;
+            nextId = _wrapNFTId(nextId + 1, max);
         }
 
         vm.expectEmit(true, true, false, true, address(dn404));
@@ -266,15 +264,14 @@ contract DN404Handler is Test {
         uint256 nextId = dn404.getNextTokenId();
 
         for (uint256 i; i < nftAmount; ++i) {
-            if (nextId > max) nextId = 1;
             while (ownerOf[nextId] != address(0)) {
-                if (++nextId > max) nextId = 1;
+                nextId = _wrapNFTId(nextId + 1, max);
             }
             vm.expectEmit(true, true, true, false, address(mirror));
             emit Transfer(address(0), to, nextId);
             owned[to].push(nextId);
             ownerOf[nextId] = to;
-            ++nextId;
+            nextId = _wrapNFTId(nextId + 1, max);
         }
 
         vm.expectEmit(true, true, false, true, address(dn404));
@@ -345,6 +342,14 @@ contract DN404Handler is Test {
         /// @solidity memory-safe-assembly
         assembly {
             z := mul(gt(x, y), sub(x, y))
+        }
+    }
+
+    function _wrapNFTId(uint256 id, uint256 maxNFTId) private pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := gt(id, maxNFTId)
+            result := or(result, mul(iszero(result), id))
         }
     }
 }

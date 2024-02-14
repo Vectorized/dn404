@@ -336,6 +336,8 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
 
+        _TransferTemps memory t;
+
         unchecked {
             uint256 currentTokenSupply = uint256($.totalSupply) + amount;
             if (_toUint(amount > _MAX_SUPPLY) | _toUint(currentTokenSupply > _MAX_SUPPLY) != 0) {
@@ -343,33 +345,36 @@ abstract contract DN404 {
             }
             $.totalSupply = uint96(currentTokenSupply);
 
-            uint256 toBalance = toAddressData.balance + amount;
-            toAddressData.balance = uint96(toBalance);
+            t.toBalance = toAddressData.balance + amount;
+            toAddressData.balance = uint96(t.toBalance);
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = toAddressData.ownedLength;
-                uint256 toEnd = toBalance / _WAD;
+                uint256 toEnd = t.toBalance / _WAD;
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
                 Uint32Map storage oo = $.oo;
 
                 if (packedLogs.logs.length != 0) {
                     uint256 maxNFTId = currentTokenSupply / _WAD;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
+
+                    t.nextTokenId = $.nextTokenId;
+                    t.burnedPoolSize = $.burnedPoolSize;
+
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
                     toAddressData.ownedLength = uint32(toEnd);
                     // Mint loop.
                     do {
                         uint256 id;
-                        if ($.burnedPoolSize != 0) {
-                            id = _get($.burnedPool, --$.burnedPoolSize);
+                        if (t.burnedPoolSize != 0) {
+                            id = _get($.burnedPool, --t.burnedPoolSize);
                         } else {
-                            id = $.nextTokenId;
-                            if (id > maxNFTId) id = 1;
+                            id = t.nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
-                                if (++id > maxNFTId) id = 1;
+                                id = _wrapNFTId(id + 1, maxNFTId);
                             }
-                            $.nextTokenId = uint32(id + 1);
+                            t.nextTokenId = _wrapNFTId(id + 1, maxNFTId);
                         }
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
@@ -377,7 +382,8 @@ abstract contract DN404 {
                     } while (toIndex != toEnd);
 
                     // Leave some spacing between minted batches for better open addressing.
-                    $.nextTokenId += 7;
+                    $.nextTokenId = uint32(_wrapNFTId(t.nextTokenId + 7, maxNFTId));
+                    $.burnedPoolSize = uint32(t.burnedPoolSize);
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
             }
@@ -538,21 +544,20 @@ abstract contract DN404 {
                         id = _get($.burnedPool, --t.burnedPoolSize);
                     } else {
                         id = t.nextTokenId;
-                        if (id > maxNFTId) id = 1;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
-                            if (++id > maxNFTId) id = 1;
+                            id = _wrapNFTId(id + 1, maxNFTId);
                         }
-                        t.nextTokenId = id + 1;
+                        t.nextTokenId = _wrapNFTId(id + 1, maxNFTId);
                     }
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, to, id, 0);
                 } while (toIndex != toEnd);
+                // Leave some spacing between minted batches for better open addressing.
+                $.nextTokenId = uint32(_wrapNFTId(t.nextTokenId + 7, maxNFTId));
             }
 
             if (packedLogs.logs.length != 0) {
-                // Leave some spacing between minted batches for better open addressing.
-                $.nextTokenId = uint32(t.nextTokenId + 7);
                 $.burnedPoolSize = uint32(t.burnedPoolSize);
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
@@ -1073,6 +1078,15 @@ abstract contract DN404 {
             let m := 0xffffffffffffffff // Value mask.
             let combined := or(shl(32, ownedIndex), and(0xffffffff, ownership))
             sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), combined)))))
+        }
+    }
+
+    /// @dev Wraps the NFT ID.
+    function _wrapNFTId(uint256 id, uint256 maxNFTId) private pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := gt(id, maxNFTId)
+            result := or(result, mul(iszero(result), id))
         }
     }
 
