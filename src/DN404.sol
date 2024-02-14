@@ -122,6 +122,11 @@ abstract contract DN404 {
         mapping(uint256 => uint256) map;
     }
 
+    /// @dev A Bitmap map in storage.
+    struct Bitmap {
+        mapping(uint256 => uint256) map;
+    }
+
     /// @dev A struct to wrap a uint256 in storage.
     struct Uint256Ref {
         uint256 value;
@@ -153,6 +158,8 @@ abstract contract DN404 {
         Uint32Map oo;
         // Mapping of user account AddressData
         mapping(address => AddressData) addressData;
+        // Bitmap of whether a token approval exists.
+        Bitmap tokenApprovalExists;
     }
 
     /// @dev Returns a storage pointer for DN404Storage.
@@ -399,20 +406,23 @@ abstract contract DN404 {
 
             Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
-            uint256 nftAmountToBurn = _zeroFloorSub(fromIndex, fromBalance / _WAD);
+            uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _WAD);
 
-            if (nftAmountToBurn != 0) {
-                $.totalNFTSupply -= uint32(nftAmountToBurn);
+            if (numNFTBurns != 0) {
+                $.totalNFTSupply -= uint32(numNFTBurns);
 
-                _PackedLogs memory packedLogs = _packedLogsMalloc(nftAmountToBurn);
+                _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 Uint32Map storage oo = $.oo;
-                uint256 fromEnd = fromIndex - nftAmountToBurn;
+                uint256 fromEnd = fromIndex - numNFTBurns;
                 // Burn loop.
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    delete $.tokenApprovals[id];
                     _packedLogsAppend(packedLogs, from, id, 1);
+                    if (_get($.tokenApprovalExists, id)) {
+                        _unset($.tokenApprovalExists, id);
+                        delete $.tokenApprovals[id];
+                    }
                 } while (fromIndex != fromEnd);
 
                 fromAddressData.ownedLength = uint32(fromIndex);
@@ -461,39 +471,41 @@ abstract contract DN404 {
             fromAddressData.balance = uint96(t.fromBalance);
             toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
 
-            t.nftAmountToBurn = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
+            t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                if (from == to) t.toOwnedLength = t.fromOwnedLength - t.nftAmountToBurn;
-                t.nftAmountToMint = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
+                if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
+                t.numNFTMints = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
-            _PackedLogs memory packedLogs = _packedLogsMalloc(t.nftAmountToBurn + t.nftAmountToMint);
+            $.totalNFTSupply = uint32(uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns);
+            _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
 
-            if (t.nftAmountToBurn != 0) {
+            if (t.numNFTBurns != 0) {
                 Uint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
-                uint256 fromEnd = fromIndex - t.nftAmountToBurn;
-                $.totalNFTSupply -= uint32(t.nftAmountToBurn);
+                uint256 fromEnd = fromIndex - t.numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
                 // Burn loop.
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    delete $.tokenApprovals[id];
                     _packedLogsAppend(packedLogs, from, id, 1);
+                    if (_get($.tokenApprovalExists, id)) {
+                        _unset($.tokenApprovalExists, id);
+                        delete $.tokenApprovals[id];
+                    }
                 } while (fromIndex != fromEnd);
             }
 
-            if (t.nftAmountToMint != 0) {
+            if (t.numNFTMints != 0) {
                 Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = t.toOwnedLength;
-                uint256 toEnd = toIndex + t.nftAmountToMint;
+                uint256 toEnd = toIndex + t.numNFTMints;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 maxNFTId = $.totalSupply / _WAD;
                 uint256 id = $.nextTokenId;
-                $.totalNFTSupply += uint32(t.nftAmountToMint);
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
@@ -566,7 +578,10 @@ abstract contract DN404 {
             Uint32Map storage fromOwned = owned[from];
 
             _set(oo, _ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
-            delete $.tokenApprovals[id];
+            if (_get($.tokenApprovalExists, id)) {
+                _unset($.tokenApprovalExists, id);
+                delete $.tokenApprovals[id];
+            }
 
             uint256 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
             _set(fromOwned, _get(oo, _ownedIndex(id)), uint32(updatedId));
@@ -752,6 +767,9 @@ abstract contract DN404 {
         }
 
         $.tokenApprovals[id] = spender;
+        if (spender != address(0)) {
+            _set($.tokenApprovalExists, id);
+        }
     }
 
     /// @dev Approve or remove the `operator` as an operator for `msgSender`,
@@ -918,8 +936,8 @@ abstract contract DN404 {
 
     /// @dev Struct of temporary variables for transfers.
     struct _TransferTemps {
-        uint256 nftAmountToBurn;
-        uint256 nftAmountToMint;
+        uint256 numNFTBurns;
+        uint256 numNFTMints;
         uint256 fromBalance;
         uint256 toBalance;
         uint256 fromOwnedLength;
@@ -1016,5 +1034,24 @@ abstract contract DN404 {
             let m := 0xffffffffffffffff // Value mask.
             sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), value)))))
         }
+    }
+
+    /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
+    function _get(Bitmap storage bitmap, uint256 index) private view returns (bool isSet) {
+        uint256 b = (bitmap.map[index >> 8] >> (index & 0xff)) & 1;
+        /// @solidity memory-safe-assembly
+        assembly {
+            isSet := b
+        }
+    }
+
+    /// @dev Updates the bit at `index` in `bitmap` to true.
+    function _set(Bitmap storage bitmap, uint256 index) private {
+        bitmap.map[index >> 8] |= (1 << (index & 0xff));
+    }
+
+    /// @dev Updates the bit at `index` in `bitmap` to false.
+    function _unset(Bitmap storage bitmap, uint256 index) private {
+        bitmap.map[index >> 8] &= ~(1 << (index & 0xff));
     }
 }
