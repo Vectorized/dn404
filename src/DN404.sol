@@ -227,13 +227,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function approve(address spender, uint256 amount) public virtual returns (bool) {
-        DN404Storage storage $ = _getDN404Storage();
-
-        $.allowance[msg.sender][spender] = amount;
-
-        emit Approval(msg.sender, spender, amount);
-
-        return true;
+        return _approve(msg.sender, spender, amount);
     }
 
     /// @dev Transfer `amount` tokens from the caller to `to`.
@@ -535,6 +529,23 @@ abstract contract DN404 {
         }
 
         emit Transfer(from, to, _WAD);
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                 INTERNAL APPROVE FUNCTIONS                 */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Sets `amount` as the allowance of `spender` over the tokens of `owner`.
+    ///
+    /// Emits a {Approval} event.
+    function _approve(address owner, address spender, uint256 amount) internal returns (bool) {
+        DN404Storage storage $ = _getDN404Storage();
+
+        $.allowance[owner][spender] = amount;
+
+        emit Approval(owner, spender, amount);
+
+        return true;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
