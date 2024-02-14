@@ -3,6 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
+import {MockDN404Ownable} from "./utils/mocks/MockDN404Ownable.sol";
 import {DN404Mirror, MockDN404Mirror} from "./utils/mocks/MockDN404Mirror.sol";
 
 contract Invalid721Receiver {}
@@ -13,6 +14,8 @@ contract DN404MirrorTest is SoladyTest {
     event Approval(address indexed owner, address indexed account, uint256 indexed id);
 
     event ApprovalForAll(address indexed owner, address indexed operator, bool isApproved);
+
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
 
     uint256 private constant _WAD = 1000000000000000000;
 
@@ -180,5 +183,25 @@ contract DN404MirrorTest is SoladyTest {
         (bool success,) =
             address(mirror).call(abi.encodeWithSignature("logTransfer(uint256[])", packedLogs));
         assertTrue(success);
+    }
+
+    function testPullOwner() public {
+        dn.initializeDN404(1000, address(this), address(mirror));
+        assertEq(mirror.owner(), address(0));
+        mirror.pullOwner();
+        assertEq(mirror.owner(), address(0));
+    }
+
+    function testPullOwnerWithOwnable() public {
+        MockDN404Ownable dnOwnable = new MockDN404Ownable();
+        dnOwnable.initializeDN404(1000, address(this), address(mirror));
+        address newOwner = address(123);
+        dnOwnable.transferOwnership(newOwner);
+
+        assertEq(mirror.owner(), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit OwnershipTransferred(address(0), newOwner);
+        mirror.pullOwner();
+        assertEq(mirror.owner(), newOwner);
     }
 }
