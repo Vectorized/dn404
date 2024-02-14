@@ -411,23 +411,22 @@ abstract contract DN404 {
 
         AddressData storage fromAddressData = _addressData(from);
 
-        uint256 fromBalance = fromAddressData.balance;
-        if (amount > fromBalance) revert InsufficientBalance();
+        _TransferTemps memory t;
 
-        uint256 currentTokenSupply = $.totalSupply;
+        if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
 
         unchecked {
-            fromBalance -= amount;
-            fromAddressData.balance = uint96(fromBalance);
-            currentTokenSupply -= amount;
-            $.totalSupply = uint96(currentTokenSupply);
+            fromAddressData.balance = uint96(t.fromBalance -= amount);
+            $.totalSupply = uint96(t.totalSupply = uint256($.totalSupply) - amount);
 
             Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
-            uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _WAD);
+            uint256 numNFTBurns = _zeroFloorSub(fromIndex, t.fromBalance / _WAD);
 
             if (numNFTBurns != 0) {
-                $.totalNFTSupply -= uint32(numNFTBurns);
+                t.addToBurnedPool =
+                    _addToBurnedPool($.totalNFTSupply -= uint32(numNFTBurns), t.totalSupply);
+                t.burnedPoolSize = $.burnedPoolSize;
 
                 _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 Uint32Map storage oo = $.oo;
@@ -437,12 +436,16 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, from, id, 1);
+                    if (t.addToBurnedPool) {
+                        _set($.burnedPool, t.burnedPoolSize++, uint32(id));
+                    }
                     if (_get($.tokenApprovalExists, id)) {
                         _unset($.tokenApprovalExists, id);
                         delete $.tokenApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
 
+                $.burnedPoolSize = uint32(t.burnedPoolSize);
                 fromAddressData.ownedLength = uint32(fromIndex);
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
@@ -480,17 +483,15 @@ abstract contract DN404 {
         _TransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
-        t.fromBalance = fromAddressData.balance;
         t.burnedPoolSize = $.burnedPoolSize;
         t.nextTokenId = $.nextTokenId;
         t.totalSupply = $.totalSupply;
 
-        if (amount > t.fromBalance) revert InsufficientBalance();
+        if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
 
         unchecked {
-            t.fromBalance -= amount;
-            fromAddressData.balance = uint96(t.fromBalance);
-            toAddressData.balance = uint96(t.toBalance = toAddressData.balance + amount);
+            fromAddressData.balance = uint96(t.fromBalance -= amount);
+            toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
 
             t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
 
@@ -499,13 +500,10 @@ abstract contract DN404 {
                 t.numNFTMints = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
             }
 
-            {
-                uint256 n = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
-                $.totalNFTSupply = uint32(n);
-                // Add to burned pool if the load factor > 50%, and collection is not small.
-                uint256 thres = (t.totalSupply / _WAD) >> 1;
-                t.shouldAddToBurnedPool = _toUint(n > thres) & _toUint(thres > 128) != 0;
-            }
+            t.addToBurnedPool = _addToBurnedPool(
+                $.totalNFTSupply = uint32(uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns),
+                t.totalSupply
+            );
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
@@ -520,7 +518,7 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, from, id, 1);
-                    if (t.shouldAddToBurnedPool) {
+                    if (t.addToBurnedPool) {
                         _set($.burnedPool, t.burnedPoolSize++, uint32(id));
                     }
                     if (_get($.tokenApprovalExists, id)) {
@@ -569,6 +567,18 @@ abstract contract DN404 {
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
+    }
+
+    /// @dev Returns if burns should be added to the burn pool.
+    function _addToBurnedPool(uint256 totalNFTSupplyAfterBurn, uint256 totalSupplyAfterBurn)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
+        // Add to burned pool if the load factor > 50%, and collection is not small.
+        uint256 thres = (totalSupplyAfterBurn / _WAD) >> 1;
+        return _toUint(totalNFTSupplyAfterBurn > thres) & _toUint(thres > 128) != 0;
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
@@ -983,7 +993,7 @@ abstract contract DN404 {
         uint256 burnedPoolSize;
         uint256 nextTokenId;
         uint256 totalSupply;
-        bool shouldAddToBurnedPool;
+        bool addToBurnedPool;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
