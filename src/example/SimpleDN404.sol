@@ -9,7 +9,7 @@ import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
 /**
  * @title SimpleDN404
- * @notice Sample DN404 contract that demonstrates the owner selling fungile tokens.
+ * @notice Sample DN404 contract that demonstrates the owner selling fungible tokens.
  * When a user has at least one base unit (10^18) amount of tokens, they will automatically receive an NFT.
  * NFTs are minted as an address accumulates each base unit amount of tokens.
  */
