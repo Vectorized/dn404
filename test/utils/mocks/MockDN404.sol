@@ -74,4 +74,8 @@ contract MockDN404 is DN404 {
     function getNextTokenId() public view returns (uint32) {
         return _getDN404Storage().nextTokenId;
     }
+
+    function clearBurnedPool() public {
+        _getDN404Storage().burnedPoolSize = 0;
+    }
 }
