@@ -864,12 +864,14 @@ abstract contract DN404 {
     function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := add(mload(0x40), 0x40) // Offset by 2 words for `_packedLogsSend`.
-            mstore(logs, n)
+            // Offset forward by 2 words for `_packedLogsSend`.
+            // These two words are required to store the function signature and array offset.
+            let logs := add(mload(0x40), 0x40)
+            mstore(logs, n) // Store the length.
             let offset := add(0x20, logs)
-            mstore(0x40, add(offset, shl(5, n)))
-            mstore(p, logs)
-            mstore(add(0x20, p), offset)
+            mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
+            mstore(p, logs) // Set `p.logs`.
+            mstore(add(0x20, p), offset) // Set `p.offset`.
         }
     }
 
