@@ -43,10 +43,14 @@ contract DN404CustomUnitTest is SoladyTest {
 
         unchecked {
             uint256 sum = totalSupply + amount;
-            bool t = sum > type(uint96).max || sum / unit > type(uint32).max - 1;
-            bool expected = t || amount > type(uint96).max || amount / unit > type(uint32).max - 1;
+            bool t = _totalSupplyOverflows(sum, unit);
+            bool expected = t || _totalSupplyOverflows(amount, unit);
             bool computed = t || sum < amount;
             assertEq(computed, expected);
         }
+    }
+
+    function _totalSupplyOverflows(uint256 amount, uint256 unit) private pure returns (bool) {
+        return (amount > type(uint96).max) || (amount / unit > type(uint32).max - 1);
     }
 }
