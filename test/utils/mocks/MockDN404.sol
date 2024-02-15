@@ -33,10 +33,6 @@ contract MockDN404 is DN404 {
         return string(abi.encodePacked(_baseURI, id));
     }
 
-    function setWhitelist(address target, bool status) public {
-        _setSkipNFT(target, status);
-    }
-
     function registerAndResolveAlias(address target) public returns (uint32) {
         return _registerAndResolveAlias(_addressData(target), target);
     }
@@ -55,10 +51,6 @@ contract MockDN404 is DN404 {
         address mirrorNFTContract
     ) public {
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirrorNFTContract);
-    }
-
-    function ownerAt(uint256 id) public view returns (address) {
-        return _ownerAt(id);
     }
 
     function getAddressDataInitialized(address target) public view returns (bool) {

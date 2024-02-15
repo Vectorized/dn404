@@ -14,9 +14,7 @@ contract DN404Handler is Test {
     MockDN404 dn404;
     DN404Mirror mirror;
 
-    uint256 public sum;
-
-    address user0 = vm.addr(uint256(keccak256("OWNER")));
+    address user0 = vm.addr(uint256(keccak256("User0")));
     address user1 = vm.addr(uint256(keccak256("User1")));
     address user2 = vm.addr(uint256(keccak256("User2")));
     address user3 = vm.addr(uint256(keccak256("User3")));
@@ -25,7 +23,7 @@ contract DN404Handler is Test {
 
     address[6] actors;
 
-    mapping(address => uint256) public balanceOf;
+    mapping(address => uint256) public nftsOwned;
 
     event Transfer(address indexed from, address indexed to, uint256 indexed id);
 
@@ -84,12 +82,12 @@ contract DN404Handler is Test {
 
         dn404.transfer(to, amount);
 
-        uint256 fromNFTPreOwned = balanceOf[from];
+        uint256 fromNFTPreOwned = nftsOwned[from];
 
-        balanceOf[from] -= _zeroFloorSub(fromNFTPreOwned, (fromPreBalance - amount) / _WAD);
+        nftsOwned[from] -= _zeroFloorSub(fromNFTPreOwned, (fromPreBalance - amount) / _WAD);
         if (!dn404.getSkipNFT(to)) {
             if (from == to) toPreBalance -= amount;
-            balanceOf[to] += _zeroFloorSub((toPreBalance + amount) / _WAD, balanceOf[to]);
+            nftsOwned[to] += _zeroFloorSub((toPreBalance + amount) / _WAD, nftsOwned[to]);
         }
     }
 
@@ -115,12 +113,12 @@ contract DN404Handler is Test {
 
         dn404.transferFrom(from, to, amount);
 
-        uint256 fromNFTPreOwned = balanceOf[from];
+        uint256 fromNFTPreOwned = nftsOwned[from];
 
-        balanceOf[from] -= _zeroFloorSub(fromNFTPreOwned, (fromPreBalance - amount) / _WAD);
+        nftsOwned[from] -= _zeroFloorSub(fromNFTPreOwned, (fromPreBalance - amount) / _WAD);
         if (!dn404.getSkipNFT(to)) {
             if (from == to) toPreBalance -= amount;
-            balanceOf[to] += _zeroFloorSub((toPreBalance + amount) / _WAD, balanceOf[to]);
+            nftsOwned[to] += _zeroFloorSub((toPreBalance + amount) / _WAD, nftsOwned[to]);
         }
     }
 
@@ -132,9 +130,8 @@ contract DN404Handler is Test {
 
         dn404.mint(to, amount);
 
-        sum += amount;
         if (!dn404.getSkipNFT(to)) {
-            balanceOf[to] = (toPreBalance + amount) / _WAD;
+            nftsOwned[to] = (toPreBalance + amount) / _WAD;
         }
     }
 
@@ -147,13 +144,67 @@ contract DN404Handler is Test {
 
         dn404.burn(from, amount);
 
-        sum -= amount;
-        balanceOf[from] -= _zeroFloorSub(balanceOf[from], (fromPreBalance - amount) / _WAD);
+        nftsOwned[from] -= _zeroFloorSub(nftsOwned[from], (fromPreBalance - amount) / _WAD);
     }
 
     function setSkipNFT(uint256 actorIndexSeed, bool status) external {
         vm.startPrank(randomAddress(actorIndexSeed));
         dn404.setSkipNFT(status);
+    }
+
+    function approveNFT(uint256 ownerIndexSeed, uint256 spenderIndexSeed, uint256 id) external {
+        address owner = randomAddress(ownerIndexSeed);
+        address spender = randomAddress(spenderIndexSeed);
+
+        if (mirror.ownerAt(id) != address(0)) return;
+        if (mirror.ownerAt(id) != owner) {
+            owner = mirror.ownerAt(id);
+        }
+
+        vm.startPrank(owner);
+        mirror.approve(spender, id);
+    }
+
+    function setApprovalForAll(uint256 ownerIndexSeed, uint256 spenderIndexSeed, uint256 id)
+        external
+    {
+        address owner = randomAddress(ownerIndexSeed);
+        address spender = randomAddress(spenderIndexSeed);
+
+        if (mirror.ownerAt(id) != address(0)) return;
+        if (mirror.ownerAt(id) != owner) {
+            owner = mirror.ownerAt(id);
+        }
+
+        vm.startPrank(owner);
+        mirror.approve(spender, id);
+    }
+
+    function transferFromNFT(
+        uint256 senderIndexSeed,
+        uint256 fromIndexSeed,
+        uint256 toIndexSeed,
+        uint32 id
+    ) external {
+        address sender = randomAddress(senderIndexSeed);
+        address from = randomAddress(fromIndexSeed);
+        address to = randomAddress(toIndexSeed);
+
+        if (mirror.ownerAt(id) == address(0)) return;
+        if (mirror.getApproved(id) != sender || mirror.isApprovedForAll(from, sender)) {
+            sender = from;
+        }
+        if (mirror.ownerAt(id) != from) {
+            from = mirror.ownerAt(id);
+            sender = from;
+        }
+
+        vm.startPrank(sender);
+
+        mirror.transferFrom(from, to, id);
+
+        --nftsOwned[from];
+        ++nftsOwned[to];
     }
 
     function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {

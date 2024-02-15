@@ -146,7 +146,7 @@ contract DN404Test is SoladyTest {
 
         uint256 count;
         for (uint256 i = 0; i < 10; ++i) {
-            if (dn.ownerAt(i) == initialSupplyOwner) ++count;
+            if (mirror.ownerAt(i) == initialSupplyOwner) ++count;
         }
         assertEq(count, 5);
 
@@ -185,7 +185,7 @@ contract DN404Test is SoladyTest {
 
         uint256 count;
         for (uint256 i = 0; i < 10; ++i) {
-            if (dn.ownerAt(i) == initialSupplyOwner) ++count;
+            if (mirror.ownerAt(i) == initialSupplyOwner) ++count;
         }
         assertEq(count, 2);
     }
@@ -241,25 +241,25 @@ contract DN404Test is SoladyTest {
         dn.transfer(bob, 5 * _WAD);
 
         for (uint256 i = 1; i <= 5; ++i) {
-            assertEq(dn.ownerAt(i), alice);
+            assertEq(mirror.ownerAt(i), alice);
         }
         for (uint256 i = 6; i <= 10; ++i) {
-            assertEq(dn.ownerAt(i), bob);
+            assertEq(mirror.ownerAt(i), bob);
         }
 
         vm.prank(alice);
         dn.transfer(initialSupplyOwner, 5 * _WAD);
 
         for (uint256 i = 1; i <= 5; ++i) {
-            assertEq(dn.ownerAt(i), address(0));
+            assertEq(mirror.ownerAt(i), address(0));
         }
         for (uint256 i = 6; i <= 10; ++i) {
-            assertEq(dn.ownerAt(i), bob);
+            assertEq(mirror.ownerAt(i), bob);
         }
 
         vm.prank(initialSupplyOwner);
         dn.transfer(alice, 1 * _WAD);
-        assertEq(dn.ownerAt(1), alice);
+        assertEq(mirror.ownerAt(1), alice);
     }
 
     function testMixed(uint256) public {
@@ -305,7 +305,7 @@ contract DN404Test is SoladyTest {
                 address to = addresses[_random() % 3];
 
                 for (uint256 id = 1; id <= n; ++id) {
-                    if (dn.ownerAt(id) == from && _random() % 2 == 0) {
+                    if (mirror.ownerAt(id) == from && _random() % 2 == 0) {
                         vm.prank(from);
                         mirror.transferFrom(from, to, id);
                         break;
@@ -328,11 +328,11 @@ contract DN404Test is SoladyTest {
 
             uint256 numOwned;
             for (uint256 i = 1; i <= n; ++i) {
-                if (dn.ownerAt(i) != address(0)) numOwned++;
+                if (mirror.ownerAt(i) != address(0)) numOwned++;
             }
             assertEq(numOwned, nftBalanceSum);
-            assertEq(dn.ownerAt(0), address(0));
-            assertEq(dn.ownerAt(n + 1), address(0));
+            assertEq(mirror.ownerAt(0), address(0));
+            assertEq(mirror.ownerAt(n + 1), address(0));
         }
 
         if (_random() % 4 == 0) {

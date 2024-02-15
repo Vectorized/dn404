@@ -890,6 +890,15 @@ abstract contract DN404 {
 
             _return(uint160(_ownerOf(id)));
         }
+        // `ownerAt(uint256)`.
+        if (fnSelector == 0x24359879) {
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
+            if (msg.data.length < 0x24) revert();
+
+            uint256 id = _calldataload(0x04);
+
+            _return(uint160(_ownerAt(id)));
+        }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
             if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
