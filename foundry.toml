@@ -27,3 +27,6 @@ runs = 30
 depth = 15
 fail_on_revert = true
 dictionary_weight = 80
+
+[rpc_endpoints]
+mainnet = '${ETH_RPC_URL}'
