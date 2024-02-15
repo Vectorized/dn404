@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
+import {LibClone} from "solady/utils/LibClone.sol";
 
 contract DN404Test is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
@@ -193,10 +194,16 @@ contract DN404Test is SoladyTest {
     }
 
     function testSetAndGetSkipNFT() public {
-        assertEq(dn.getAddressDataInitialized(address(111)), false);
-        _testSetAndGetSkipNFT(address(111), true);
-        _testSetAndGetSkipNFT(address(111), false);
-        _testSetAndGetSkipNFT(address(111), true);
+        for (uint256 t; t != 10; ++t) {
+            address a = address(uint160(t << 128));
+            if (t & 1 == 0) a = LibClone.clone(a);
+            // Contracts skip NFTs by default.
+            assertEq(dn.getSkipNFT(a), t & 1 == 0);
+            assertEq(dn.getAddressDataInitialized(a), false);
+            _testSetAndGetSkipNFT(a, true);
+            _testSetAndGetSkipNFT(a, false);
+            _testSetAndGetSkipNFT(a, true);
+        }
     }
 
     function _testSetAndGetSkipNFT(address target, bool status) internal {
