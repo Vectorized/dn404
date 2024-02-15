@@ -362,6 +362,7 @@ abstract contract DN404 {
                 Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
+                _packedLogsSet(packedLogs, to, 0);
 
                 if (packedLogs.logs.length != 0) {
                     uint256 burnedPoolSize = $.burnedPoolSize;
@@ -383,7 +384,7 @@ abstract contract DN404 {
                         }
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
-                        _packedLogsAppend(packedLogs, to, id, 0);
+                        _packedLogsAppend(packedLogs, id);
                     } while (toIndex != toEnd);
 
                     // Leave some spacing between minted batches for better open addressing.
@@ -429,11 +430,12 @@ abstract contract DN404 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                address from_ = from;
+                _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
+                _packedLogsSet(packedLogs, from, 1);
                 uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
                 $.totalNFTSupply = uint32(totalNFTSupply);
                 bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
-                _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
+
                 Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
@@ -442,7 +444,7 @@ abstract contract DN404 {
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    _packedLogsAppend(packedLogs, from_, id, 1);
+                    _packedLogsAppend(packedLogs, id);
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
@@ -512,9 +514,9 @@ abstract contract DN404 {
 
             uint256 burnedPoolSize = $.burnedPoolSize;
             if (t.numNFTBurns != 0) {
-                address from_ = from;
+                _packedLogsSet(packedLogs, from, 1);
                 bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
-                Uint32Map storage fromOwned = $.owned[from_];
+                Uint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
@@ -522,7 +524,7 @@ abstract contract DN404 {
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    _packedLogsAppend(packedLogs, from_, id, 1);
+                    _packedLogsAppend(packedLogs, id);
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
@@ -534,12 +536,12 @@ abstract contract DN404 {
             }
 
             if (t.numNFTMints != 0) {
+                _packedLogsSet(packedLogs, to, 0);
                 uint256 nextTokenId = $.nextTokenId;
-                address to_ = to;
-                Uint32Map storage toOwned = $.owned[to_];
+                Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
-                uint32 toAlias = _registerAndResolveAlias(toAddressData, to_);
+                uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 maxNFTId = t.totalSupply / _unit();
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
@@ -556,7 +558,7 @@ abstract contract DN404 {
                     }
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
-                    _packedLogsAppend(packedLogs, to_, id, 0);
+                    _packedLogsAppend(packedLogs, id);
                 } while (toIndex != toEnd);
                 // Leave some spacing between minted batches for better open addressing.
                 $.nextTokenId = uint32(_wrapNFTId(nextTokenId + 7, maxNFTId));
@@ -952,6 +954,7 @@ abstract contract DN404 {
     /// emitted by the mirror NFT contract.
     struct _PackedLogs {
         uint256 offset;
+        uint256 addressAndBit;
         uint256[] logs;
     }
 
@@ -965,20 +968,25 @@ abstract contract DN404 {
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs)
             mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
-            mstore(add(0x20, p), logs) // Set `p.logs`.
+            mstore(add(0x40, p), logs) // Set `p.logs`.
             mstore(p, offset) // Set `p.offset`.
         }
     }
 
-    /// @dev Adds a packed log item to `p` with address `a`, token `id` and burn flag `burnBit`.
-    function _packedLogsAppend(_PackedLogs memory p, address a, uint256 id, uint256 burnBit)
-        private
-        pure
-    {
+    /// @dev Set the current address and the burn bit.
+    function _packedLogsSet(_PackedLogs memory p, address a, uint256 burnBit) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(add(p, 0x20), or(shl(96, a), burnBit))
+        }
+    }
+
+    /// @dev Adds a packed log item to `p` with token `id`.
+    function _packedLogsAppend(_PackedLogs memory p, uint256 id) private pure {
         /// @solidity memory-safe-assembly
         assembly {
             let offset := mload(p)
-            mstore(offset, or(or(shl(96, a), shl(8, id)), burnBit))
+            mstore(offset, or(mload(add(p, 0x20)), shl(8, id)))
             mstore(p, add(offset, 0x20))
         }
     }
@@ -987,7 +995,7 @@ abstract contract DN404 {
     function _packedLogsSend(_PackedLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := mload(add(p, 0x20))
+            let logs := mload(add(p, 0x40))
             let o := sub(logs, 0x40) // Start of calldata to send.
             mstore(o, 0x263c69d6) // `logTransfer(uint256[])`.
             mstore(add(o, 0x20), 0x20) // Offset of `logs` in the calldata to send.
