@@ -54,15 +54,48 @@ contract DN404CustomUnitTest is SoladyTest {
             vm.expectRevert(DN404.TotalSupplyOverflow.selector);
             dn.mint(alice, unit * numNFTMints);
         } else {
-            dn.mint(alice, unit * numNFTMints);
-            assertEq(dn.totalSupply(), unit * numNFTMints + initial);
+            uint256 expectedBalance = unit * numNFTMints;
+            dn.mint(alice, expectedBalance);
+            assertEq(dn.totalSupply(), expectedBalance + initial);
             assertEq(dn.balanceOf(address(this)), initial);
-            assertEq(dn.balanceOf(alice), unit * numNFTMints);
+            assertEq(dn.balanceOf(alice), expectedBalance);
             assertEq(mirror.balanceOf(alice), numNFTMints);
             uint256 burnAmount = _bound(_random(), 0, dn.balanceOf(alice));
             dn.burn(alice, burnAmount);
-            assertEq(dn.balanceOf(alice), unit * numNFTMints - burnAmount);
-            assertEq(mirror.balanceOf(alice), (unit * numNFTMints - burnAmount) / unit);
+            expectedBalance -= burnAmount;
+            assertEq(dn.balanceOf(alice), expectedBalance);
+            assertEq(mirror.balanceOf(alice), expectedBalance / unit);
+        }
+    }
+
+    function testMintWithoutNFTs(uint256 initial, uint256 unit, uint256 numNFTMints) public {
+        address alice = address(111);
+        vm.prank(alice);
+        dn.setSkipNFT(true);
+
+        unit = _bound(unit, 1, type(uint96).max - 1);
+        dn.setUnit(unit);
+
+        initial = _bound(initial, 0, type(uint96).max - 1);
+        if (initial / unit > type(uint32).max - 1) {
+            vm.expectRevert(DN404.TotalSupplyOverflow.selector);
+            dn.initializeDN404(initial, address(this), address(mirror));
+        } else {
+            dn.initializeDN404(initial, address(this), address(mirror));
+            numNFTMints = _bound(numNFTMints, 0, type(uint32).max);
+            uint256 expectedBalance = unit * numNFTMints;
+            uint256 expectedTotalSupply = initial + expectedBalance;
+            if (
+                expectedTotalSupply / unit > type(uint32).max - 1
+                    || expectedTotalSupply > type(uint96).max
+            ) {
+                vm.expectRevert(DN404.TotalSupplyOverflow.selector);
+                dn.mint(alice, unit * numNFTMints);
+            } else {
+                dn.mint(alice, unit * numNFTMints);
+                assertEq(dn.totalSupply(), expectedTotalSupply);
+                assertEq(dn.balanceOf(alice), expectedBalance);
+            }
         }
     }
 
