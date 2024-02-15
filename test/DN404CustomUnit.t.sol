@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "./utils/SoladyTest.sol";
 import {MockDN404CustomUnit} from "./utils/mocks/MockDN404CustomUnit.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
+import {DN404} from "../src/DN404.sol";
 
 contract DN404CustomUnitTest is SoladyTest {
     MockDN404CustomUnit dn;
@@ -12,6 +13,12 @@ contract DN404CustomUnitTest is SoladyTest {
     function setUp() public {
         dn = new MockDN404CustomUnit();
         mirror = new DN404Mirror(address(this));
+    }
+
+    function testInitializeWithZeroUnitReverts() public {
+        dn.setUnit(0);
+        vm.expectRevert(DN404.UnitIsZero.selector);
+        dn.initializeDN404(1000, address(this), address(mirror));
     }
 
     function testMint() public {
@@ -32,6 +39,48 @@ contract DN404CustomUnitTest is SoladyTest {
         dn.mint(alice, unit * numNFTMints);
         assertEq(dn.totalSupply(), unit * numNFTMints + 1000);
         assertEq(mirror.balanceOf(alice), numNFTMints);
+    }
+
+    function testNFTMintAndBurn(uint256 initial, uint256 unit, uint256 numNFTMints) public {
+        address alice = address(111);
+        numNFTMints = _bound(numNFTMints, 0, 10);
+        initial = _bound(initial, 0, type(uint96).max - 1);
+        unit = _bound(unit, initial + 1, type(uint96).max);
+
+        dn.setUnit(unit);
+        dn.initializeDN404(initial, address(this), address(mirror));
+
+        if (initial + unit * numNFTMints > type(uint96).max) {
+            vm.expectRevert(DN404.TotalSupplyOverflow.selector);
+            dn.mint(alice, unit * numNFTMints);
+        } else {
+            dn.mint(alice, unit * numNFTMints);
+            assertEq(dn.totalSupply(), unit * numNFTMints + initial);
+            assertEq(dn.balanceOf(address(this)), initial);
+            assertEq(dn.balanceOf(alice), unit * numNFTMints);
+            assertEq(mirror.balanceOf(alice), numNFTMints);
+            uint256 burnAmount = _bound(_random(), 0, dn.balanceOf(alice));
+            dn.burn(alice, burnAmount);
+            assertEq(dn.balanceOf(alice), unit * numNFTMints - burnAmount);
+            assertEq(mirror.balanceOf(alice), (unit * numNFTMints - burnAmount) / unit);
+        }
+    }
+
+    function testNFTMintViaTransfer(uint256 unit, uint256 numNFTMints, uint256 dust) public {
+        address alice = address(111);
+        unit = _bound(unit, 1, type(uint96).max);
+        numNFTMints = _bound(numNFTMints, 0, 10);
+        dust = _bound(dust, 0, unit - 1);
+        dn.setUnit(unit);
+        uint256 initial = unit * numNFTMints + dust;
+        if (initial > type(uint96).max) {
+            vm.expectRevert(DN404.TotalSupplyOverflow.selector);
+            dn.initializeDN404(initial, address(this), address(mirror));
+        } else {
+            dn.initializeDN404(initial, address(this), address(mirror));
+            dn.transfer(alice, initial);
+            assertEq(mirror.balanceOf(alice), numNFTMints);
+        }
     }
 
     function testTotalSupplyOverflowsTrick(uint256 totalSupply, uint256 amount, uint256 unit)
