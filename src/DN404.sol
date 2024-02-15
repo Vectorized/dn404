@@ -38,6 +38,10 @@ abstract contract DN404 {
     uint256 private constant _APPROVAL_EVENT_SIGNATURE =
         0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925;
 
+    /// @dev `keccak256(bytes("SkipNFTSet(address,bool)"))`.
+    uint256 private constant _SKIP_NFT_SET_EVENT_SIGNATURE =
+        0xb5a1de456fff688115a4f75380060c23c8532d14ff85f687cc871456d6420393;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                        CUSTOM ERRORS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -706,11 +710,12 @@ abstract contract DN404 {
         return d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0;
     }
 
-    /// @dev Sets the caller's skipNFT flag to `skipNFT`
+    /// @dev Sets the caller's skipNFT flag to `skipNFT`. Returns true.
     ///
     /// Emits a {SkipNFTSet} event.
-    function setSkipNFT(bool skipNFT) public virtual {
+    function setSkipNFT(bool skipNFT) public virtual returns (bool) {
         _setSkipNFT(msg.sender, skipNFT);
+        return true;
     }
 
     /// @dev Internal function to set account `owner` skipNFT flag to `state`
@@ -723,7 +728,11 @@ abstract contract DN404 {
         if ((d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0) != state) {
             d.flags ^= _ADDRESS_DATA_SKIP_NFT_FLAG;
         }
-        emit SkipNFTSet(owner, state);
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, iszero(iszero(state)))
+            log2(0x00, 0x20, _SKIP_NFT_SET_EVENT_SIGNATURE, shr(96, shl(96, owner)))
+        }
     }
 
     /// @dev Returns a storage data pointer for account `owner` AddressData
