@@ -342,29 +342,31 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         unchecked {
-            uint256 totalSupply_ = uint256($.totalSupply) + amount;
-            $.totalSupply = uint96(totalSupply_);
-            if (_totalSupplyOverflows(totalSupply_) | _toUint(totalSupply_ < amount) != 0) {
-                revert TotalSupplyOverflow();
+            uint256 maxNFTId;
+            {
+                uint256 totalSupply_ = uint256($.totalSupply) + amount;
+                $.totalSupply = uint96(totalSupply_);
+                if (_totalSupplyOverflows(totalSupply_) | _toUint(totalSupply_ < amount) != 0) {
+                    revert TotalSupplyOverflow();
+                }
+                maxNFTId = totalSupply_ / _unit();
             }
-            uint256 toBalance = uint256(toAddressData.balance) + amount;
-            toAddressData.balance = uint96(toBalance);
-
+            uint256 toEnd;
+            {
+                uint256 toBalance = uint256(toAddressData.balance) + amount;
+                toAddressData.balance = uint96(toBalance);
+                toEnd = toBalance / _unit();
+            }
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                address to_ = to;
-                Uint32Map storage toOwned = $.owned[to_];
-                uint256 toIndex = toAddressData.ownedLength;
-                uint256 toEnd = toBalance / _unit();
-                _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
+                Uint32Map storage toOwned = $.owned[to];
                 Uint32Map storage oo = $.oo;
+                uint256 toIndex = toAddressData.ownedLength;
+                _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
 
                 if (packedLogs.logs.length != 0) {
-                    uint256 maxNFTId = totalSupply_ / _unit();
-                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to_);
-
-                    uint256 nextTokenId = $.nextTokenId;
                     uint256 burnedPoolSize = $.burnedPoolSize;
-
+                    uint256 nextTokenId = $.nextTokenId;
+                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
                     toAddressData.ownedLength = uint32(toEnd);
                     // Mint loop.
@@ -381,7 +383,7 @@ abstract contract DN404 {
                         }
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
-                        _packedLogsAppend(packedLogs, to_, id, 0);
+                        _packedLogsAppend(packedLogs, to, id, 0);
                     } while (toIndex != toEnd);
 
                     // Leave some spacing between minted batches for better open addressing.
@@ -427,20 +429,19 @@ abstract contract DN404 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                address from_ = from;
                 uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
                 $.totalNFTSupply = uint32(totalNFTSupply);
                 bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
-                uint256 burnedPoolSize = $.burnedPoolSize;
-
                 _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
+                fromAddressData.ownedLength = uint32(fromEnd);
+                uint256 burnedPoolSize = $.burnedPoolSize;
                 // Burn loop.
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    _packedLogsAppend(packedLogs, from_, id, 1);
+                    _packedLogsAppend(packedLogs, from, id, 1);
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
@@ -451,7 +452,6 @@ abstract contract DN404 {
                 } while (fromIndex != fromEnd);
 
                 $.burnedPoolSize = uint32(burnedPoolSize);
-                fromAddressData.ownedLength = uint32(fromIndex);
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
