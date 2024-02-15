@@ -11,6 +11,8 @@ contract DN404Test is SoladyTest {
     MockDN404 dn;
     DN404Mirror mirror;
 
+    event SkipNFTSet(address indexed target, bool status);
+
     function setUp() public {
         dn = new MockDN404();
         mirror = new DN404Mirror(address(this));
@@ -192,28 +194,18 @@ contract DN404Test is SoladyTest {
 
     function testSetAndGetSkipNFT() public {
         assertEq(dn.getAddressDataInitialized(address(111)), false);
-        vm.startPrank(address(111));
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(111)), false);
-        assertEq(dn.getAddressDataInitialized(address(111)), true);
-        dn.setSkipNFT(true);
-        assertEq(dn.getSkipNFT(address(111)), true);
-        assertEq(dn.getAddressDataInitialized(address(111)), true);
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(111)), false);
-        assertEq(dn.getAddressDataInitialized(address(111)), true);
-        vm.stopPrank();
+        _testSetAndGetSkipNFT(address(111), true);
+        _testSetAndGetSkipNFT(address(111), false);
+        _testSetAndGetSkipNFT(address(111), true);
+    }
 
-        assertEq(dn.getAddressDataInitialized(address(this)), false);
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(this)), false);
-        assertEq(dn.getAddressDataInitialized(address(this)), true);
-        dn.setSkipNFT(true);
-        assertEq(dn.getSkipNFT(address(this)), true);
-        assertEq(dn.getAddressDataInitialized(address(this)), true);
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(this)), false);
-        assertEq(dn.getAddressDataInitialized(address(this)), true);
+    function _testSetAndGetSkipNFT(address target, bool status) internal {
+        vm.prank(target);
+        vm.expectEmit(true, true, true, true);
+        emit SkipNFTSet(target, status);
+        dn.setSkipNFT(status);
+        assertEq(dn.getSkipNFT(target), status);
+        assertEq(dn.getAddressDataInitialized(target), true);
     }
 
     function testSetAndGetAux(address a, uint88 aux) public {
