@@ -421,17 +421,16 @@ abstract contract DN404 {
 
         unchecked {
             fromAddressData.balance = uint96(fromBalance -= amount);
-            uint256 totalSupply_ = uint256($.totalSupply) - amount;
-            $.totalSupply = uint96(totalSupply_);
+            $.totalSupply = uint96(amount = uint256($.totalSupply) - amount);
 
             Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
-                $.totalNFTSupply = uint32(totalNFTSupply);
-                bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
+                bool addToBurnedPool = _addToBurnedPool(
+                    $.totalNFTSupply = uint32(uint256($.totalNFTSupply) - numNFTBurns), amount
+                );
                 _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
