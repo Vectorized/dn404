@@ -80,7 +80,7 @@ contract NFTMintDN404 is DN404, Ownable {
         unchecked {
             ++numMinted;
         }
-        _mint(msg.sender, amount * _WAD);
+        _mint(msg.sender, amount * _unit());
     }
 
     function allowlistMint(uint256 amount, bytes32[] calldata proof)
@@ -100,7 +100,7 @@ contract NFTMintDN404 is DN404, Ownable {
         unchecked {
             ++numMinted;
         }
-        _mint(msg.sender, amount * _WAD);
+        _mint(msg.sender, amount * _unit());
     }
 
     function setBaseURI(string calldata baseURI_) public onlyOwner {
