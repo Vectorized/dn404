@@ -54,6 +54,9 @@ abstract contract DN404 {
     /// @dev Thrown when minting an amount of tokens that would overflow the max tokens.
     error TotalSupplyOverflow();
 
+    /// @dev The unit cannot be zero.
+    error UnitIsZero();
+
     /// @dev Thrown when the caller for a fallback NFT function is not the mirror contract.
     error SenderNotMirror();
 
@@ -83,15 +86,6 @@ abstract contract DN404 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                         CONSTANTS                          */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
-
-    /// @dev Amount of token balance that is equal to one NFT.
-    uint256 internal constant _WAD = 10 ** 18;
-
-    /// @dev The maximum token ID allowed for an NFT.
-    uint256 internal constant _MAX_TOKEN_ID = 0xffffffff;
-
-    /// @dev The maximum possible token supply.
-    uint256 internal constant _MAX_SUPPLY = 10 ** 18 * 0xffffffff - 1;
 
     /// @dev The flag to denote that the address data is initialized.
     uint8 internal constant _ADDRESS_DATA_INITIALIZED_FLAG = 1 << 0;
@@ -206,9 +200,11 @@ abstract contract DN404 {
         $.nextTokenId = 1;
         $.mirrorERC721 = mirror;
 
+        if (_unit() == 0) revert UnitIsZero();
+
         if (initialTokenSupply != 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (initialTokenSupply > _MAX_SUPPLY) revert TotalSupplyOverflow();
+            if (_totalSupplyOverflows(initialTokenSupply) != 0) revert TotalSupplyOverflow();
 
             $.totalSupply = uint96(initialTokenSupply);
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
@@ -223,6 +219,15 @@ abstract contract DN404 {
 
             _setSkipNFT(initialSupplyOwner, true);
         }
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*               BASE UNIT FUNCTION TO OVERRIDE               */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Amount of token balance that is equal to one NFT.
+    function _unit() internal view virtual returns (uint256) {
+        return 10 ** 18;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -339,7 +344,7 @@ abstract contract DN404 {
         unchecked {
             uint256 totalSupply_ = uint256($.totalSupply) + amount;
             $.totalSupply = uint96(totalSupply_);
-            if (_toUint(amount > _MAX_SUPPLY) | _toUint(totalSupply_ > _MAX_SUPPLY) != 0) {
+            if (_totalSupplyOverflows(totalSupply_) | _toUint(totalSupply_ < amount) != 0) {
                 revert TotalSupplyOverflow();
             }
             uint256 toBalance = uint256(toAddressData.balance) + amount;
@@ -349,12 +354,12 @@ abstract contract DN404 {
                 address to_ = to;
                 Uint32Map storage toOwned = $.owned[to_];
                 uint256 toIndex = toAddressData.ownedLength;
-                uint256 toEnd = toBalance / _WAD;
+                uint256 toEnd = toBalance / _unit();
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
                 Uint32Map storage oo = $.oo;
 
                 if (packedLogs.logs.length != 0) {
-                    uint256 maxNFTId = totalSupply_ / _WAD;
+                    uint256 maxNFTId = totalSupply_ / _unit();
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to_);
 
                     uint256 nextTokenId = $.nextTokenId;
@@ -419,7 +424,7 @@ abstract contract DN404 {
 
             Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
-            uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _WAD);
+            uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
                 address from_ = from;
@@ -491,11 +496,11 @@ abstract contract DN404 {
             fromAddressData.balance = uint96(t.fromBalance -= amount);
             toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
 
-            t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _WAD);
+            t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _unit());
 
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
-                t.numNFTMints = _zeroFloorSub(t.toBalance / _WAD, t.toOwnedLength);
+                t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedLength);
             }
 
             t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
@@ -534,7 +539,7 @@ abstract contract DN404 {
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to_);
-                uint256 maxNFTId = t.totalSupply / _WAD;
+                uint256 maxNFTId = t.totalSupply / _unit();
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
@@ -578,7 +583,7 @@ abstract contract DN404 {
         returns (bool)
     {
         // Add to burned pool if the load factor > 50%, and collection is not small.
-        uint256 thres = (totalSupplyAfterBurn / _WAD) >> 1;
+        uint256 thres = (totalSupplyAfterBurn / _unit()) >> 1;
         return _toUint(totalNFTSupplyAfterBurn > thres) & _toUint(thres > 128) != 0;
     }
 
@@ -618,10 +623,10 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
 
-        fromAddressData.balance -= uint96(_WAD);
+        fromAddressData.balance -= uint96(_unit());
 
         unchecked {
-            toAddressData.balance += uint96(_WAD);
+            toAddressData.balance += uint96(_unit());
 
             mapping(address => Uint32Map) storage owned = $.owned;
             Uint32Map storage fromOwned = owned[from];
@@ -640,10 +645,11 @@ abstract contract DN404 {
             _set(owned[to], n, uint32(id));
             _set(oo, _ownedIndex(id), uint32(n));
         }
+        uint256 unit = _unit();
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Transfer} event.
-            mstore(0x00, _WAD)
+            mstore(0x00, unit)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
@@ -932,6 +938,14 @@ abstract contract DN404 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      PRIVATE HELPERS                       */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns whether `amount` is a valid `totalSupply`.
+    function _totalSupplyOverflows(uint256 amount) private view returns (uint256) {
+        unchecked {
+            return _toUint(amount > type(uint96).max)
+                | _toUint(amount / _unit() > type(uint32).max - 1);
+        }
+    }
 
     /// @dev Struct containing packed log data for {Transfer} events to be
     /// emitted by the mirror NFT contract.
