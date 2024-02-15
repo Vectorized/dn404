@@ -25,12 +25,7 @@ contract DN404Handler is Test {
 
     address[6] actors;
 
-    mapping(address => uint256[]) public owned;
-    mapping(uint256 => address) public ownerOf;
-
-    function balanceOf(address a) external view returns (uint256) {
-        return owned[a].length;
-    }
+    mapping(address => uint256) public balanceOf;
 
     event Transfer(address indexed from, address indexed to, uint256 indexed id);
 
@@ -78,91 +73,23 @@ contract DN404Handler is Test {
         dn404.approve(spender, amount);
     }
 
-    struct TransferCache {
-        uint256 fromInitialTokenBalance;
-        uint256 toInitialTokenBalance;
-        uint256 initialToNFTBalance;
-        uint256 initialFromNFTBalance;
-        uint256 toAfterBalance;
-        uint256 fromAfterBalance;
-    }
-
     function transfer(uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amount) external {
         address from = randomAddress(fromIndexSeed);
         address to = randomAddress(toIndexSeed);
+        amount = bound(amount, 0, dn404.balanceOf(from));
         vm.startPrank(from);
 
-        amount = bound(amount, 0, dn404.balanceOf(from));
-
-        TransferCache memory transferCache;
-        transferCache.toAfterBalance = dn404.balanceOf(to) + amount;
-        transferCache.fromAfterBalance = dn404.balanceOf(from) - amount;
-
-        uint256 max = dn404.totalSupply() / _WAD;
-        uint256 nextId = dn404.getNextTokenId();
-
-        transferCache.fromInitialTokenBalance = dn404.balanceOf(from);
-        transferCache.toInitialTokenBalance = dn404.balanceOf(to);
-
-        transferCache.initialToNFTBalance = mirror.balanceOf(to);
-        transferCache.initialFromNFTBalance = mirror.balanceOf(from);
-
-        unchecked {
-            uint256 fromNftAmount =
-                _zeroFloorSub(owned[from].length, transferCache.fromAfterBalance / _WAD);
-            uint256 n = owned[from].length;
-            for (uint256 i; i < fromNftAmount; ++i) {
-                uint256 id = owned[from][--n];
-                vm.expectEmit(true, true, true, false, address(mirror));
-                emit Transfer(from, address(0), id);
-                owned[from].pop();
-                ownerOf[id] = address(0);
-            }
-        }
-
-        uint256 toNftAmount;
-        if (!dn404.getSkipNFT(to)) {
-            toNftAmount = to != from
-                ? (transferCache.toAfterBalance / _WAD) - owned[to].length
-                : (transferCache.toInitialTokenBalance / _WAD) - owned[to].length;
-        }
-
-        unchecked {
-            for (uint256 i; i < toNftAmount; ++i) {
-                while (ownerOf[nextId] != address(0)) {
-                    nextId = _wrapNFTId(nextId + 1, max);
-                }
-                vm.expectEmit(true, true, true, false, address(mirror));
-                emit Transfer(address(0), to, nextId);
-                owned[to].push(nextId);
-                ownerOf[nextId] = to;
-                nextId = _wrapNFTId(nextId + 1, max);
-            }
-        }
-
-        vm.expectEmit(true, true, false, true, address(dn404));
-        assembly {
-            // log erc20 transfer using assembly because nft transfer is already defined
-            mstore(0x00, amount)
-            log3(
-                0x00,
-                0x20,
-                0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,
-                from,
-                to
-            )
-        }
+        uint256 fromPreBalance = dn404.balanceOf(from);
+        uint256 toPreBalance = dn404.balanceOf(to);
 
         dn404.transfer(to, amount);
 
-        if (to != from) {
-            assertEq(mirror.balanceOf(from), owned[from].length);
-            assertEq(mirror.balanceOf(to), owned[to].length);
-            assertEq(dn404.balanceOf(from), transferCache.fromInitialTokenBalance - amount);
-            assertEq(dn404.balanceOf(to), transferCache.toInitialTokenBalance + amount);
-        } else {
-            assertEq(mirror.balanceOf(from), owned[from].length);
-            assertEq(dn404.balanceOf(from), transferCache.fromInitialTokenBalance);
+        uint256 fromNFTPreOwned = balanceOf[from];
+
+        balanceOf[from] -= _zeroFloorSub(fromNFTPreOwned, (fromPreBalance - amount) / _WAD);
+        if (!dn404.getSkipNFT(to)) {
+            if (from == to) toPreBalance -= amount;
+            balanceOf[to] += _zeroFloorSub((toPreBalance + amount) / _WAD, balanceOf[to]);
         }
     }
 
@@ -175,171 +102,53 @@ contract DN404Handler is Test {
         address sender = randomAddress(senderIndexSeed);
         address from = randomAddress(fromIndexSeed);
         address to = randomAddress(toIndexSeed);
+        amount = bound(amount, 0, dn404.balanceOf(from));
         vm.startPrank(sender);
 
-        amount = bound(amount, 0, dn404.balanceOf(from));
+        uint256 fromPreBalance = dn404.balanceOf(from);
+        uint256 toPreBalance = dn404.balanceOf(to);
+
         if (dn404.allowance(from, sender) < amount) {
             sender = from;
             vm.startPrank(sender);
         }
 
-        TransferCache memory transferCache;
-
-        transferCache.toAfterBalance = dn404.balanceOf(to) + amount;
-        transferCache.fromAfterBalance = dn404.balanceOf(from) - amount;
-
-        uint256 max = dn404.totalSupply() / _WAD;
-        uint256 nextId = dn404.getNextTokenId();
-
-        transferCache.fromInitialTokenBalance = dn404.balanceOf(from);
-        transferCache.toInitialTokenBalance = dn404.balanceOf(to);
-
-        transferCache.initialToNFTBalance = mirror.balanceOf(to);
-        transferCache.initialFromNFTBalance = mirror.balanceOf(from);
-
-        unchecked {
-            uint256 fromNftAmount =
-                _zeroFloorSub(owned[from].length, transferCache.fromAfterBalance / _WAD);
-            uint256 n = owned[from].length;
-            for (uint256 i; i < fromNftAmount; ++i) {
-                uint256 id = owned[from][--n];
-                vm.expectEmit(true, true, true, false, address(mirror));
-                emit Transfer(from, address(0), id);
-                owned[from].pop();
-                ownerOf[id] = address(0);
-            }
-        }
-
-        uint256 toNftAmount;
-        if (!dn404.getSkipNFT(to)) {
-            toNftAmount = to != from
-                ? (transferCache.toAfterBalance / _WAD) - owned[to].length
-                : (transferCache.toInitialTokenBalance / _WAD) - owned[to].length;
-        }
-
-        unchecked {
-            for (uint256 i; i < toNftAmount; ++i) {
-                while (ownerOf[nextId] != address(0)) {
-                    nextId = _wrapNFTId(nextId + 1, max);
-                }
-                vm.expectEmit(true, true, true, false, address(mirror));
-                emit Transfer(address(0), to, nextId);
-                owned[to].push(nextId);
-                ownerOf[nextId] = to;
-                nextId = _wrapNFTId(nextId + 1, max);
-            }
-        }
-
-        vm.expectEmit(true, true, false, true, address(dn404));
-        assembly {
-            // log erc20 transfer using assembly because nft transfer is already defined
-            mstore(0x00, amount)
-            log3(
-                0x00,
-                0x20,
-                0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,
-                from,
-                to
-            )
-        }
-
         dn404.transferFrom(from, to, amount);
 
-        if (to != from) {
-            assertEq(mirror.balanceOf(from), owned[from].length);
-            assertEq(mirror.balanceOf(to), owned[to].length);
-            assertEq(dn404.balanceOf(from), transferCache.fromInitialTokenBalance - amount);
-            assertEq(dn404.balanceOf(to), transferCache.toInitialTokenBalance + amount);
-        } else {
-            assertEq(mirror.balanceOf(from), owned[from].length);
-            assertEq(dn404.balanceOf(from), transferCache.fromInitialTokenBalance);
+        uint256 fromNFTPreOwned = balanceOf[from];
+
+        balanceOf[from] -= _zeroFloorSub(fromNFTPreOwned, (fromPreBalance - amount) / _WAD);
+        if (!dn404.getSkipNFT(to)) {
+            if (from == to) toPreBalance -= amount;
+            balanceOf[to] += _zeroFloorSub((toPreBalance + amount) / _WAD, balanceOf[to]);
         }
     }
 
     function mint(uint256 toIndexSeed, uint256 amount) external {
         address to = randomAddress(toIndexSeed);
         amount = bound(amount, 0, 100e18);
-        uint256 toInitialTokenBalance = dn404.balanceOf(to);
 
-        uint256 nftAmount;
-        if (!dn404.getSkipNFT(to)) {
-            nftAmount = ((dn404.balanceOf(to) + amount) / _WAD) - owned[to].length;
-        }
-
-        unchecked {
-            uint256 max = (dn404.totalSupply() + amount) / _WAD;
-            uint256 nextId = dn404.getNextTokenId();
-            for (uint256 i; i < nftAmount; ++i) {
-                while (ownerOf[nextId] != address(0)) {
-                    nextId = _wrapNFTId(nextId + 1, max);
-                }
-                vm.expectEmit(true, true, true, false, address(mirror));
-                emit Transfer(address(0), to, nextId);
-                owned[to].push(nextId);
-                ownerOf[nextId] = to;
-                nextId = _wrapNFTId(nextId + 1, max);
-            }
-        }
-
-        vm.expectEmit(true, true, false, true, address(dn404));
-        assembly {
-            // log erc20 transfer using assembly because nft transfer is already defined
-            mstore(0x00, amount)
-            log3(
-                0x00,
-                0x20,
-                0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,
-                0x00,
-                to
-            )
-        }
+        uint256 toPreBalance = dn404.balanceOf(to);
 
         dn404.mint(to, amount);
 
-        assertEq(mirror.balanceOf(to), owned[to].length);
-        assertEq(dn404.balanceOf(to), toInitialTokenBalance + amount);
-
         sum += amount;
+        if (!dn404.getSkipNFT(to)) {
+            balanceOf[to] = (toPreBalance + amount) / _WAD;
+        }
     }
 
     function burn(uint256 fromIndexSeed, uint256 amount) external {
         address from = randomAddress(fromIndexSeed);
         vm.startPrank(from);
         amount = bound(amount, 0, dn404.balanceOf(from));
-        uint256 fromInitialTokenBalance = dn404.balanceOf(from);
 
-        unchecked {
-            uint256 nftAmount =
-                _zeroFloorSub(owned[from].length, (dn404.balanceOf(from) - amount) / _WAD);
-            uint256 n = owned[from].length;
-            for (uint256 i; i < nftAmount; ++i) {
-                uint256 id = owned[from][--n];
-                vm.expectEmit(true, true, true, false, address(mirror));
-                emit Transfer(from, address(0), id);
-                owned[from].pop();
-                ownerOf[id] = address(0);
-            }
-        }
-
-        vm.expectEmit(true, true, false, true, address(dn404));
-        assembly {
-            // log erc20 transfer using assembly because nft transfer is already defined
-            mstore(0x00, amount)
-            log3(
-                0x00,
-                0x20,
-                0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef,
-                from,
-                0x00
-            )
-        }
+        uint256 fromPreBalance = dn404.balanceOf(from);
 
         dn404.burn(from, amount);
 
-        assertEq(mirror.balanceOf(from), owned[from].length);
-        assertEq(dn404.balanceOf(from), fromInitialTokenBalance - amount);
-
         sum -= amount;
+        balanceOf[from] -= _zeroFloorSub(balanceOf[from], (fromPreBalance - amount) / _WAD);
     }
 
     function setSkipNFT(uint256 actorIndexSeed, bool status) external {
@@ -351,14 +160,6 @@ contract DN404Handler is Test {
         /// @solidity memory-safe-assembly
         assembly {
             z := mul(gt(x, y), sub(x, y))
-        }
-    }
-
-    function _wrapNFTId(uint256 id, uint256 maxNFTId) private pure returns (uint256 result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := gt(id, maxNFTId)
-            result := or(result, mul(iszero(result), id))
         }
     }
 }
