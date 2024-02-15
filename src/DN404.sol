@@ -421,16 +421,18 @@ abstract contract DN404 {
 
         unchecked {
             fromAddressData.balance = uint96(fromBalance -= amount);
-            $.totalSupply = uint96(amount = uint256($.totalSupply) - amount);
+            uint256 totalSupply_ = uint256($.totalSupply) - amount;
+            $.totalSupply = uint96(totalSupply_);
 
             Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                bool addToBurnedPool = _addToBurnedPool(
-                    $.totalNFTSupply = uint32(uint256($.totalNFTSupply) - numNFTBurns), amount
-                );
+                address from_ = from;
+                uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
+                $.totalNFTSupply = uint32(totalNFTSupply);
+                bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
                 _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
@@ -440,7 +442,7 @@ abstract contract DN404 {
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    _packedLogsAppend(packedLogs, from, id, 1);
+                    _packedLogsAppend(packedLogs, from_, id, 1);
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
