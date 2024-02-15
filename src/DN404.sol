@@ -362,9 +362,9 @@ abstract contract DN404 {
                 Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
-                _packedLogsSet(packedLogs, to, 0);
 
                 if (packedLogs.logs.length != 0) {
+                    _packedLogsSet(packedLogs, to, 0);
                     uint256 burnedPoolSize = $.burnedPoolSize;
                     uint256 nextTokenId = $.nextTokenId;
                     uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
