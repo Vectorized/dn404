@@ -138,25 +138,28 @@ contract MappingsTest is SoladyTest {
             }
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
             let bucket := shr(8, begin)
-            let bucketBitsNegated := 0
             let firstBucket := bucket
             let lastBucket := shr(8, end)
-            for {} iszero(gt(bucket, lastBucket)) { bucket := add(bucket, 1) } {
-                bucketBitsNegated := not(sload(add(shl(96, bitmap.slot), bucket)))
-                if eq(bucket, firstBucket) {
-                    let offset := and(0xff, begin)
-                    bucketBitsNegated := shl(offset, shr(offset, bucketBitsNegated))
-                }
+            let negBits := not(sload(add(shl(96, bitmap.slot), bucket)))
+            for {} 1 {} {
+                negBits := shl(and(0xff, begin), shr(and(0xff, begin), negBits))
                 if eq(bucket, lastBucket) {
-                    let offset := and(0xff, not(end))
-                    bucketBitsNegated := shr(offset, shl(offset, bucketBitsNegated))
+                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
                 }
-                if bucketBitsNegated { break }
+                if negBits { break }
+                bucket := add(bucket, 1)
+                for {} iszero(gt(bucket, lastBucket)) { bucket := add(bucket, 1) } {
+                    negBits := not(sload(add(shl(96, bitmap.slot), bucket)))
+                    if negBits { break }
+                }
+                if gt(bucket, lastBucket) {
+                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
+                }
+                break
             }
-            if bucketBitsNegated {
-                unsetBitIndex := or(shl(8, bucket), ffs(bucketBitsNegated))
-                if lt(unsetBitIndex, begin) { unsetBitIndex := not(0) }
-                if iszero(lt(unsetBitIndex, end)) { unsetBitIndex := not(0) }
+            if negBits {
+                let i := or(shl(8, bucket), ffs(negBits))
+                unsetBitIndex := or(i, sub(0, or(iszero(lt(i, end)), lt(i, begin))))
             }
         }
     }
