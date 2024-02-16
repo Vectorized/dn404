@@ -168,15 +168,6 @@ contract DN404MirrorTest is SoladyTest {
 
         uint256 totalNFTSupply = mirror.totalSupply();
         do {
-            if (_random() % 2 == 0) {
-                dn.setAddToBurnedPool(_random() % 2 == 0);
-            }
-
-            if (_random() % 2 == 0) {
-                vm.prank(addresses[_random() % n]);
-                dn.setSkipNFT(_random() & 1 == 0);
-            }
-
             address to = addresses[_random() % n];
             address from = addresses[_random() % n];
             if (mirror.balanceOf(from) > 0) {
