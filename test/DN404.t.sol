@@ -338,19 +338,19 @@ contract DN404Test is SoladyTest {
             assertEq(numOwned, nftBalanceSum);
             assertEq(mirror.ownerAt(0), address(0));
             assertEq(mirror.ownerAt(n + 1), address(0));
-
-            if (_random() % 8 == 0) {
-                uint256[] memory allTokenIds;
-                for (uint256 i; i < 3; ++i) {
-                    uint256[] memory tokens = dn.tokensOf(addresses[i]);
-                    // Might not be sorted.
-                    LibSort.insertionSort(tokens);
-                    allTokenIds = LibSort.union(allTokenIds, tokens);
-                    assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
-                }
-                assertEq(allTokenIds.length, numOwned);
-            }
         } while (_random() % 8 > 0);
+
+        if (_random() % 8 == 0) {
+            uint256[] memory allTokenIds;
+            for (uint256 i; i < 3; ++i) {
+                uint256[] memory tokens = dn.tokensOf(addresses[i]);
+                // Might not be sorted.
+                LibSort.insertionSort(tokens);
+                allTokenIds = LibSort.union(allTokenIds, tokens);
+                assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
+            }
+            assertEq(allTokenIds.length, mirror.totalSupply());
+        }
 
         if (_random() % 4 == 0) {
             uint256 end = n + 1 + n;
