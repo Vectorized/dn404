@@ -12,6 +12,8 @@ contract MockDN404 is DN404 {
 
     bool addToBurnedPool;
 
+    bool givePermit2DefaultInfiniteAllowance;
+
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
         _name = name_;
         _symbol = symbol_;
@@ -102,5 +104,13 @@ contract MockDN404 is DN404 {
         DN404Storage storage $ = _getDN404Storage();
         uint256 n = $.addressData[owner].ownedLength;
         return _get($.owned[owner], seed % n);
+    }
+
+    function setGivePermit2DefaultInfiniteAllowance(bool value) public {
+        givePermit2DefaultInfiniteAllowance = value;
+    }
+
+    function _givePermit2DefaultInfiniteAllowance() internal view virtual override returns (bool) {
+        return givePermit2DefaultInfiniteAllowance;
     }
 }

@@ -334,6 +334,7 @@ abstract contract DN404 {
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         Uint256Ref storage a = _ref(_getDN404Storage().allowance, from, msg.sender);
+
         uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
             && (_getDN404Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == 0
             ? type(uint256).max
