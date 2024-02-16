@@ -126,7 +126,7 @@ abstract contract DN404 {
     }
 
     /// @dev A struct to wrap a uint256 in storage.
-    struct Uint256Ref {
+    struct DNUint256Ref {
         uint256 value;
     }
 
@@ -153,7 +153,7 @@ abstract contract DN404 {
         // DNBitmap of whether an non-zero NFT approval may exist.
         DNBitmap mayHaveNFTApproval;
         // Mapping of user allowances for token spenders.
-        mapping(address => mapping(address => Uint256Ref)) allowance;
+        mapping(address => mapping(address => DNUint256Ref)) allowance;
         // Mapping of NFT IDs owned by an address.
         mapping(address => DNUint32Map) owned;
         // The pool of burned NFT IDs.
@@ -314,7 +314,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
-        Uint256Ref storage a = _getDN404Storage().allowance[from][msg.sender];
+        DNUint256Ref storage a = _getDN404Storage().allowance[from][msg.sender];
         uint256 allowed = a.value;
 
         if (allowed != type(uint256).max) {
