@@ -445,7 +445,7 @@ contract DN404Test is SoladyTest {
         assertEq(dn.allowance(alice, _PERMIT2), 0);
         vm.expectRevert(DN404.InsufficientAllowance.selector);
         dn.transferFrom(alice, bob, 1);
-        vm.stopPrank(_PERMIT2);
+        vm.stopPrank();
 
         vm.prank(alice);
         dn.approve(_PERMIT2, 1);
