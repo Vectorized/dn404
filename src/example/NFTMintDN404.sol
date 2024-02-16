@@ -12,6 +12,7 @@ import {MerkleProofLib} from "solady/utils/MerkleProofLib.sol";
  * @title NFTMintDN404
  * @notice Sample DN404 contract that demonstrates the owner selling NFTs rather than the fungible token.
  * The underlying call still mints ERC20 tokens, but to the end user it'll appear as a standard NFT mint.
+ * Each address is limited to MAX_PER_WALLET total mints.
  */
 contract NFTMintDN404 is DN404, Ownable {
     string private _name;
@@ -21,17 +22,16 @@ contract NFTMintDN404 is DN404, Ownable {
     uint120 public publicPrice;
     uint120 public allowlistPrice;
     bool public live;
-    uint256 public maxMint;
     uint256 public numMinted;
 
+    uint256 public constant MAX_PER_WALLET = 5;
     uint256 public constant MAX_SUPPLY = 5000;
 
-    mapping(address => bool) public minted;
+    mapping(address => uint256) public mintedCount;
 
     error InvalidProof();
     error InvalidMint();
     error InvalidPrice();
-    error ExceedsMaxMint();
     error TotalSupplyReached();
     error NotLive();
 
@@ -41,9 +41,6 @@ contract NFTMintDN404 is DN404, Ownable {
         }
         if (price * amount != msg.value) {
             revert InvalidPrice();
-        }
-        if (amount > maxMint) {
-            revert ExceedsMaxMint();
         }
         if (numMinted + amount > MAX_SUPPLY) {
             revert TotalSupplyReached();
@@ -55,7 +52,6 @@ contract NFTMintDN404 is DN404, Ownable {
         string memory name_,
         string memory symbol_,
         bytes32 allowlistRoot_,
-        uint256 maxMint_,
         uint120 publicPrice_,
         uint120 allowlistPrice_,
         uint96 initialTokenSupply,
@@ -66,7 +62,6 @@ contract NFTMintDN404 is DN404, Ownable {
         _name = name_;
         _symbol = symbol_;
         allowlistRoot = allowlistRoot_;
-        maxMint = maxMint_;
         publicPrice = publicPrice_;
         allowlistPrice = allowlistPrice_;
 
@@ -75,9 +70,11 @@ contract NFTMintDN404 is DN404, Ownable {
     }
 
     function mint(uint256 amount) public payable isValidMint(publicPrice, amount) {
-        if (minted[msg.sender]) revert InvalidMint();
-        minted[msg.sender] = true;
+        if (mintedCount[msg.sender] + amount > MAX_PER_WALLET) {
+            revert InvalidMint();
+        }
         unchecked {
+            mintedCount[msg.sender] += amount;
             ++numMinted;
         }
         _mint(msg.sender, amount * _unit());
@@ -95,9 +92,11 @@ contract NFTMintDN404 is DN404, Ownable {
         ) {
             revert InvalidProof();
         }
-        if (minted[msg.sender]) revert InvalidMint();
-        minted[msg.sender] = true;
+        if (mintedCount[msg.sender] + amount > MAX_PER_WALLET) {
+            revert InvalidMint();
+        }
         unchecked {
+            mintedCount[msg.sender] += amount;
             ++numMinted;
         }
         _mint(msg.sender, amount * _unit());
@@ -110,10 +109,6 @@ contract NFTMintDN404 is DN404, Ownable {
     function setPrices(uint120 publicPrice_, uint120 allowlistPrice_) public onlyOwner {
         publicPrice = publicPrice_;
         allowlistPrice = allowlistPrice_;
-    }
-
-    function setMaxMint(uint256 maxMint_) public onlyOwner {
-        maxMint = maxMint_;
     }
 
     function toggleLive() public onlyOwner {

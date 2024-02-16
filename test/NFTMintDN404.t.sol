@@ -29,7 +29,6 @@ contract NFTMintDN404Test is SoladyTest {
             "DN404",
             "DN",
             allowlistRoot,
-            10,
             publicPrice,
             allowlistPrice,
             uint96(1000 * _WAD),
@@ -46,15 +45,16 @@ contract NFTMintDN404Test is SoladyTest {
         vm.expectRevert(NFTMintDN404.InvalidPrice.selector);
         dn.mint{value: 1 ether}(1);
 
-        vm.expectRevert(NFTMintDN404.ExceedsMaxMint.selector);
-        dn.mint{value: 11 * publicPrice}(11);
+        dn.mint{value: 3 * publicPrice}(3);
+        assertEq(dn.totalSupply(), 1003 * _WAD);
+        assertEq(dn.balanceOf(bob), 3 * _WAD);
 
-        dn.mint{value: 5 * publicPrice}(5);
+        dn.mint{value: 2 * publicPrice}(2);
         assertEq(dn.totalSupply(), 1005 * _WAD);
         assertEq(dn.balanceOf(bob), 5 * _WAD);
 
         vm.expectRevert(NFTMintDN404.InvalidMint.selector);
-        dn.mint{value: 6 * publicPrice}(6);
+        dn.mint{value: publicPrice}(1);
 
         vm.stopPrank();
     }
@@ -85,15 +85,12 @@ contract NFTMintDN404Test is SoladyTest {
         vm.expectRevert(NFTMintDN404.InvalidPrice.selector);
         dn.allowlistMint{value: 1 ether}(1, proof);
 
-        vm.expectRevert(NFTMintDN404.ExceedsMaxMint.selector);
-        dn.allowlistMint{value: 11 * allowlistPrice}(11, proof);
-
         dn.allowlistMint{value: 5 * allowlistPrice}(5, proof);
         assertEq(dn.totalSupply(), 1005 * _WAD);
         assertEq(dn.balanceOf(alice), 5 * _WAD);
 
         vm.expectRevert(NFTMintDN404.InvalidMint.selector);
-        dn.allowlistMint{value: 6 * allowlistPrice}(6, proof);
+        dn.allowlistMint{value: allowlistPrice}(1, proof);
 
         vm.stopPrank();
     }
