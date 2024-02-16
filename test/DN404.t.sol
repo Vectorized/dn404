@@ -4,12 +4,15 @@ pragma solidity ^0.8.4;
 import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
+import {LibClone} from "solady/utils/LibClone.sol";
 
 contract DN404Test is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
 
     MockDN404 dn;
     DN404Mirror mirror;
+
+    event SkipNFTSet(address indexed target, bool status);
 
     function setUp() public {
         dn = new MockDN404();
@@ -146,7 +149,7 @@ contract DN404Test is SoladyTest {
 
         uint256 count;
         for (uint256 i = 0; i < 10; ++i) {
-            if (dn.ownerAt(i) == initialSupplyOwner) ++count;
+            if (mirror.ownerAt(i) == initialSupplyOwner) ++count;
         }
         assertEq(count, 5);
 
@@ -185,35 +188,31 @@ contract DN404Test is SoladyTest {
 
         uint256 count;
         for (uint256 i = 0; i < 10; ++i) {
-            if (dn.ownerAt(i) == initialSupplyOwner) ++count;
+            if (mirror.ownerAt(i) == initialSupplyOwner) ++count;
         }
         assertEq(count, 2);
     }
 
     function testSetAndGetSkipNFT() public {
-        assertEq(dn.getAddressDataInitialized(address(111)), false);
-        vm.startPrank(address(111));
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(111)), false);
-        assertEq(dn.getAddressDataInitialized(address(111)), true);
-        dn.setSkipNFT(true);
-        assertEq(dn.getSkipNFT(address(111)), true);
-        assertEq(dn.getAddressDataInitialized(address(111)), true);
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(111)), false);
-        assertEq(dn.getAddressDataInitialized(address(111)), true);
-        vm.stopPrank();
+        for (uint256 t; t != 10; ++t) {
+            address a = address(uint160(t << 128));
+            if (t & 1 == 0) a = LibClone.clone(a);
+            // Contracts skip NFTs by default.
+            assertEq(dn.getSkipNFT(a), t & 1 == 0);
+            assertEq(dn.getAddressDataInitialized(a), false);
+            _testSetAndGetSkipNFT(a, true);
+            _testSetAndGetSkipNFT(a, false);
+            _testSetAndGetSkipNFT(a, true);
+        }
+    }
 
-        assertEq(dn.getAddressDataInitialized(address(this)), false);
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(this)), false);
-        assertEq(dn.getAddressDataInitialized(address(this)), true);
-        dn.setSkipNFT(true);
-        assertEq(dn.getSkipNFT(address(this)), true);
-        assertEq(dn.getAddressDataInitialized(address(this)), true);
-        dn.setSkipNFT(false);
-        assertEq(dn.getSkipNFT(address(this)), false);
-        assertEq(dn.getAddressDataInitialized(address(this)), true);
+    function _testSetAndGetSkipNFT(address target, bool status) internal {
+        vm.prank(target);
+        vm.expectEmit(true, true, true, true);
+        emit SkipNFTSet(target, status);
+        dn.setSkipNFT(status);
+        assertEq(dn.getSkipNFT(target), status);
+        assertEq(dn.getAddressDataInitialized(target), true);
     }
 
     function testSetAndGetAux(address a, uint88 aux) public {
@@ -241,25 +240,25 @@ contract DN404Test is SoladyTest {
         dn.transfer(bob, 5 * _WAD);
 
         for (uint256 i = 1; i <= 5; ++i) {
-            assertEq(dn.ownerAt(i), alice);
+            assertEq(mirror.ownerAt(i), alice);
         }
         for (uint256 i = 6; i <= 10; ++i) {
-            assertEq(dn.ownerAt(i), bob);
+            assertEq(mirror.ownerAt(i), bob);
         }
 
         vm.prank(alice);
         dn.transfer(initialSupplyOwner, 5 * _WAD);
 
         for (uint256 i = 1; i <= 5; ++i) {
-            assertEq(dn.ownerAt(i), address(0));
+            assertEq(mirror.ownerAt(i), address(0));
         }
         for (uint256 i = 6; i <= 10; ++i) {
-            assertEq(dn.ownerAt(i), bob);
+            assertEq(mirror.ownerAt(i), bob);
         }
 
         vm.prank(initialSupplyOwner);
         dn.transfer(alice, 1 * _WAD);
-        assertEq(dn.ownerAt(1), alice);
+        assertEq(mirror.ownerAt(1), alice);
     }
 
     function testMixed(uint256) public {
@@ -272,8 +271,12 @@ contract DN404Test is SoladyTest {
         addresses[1] = address(222);
         addresses[2] = initialSupplyOwner;
 
-        for (uint256 t; t != 5; ++t) {
-            {
+        do {
+            if (_random() % 4 == 0) {
+                dn.setAddToBurnedPool(_random() % 2 == 0);
+            }
+
+            if (_random() % 16 > 0) {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
 
@@ -296,12 +299,16 @@ contract DN404Test is SoladyTest {
                 dn.setSkipNFT(_random() & 1 == 0);
             }
 
+            if (_random() % 2 == 0) {
+                dn.setAddToBurnedPool(_random() % 2 == 0);
+            }
+
             if (_random() % 4 == 0) {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
 
                 for (uint256 id = 1; id <= n; ++id) {
-                    if (dn.ownerAt(id) == from && _random() % 2 == 0) {
+                    if (mirror.ownerAt(id) == from && _random() % 2 == 0) {
                         vm.prank(from);
                         mirror.transferFrom(from, to, id);
                         break;
@@ -321,14 +328,22 @@ contract DN404Test is SoladyTest {
             }
             assertEq(balanceSum, dn.totalSupply());
             assertEq(nftBalanceSum, mirror.totalSupply());
+            assertLe(nftBalanceSum, balanceSum / _WAD);
 
             uint256 numOwned;
             for (uint256 i = 1; i <= n; ++i) {
-                if (dn.ownerAt(i) != address(0)) numOwned++;
+                if (mirror.ownerAt(i) != address(0)) numOwned++;
             }
             assertEq(numOwned, nftBalanceSum);
-            assertEq(dn.ownerAt(0), address(0));
-            assertEq(dn.ownerAt(n + 1), address(0));
+            assertEq(mirror.ownerAt(0), address(0));
+            assertEq(mirror.ownerAt(n + 1), address(0));
+        } while (_random() % 8 > 0);
+
+        if (_random() % 4 == 0) {
+            uint256 end = n + 1 + n;
+            for (uint256 i = n + 1; i <= end; ++i) {
+                assertEq(mirror.ownerAt(i), address(0));
+            }
         }
 
         if (_random() % 4 == 0) {
@@ -366,5 +381,11 @@ contract DN404Test is SoladyTest {
 
         vm.startPrank(address(2222));
         dn.transfer(address(1111), 10e18);
+    }
+
+    function testNumAliasesOverflowReverts() public {
+        dn.setNumAliases(type(uint32).max);
+        vm.expectRevert();
+        dn.registerAndResolveAlias(address(this));
     }
 }

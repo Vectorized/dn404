@@ -143,6 +143,12 @@ contract DN404Mirror {
         return address(uint160(_readWord(0x6352211e, id, 0))); // `ownerOf(uint256)`.
     }
 
+    /// @dev Returns the owner of token `id` from the base DN404 contract.
+    /// @dev returns address(0) if it is does not exist
+    function ownerAt(uint256 id) public view virtual returns (address result) {
+        return address(uint160(_readWord(0x24359879, id, 0))); // `ownerAt(uint256)`.
+    }
+
     /// @dev Sets `spender` as the approved account to manage token `id` in
     /// the base DN404 contract.
     ///

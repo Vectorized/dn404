@@ -10,6 +10,8 @@ contract MockDN404 is DN404 {
 
     string private _baseURI;
 
+    bool addToBurnedPool;
+
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
         _name = name_;
         _symbol = symbol_;
@@ -29,10 +31,6 @@ contract MockDN404 is DN404 {
 
     function tokenURI(uint256 id) public view virtual override returns (string memory) {
         return string(abi.encodePacked(_baseURI, id));
-    }
-
-    function setWhitelist(address target, bool status) public {
-        _setSkipNFT(target, status);
     }
 
     function registerAndResolveAlias(address target) public returns (uint32) {
@@ -55,10 +53,6 @@ contract MockDN404 is DN404 {
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirrorNFTContract);
     }
 
-    function ownerAt(uint256 id) public view returns (address) {
-        return _ownerAt(id);
-    }
-
     function getAddressDataInitialized(address target) public view returns (bool) {
         return _getDN404Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
     }
@@ -69,5 +63,21 @@ contract MockDN404 is DN404 {
 
     function getAux(address target) public view returns (uint88) {
         return _getAux(target);
+    }
+
+    function getNextTokenId() public view returns (uint32) {
+        return _getDN404Storage().nextTokenId;
+    }
+
+    function _addToBurnedPool(uint256, uint256) internal view virtual override returns (bool) {
+        return addToBurnedPool;
+    }
+
+    function setAddToBurnedPool(bool value) public {
+        addToBurnedPool = value;
+    }
+
+    function setNumAliases(uint32 value) public {
+        _getDN404Storage().numAliases = value;
     }
 }
