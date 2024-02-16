@@ -3,6 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
 import {LibPRNG} from "solady/utils/LibPRNG.sol";
+import {LibBit} from "solady/utils/LibBit.sol";
 
 contract MappingsTest is SoladyTest {
     using LibPRNG for *;
@@ -115,6 +116,128 @@ contract MappingsTest is SoladyTest {
             let o := and(0xff, index) // Storage slot offset (bits).
             sstore(s, or(and(sload(s), not(shl(o, 1))), shl(o, iszero(iszero(value)))))
         }
+    }
+
+    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
+    /// If no set bit is found, returns `type(uint256).max`.
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+        internal
+        view
+        returns (uint256 unsetBitIndex)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
+            let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
+            let bucket := add(s, shr(8, begin))
+            let lastBucket := add(s, shr(8, end))
+            let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
+            if iszero(negBits) {
+                for {} 1 {} {
+                    bucket := add(bucket, 1)
+                    negBits := not(sload(bucket))
+                    if or(negBits, gt(bucket, lastBucket)) { break }
+                }
+                if gt(bucket, lastBucket) {
+                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
+                }
+            }
+            if negBits {
+                // Find-first-set routine.
+                let b := and(negBits, add(not(negBits), 1)) // Isolate the least significant bit.
+                let r := shl(7, lt(0xffffffffffffffffffffffffffffffff, b))
+                r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, b))))
+                r := or(r, shl(5, lt(0xffffffff, shr(r, b))))
+                // For the remaining 32 bits, use a De Bruijn lookup.
+                // forgefmt: disable-next-item
+                r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
+                    0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
+                r := or(shl(8, sub(bucket, s)), r)
+                unsetBitIndex := or(r, sub(0, or(iszero(lt(r, end)), lt(r, begin))))
+            }
+        }
+    }
+
+    function _fillBucket(Bitmap storage bitmap, uint256 i) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), i) // Storage slot.
+            sstore(s, not(0))
+        }
+    }
+
+    function testFindFirstUnset() public {
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 0);
+        _set(bitmapA, 1, true);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 0);
+        _set(bitmapA, 0, true);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 2);
+        _fillBucket(bitmapA, 0);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 256);
+        _set(bitmapA, 256, true);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 257);
+
+        assertEq(_findFirstUnset(bitmapB, 500, 1000), 500);
+        _fillBucket(bitmapB, 1); // Set bits `[256, 512)`.
+        assertEq(_findFirstUnset(bitmapB, 500, 1000), 512);
+        assertEq(_findFirstUnset(bitmapB, 500, 513), 512);
+        assertEq(_findFirstUnset(bitmapB, 500, 512), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 256, 512), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 255, 512), 255);
+        assertEq(_findFirstUnset(bitmapB, 255, 255), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 255, 254), type(uint256).max);
+    }
+
+    function testFindFirstUnset(uint256) public {
+        uint256[] memory m = new uint256[](5);
+
+        do {
+            if (_random() % 4 > 0) {
+                uint256 n = _random() % 32;
+                for (uint256 t; t != n; ++t) {
+                    uint256 r = _random() % 1024;
+                    m[r >> 8] |= 1 << (r & 0xff);
+                    _set(bitmapA, r, true);
+                }
+            }
+            if (_random() % 4 > 0) {
+                uint256 n = _random() % 8;
+                for (uint256 t; t != n; ++t) {
+                    uint256 o = _random() % 1024;
+                    uint256 q = _random() % 64;
+                    for (uint256 j; j != q; ++j) {
+                        uint256 r = j + o;
+                        if (r >= 1024) break;
+                        m[r >> 8] |= 1 << (r & 0xff);
+                        _set(bitmapA, r, true);
+                    }
+                }
+            }
+            for (uint256 j; j != 4; ++j) {
+                if (_random() % 8 == 0) {
+                    _fillBucket(bitmapA, j);
+                    m[j] = type(uint256).max;
+                }
+            }
+            do {
+                uint256 begin = _random() % (1024 + 10);
+                uint256 end = _random() % (1024 + 10);
+                uint256 actual = _findFirstUnset(bitmapA, begin, end);
+                uint256 expected = _findFirstUnset(m, begin, end);
+                assertEq(actual, expected);
+            } while (_random() % 16 > 0);
+        } while (_random() % 2 == 0);
+    }
+
+    function _findFirstUnset(uint256[] memory m, uint256 begin, uint256 end)
+        internal
+        pure
+        returns (uint256)
+    {
+        for (uint256 i = begin; i < end; ++i) {
+            if ((m[i >> 8] >> (i & 0xff)) & 1 == 0) return i;
+        }
+        return type(uint256).max;
     }
 
     Bitmap bitmapA;
