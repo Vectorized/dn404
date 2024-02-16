@@ -740,11 +740,13 @@ abstract contract DN404 {
     /// Initializes account `owner` AddressData if it is not currently initialized.
     function _addressData(address owner) internal virtual returns (AddressData storage d) {
         d = _getDN404Storage().addressData[owner];
-
-        if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
-            uint8 flags = _ADDRESS_DATA_INITIALIZED_FLAG;
-            if (_hasCode(owner)) flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
-            d.flags = flags;
+        unchecked {
+            if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
+                d.flags = uint8(
+                    (_toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG)
+                        | _ADDRESS_DATA_INITIALIZED_FLAG
+                );
+            }
         }
     }
 
@@ -1018,8 +1020,7 @@ abstract contract DN404 {
     function _wrapNFTId(uint256 id, uint256 maxNFTId) internal pure returns (uint256 result) {
         /// @solidity memory-safe-assembly
         assembly {
-            result := gt(id, maxNFTId)
-            result := or(result, mul(iszero(result), id))
+            result := or(mul(iszero(gt(id, maxNFTId)), id), gt(id, maxNFTId))
         }
     }
 
@@ -1051,10 +1052,26 @@ abstract contract DN404 {
     }
 
     /// @dev Returns whether `amount` is a valid `totalSupply`.
-    function _totalSupplyOverflows(uint256 amount) private view returns (uint256) {
+    function _totalSupplyOverflows(uint256 amount) internal view returns (uint256) {
         unchecked {
             return _toUint(amount > type(uint96).max)
                 | _toUint(amount / _unit() > type(uint32).max - 1);
+        }
+    }
+
+    /// @dev Returns `max(0, x - y)`.
+    function _zeroFloorSub(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := mul(gt(x, y), sub(x, y))
+        }
+    }
+
+    /// @dev Returns `b ? 1 : 0`.
+    function _toUint(bool b) internal pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(b))
         }
     }
 
@@ -1148,22 +1165,6 @@ abstract contract DN404 {
         assembly {
             mstore(0x00, x)
             return(0x00, 0x20)
-        }
-    }
-
-    /// @dev Returns `max(0, x - y)`.
-    function _zeroFloorSub(uint256 x, uint256 y) private pure returns (uint256 z) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            z := mul(gt(x, y), sub(x, y))
-        }
-    }
-
-    /// @dev Returns `b ? 1 : 0`.
-    function _toUint(bool b) private pure returns (uint256 result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := iszero(iszero(b))
         }
     }
 }
