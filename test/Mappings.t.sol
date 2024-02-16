@@ -117,6 +117,80 @@ contract MappingsTest is SoladyTest {
         }
     }
 
+    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
+    /// If no set bit is found, returns `type(uint256).max`.
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+        internal
+        view
+        returns (uint256 unsetBitIndex)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            function ffs(x) -> r {
+                let b := and(x, add(not(x), 1)) // Isolate the least significant bit.
+                r := or(shl(8, iszero(x)), shl(7, lt(0xffffffffffffffffffffffffffffffff, b)))
+                r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, b))))
+                r := or(r, shl(5, lt(0xffffffff, shr(r, b))))
+                // For the remaining 32 bits, use a De Bruijn lookup.
+                // forgefmt: disable-next-item
+                r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
+                    0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
+            }
+            unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
+            let bucket := shr(8, begin)
+            let bucketBitsNegated := 0
+            let firstBucket := bucket
+            let lastBucket := shr(8, end)
+            for {} iszero(gt(bucket, lastBucket)) { bucket := add(bucket, 1) } {
+                bucketBitsNegated := not(sload(add(shl(96, bitmap.slot), bucket)))
+                if eq(bucket, firstBucket) {
+                    let offset := and(0xff, begin)
+                    bucketBitsNegated := shl(offset, shr(offset, bucketBitsNegated))
+                }
+                if eq(bucket, lastBucket) {
+                    let offset := and(0xff, not(end))
+                    bucketBitsNegated := shr(offset, shl(offset, bucketBitsNegated))
+                }
+                if bucketBitsNegated { break }
+            }
+            if bucketBitsNegated {
+                unsetBitIndex := or(shl(8, bucket), ffs(bucketBitsNegated))
+                if lt(unsetBitIndex, begin) { unsetBitIndex := not(0) }
+                if iszero(lt(unsetBitIndex, end)) { unsetBitIndex := not(0) }
+            }
+        }
+    }
+
+    function _fillBucket(Bitmap storage bitmap, uint256 i) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), i) // Storage slot.
+            sstore(s, not(0))
+        }
+    }
+
+    function testFindFirstUnset() public {
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 0);
+        _set(bitmapA, 1, true);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 0);
+        _set(bitmapA, 0, true);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 2);
+        _fillBucket(bitmapA, 0);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 256);
+        _set(bitmapA, 256, true);
+        assertEq(_findFirstUnset(bitmapA, 0, 1000), 257);
+
+        assertEq(_findFirstUnset(bitmapB, 500, 1000), 500);
+        _fillBucket(bitmapB, 1); // Set bits `[256, 512)`.
+        assertEq(_findFirstUnset(bitmapB, 500, 1000), 512);
+        assertEq(_findFirstUnset(bitmapB, 500, 513), 512);
+        assertEq(_findFirstUnset(bitmapB, 500, 512), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 256, 512), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 255, 512), 255);
+        assertEq(_findFirstUnset(bitmapB, 255, 255), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 255, 254), type(uint256).max);
+    }
+
     Bitmap bitmapA;
     Bitmap bitmapB;
 

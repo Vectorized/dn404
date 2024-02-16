@@ -167,6 +167,8 @@ abstract contract DN404 {
         mapping(uint256 => address) nftApprovals;
         // Bitmap of whether an non-zero NFT approval may exist.
         Bitmap mayHaveNFTApproval;
+        // Bitmap of whether a token ID may exist.
+        Bitmap mayExist;
         // Mapping of user allowances for token spenders.
         AddressPairToUint256RefMap allowance;
         // Mapping of NFT IDs owned by an address.
@@ -415,15 +417,18 @@ abstract contract DN404 {
                         } else {
                             id = nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
-                                id = _wrapNFTId(id + 1, maxNFTId);
+                                id = _findFirstUnset($.mayExist, id + 1, maxNFTId + 1);
+                                id = _wrapNFTId(id, maxNFTId);
                             }
                             nextTokenId = _wrapNFTId(id + 1, maxNFTId);
                         }
+                        _set($.mayExist, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != toEnd);
 
+                    $.nextTokenId = uint32(nextTokenId);
                     $.burnedPoolSize = uint32(burnedPoolSize);
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
@@ -480,6 +485,7 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
+                    _set($.mayExist, id, false);
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
@@ -560,9 +566,8 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
-                    if (addToBurnedPool) {
-                        _set($.burnedPool, burnedPoolSize++, uint32(id));
-                    }
+                    _set($.mayExist, id, false);
+                    if (addToBurnedPool) _set($.burnedPool, burnedPoolSize++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
@@ -587,17 +592,18 @@ abstract contract DN404 {
                     } else {
                         id = nextTokenId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
-                            id = _wrapNFTId(id + 1, maxNFTId);
+                            id = _findFirstUnset($.mayExist, id + 1, maxNFTId + 1);
+                            id = _wrapNFTId(id, maxNFTId);
                         }
                         nextTokenId = _wrapNFTId(id + 1, maxNFTId);
                     }
+                    _set($.mayExist, id, true);
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
                 } while (toIndex != toEnd);
 
-                // Leave some spacing between minted batches for better open addressing.
-                $.nextTokenId = uint32(_wrapNFTId(nextTokenId + 7, maxNFTId));
+                $.nextTokenId = uint32(nextTokenId);
             }
 
             if (packedLogs.logs.length != 0) {
@@ -1071,6 +1077,50 @@ abstract contract DN404 {
             let s := add(shl(96, bitmap.slot), shr(8, index)) // Storage slot.
             let o := and(0xff, index) // Storage slot offset (bits).
             sstore(s, or(and(sload(s), not(shl(o, 1))), shl(o, iszero(iszero(value)))))
+        }
+    }
+
+    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
+    /// If no set bit is found, returns `type(uint256).max`.
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+        internal
+        view
+        returns (uint256 unsetBitIndex)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            function ffs(x) -> r {
+                let b := and(x, add(not(x), 1)) // Isolate the least significant bit.
+                r := or(shl(8, iszero(x)), shl(7, lt(0xffffffffffffffffffffffffffffffff, b)))
+                r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, b))))
+                r := or(r, shl(5, lt(0xffffffff, shr(r, b))))
+                // For the remaining 32 bits, use a De Bruijn lookup.
+                // forgefmt: disable-next-item
+                r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
+                    0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
+            }
+            unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
+            let bucket := shr(8, begin)
+            let bucketBitsNegated := 0
+            let firstBucket := bucket
+            let lastBucket := shr(8, end)
+            for {} iszero(gt(bucket, lastBucket)) { bucket := add(bucket, 1) } {
+                bucketBitsNegated := not(sload(add(shl(96, bitmap.slot), bucket)))
+                if eq(bucket, firstBucket) {
+                    let offset := and(0xff, begin)
+                    bucketBitsNegated := shl(offset, shr(offset, bucketBitsNegated))
+                }
+                if eq(bucket, lastBucket) {
+                    let offset := and(0xff, not(end))
+                    bucketBitsNegated := shr(offset, shl(offset, bucketBitsNegated))
+                }
+                if bucketBitsNegated { break }
+            }
+            if bucketBitsNegated {
+                unsetBitIndex := or(shl(8, bucket), ffs(bucketBitsNegated))
+                if lt(unsetBitIndex, begin) { unsetBitIndex := not(0) }
+                if iszero(lt(unsetBitIndex, end)) { unsetBitIndex := not(0) }
+            }
         }
     }
 
