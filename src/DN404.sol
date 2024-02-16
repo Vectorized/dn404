@@ -152,7 +152,7 @@ abstract contract DN404 {
         // Mapping of a user alias number to their address.
         mapping(uint32 => address) aliasToAddress;
         // Mapping of user operator approvals for NFTs.
-        mapping(address => mapping(address => bool)) operatorApprovals;
+        AddressPairToUint256RefMap operatorApprovals;
         // Mapping of NFT token approvals to approved operators.
         mapping(uint256 => address) nftApprovals;
         // Bitmap of whether an non-zero NFT approval may exist.
@@ -625,7 +625,7 @@ abstract contract DN404 {
         }
 
         if (msgSender != from) {
-            if (!$.operatorApprovals[from][msgSender]) {
+            if (_ref($.operatorApprovals, from, msgSender).value == 0) {
                 if (msgSender != $.nftApprovals[id]) {
                     revert TransferCallerNotOwnerNorApproved();
                 }
@@ -841,7 +841,7 @@ abstract contract DN404 {
         owner = $.aliasToAddress[_get($.oo, _ownershipIndex(id))];
 
         if (msgSender != owner) {
-            if (!$.operatorApprovals[owner][msgSender]) {
+            if (_ref($.operatorApprovals, owner, msgSender).value == 0) {
                 revert ApprovalCallerNotOwnerNorApproved();
             }
         }
@@ -856,7 +856,7 @@ abstract contract DN404 {
         internal
         virtual
     {
-        _getDN404Storage().operatorApprovals[msgSender][operator] = approved;
+        _ref(_getDN404Storage().operatorApprovals, msgSender, operator).value = _toUint(approved);
     }
 
     /// @dev Fallback modifier to dispatch calls from the mirror NFT contract
@@ -899,7 +899,7 @@ abstract contract DN404 {
             address owner = address(uint160(_calldataload(0x04)));
             address operator = address(uint160(_calldataload(0x24)));
 
-            _return(_toUint($.operatorApprovals[owner][operator]));
+            _return(_ref($.operatorApprovals, owner, operator).value);
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {

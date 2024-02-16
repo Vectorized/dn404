@@ -132,9 +132,6 @@ contract MappingsTest is SoladyTest {
     mapping(uint256 => uint32) internal uint32MapGroundTruthA;
     mapping(uint256 => uint32) internal uint32MapGroundTruthB;
 
-    mapping(address => mapping(address => uint256)) internal addressPairMapGroundTruthA;
-    mapping(address => mapping(address => uint256)) internal addressPairMapGroundTruthB;
-
     function testBitmapSetAndGet(uint256 i0, uint256 i1, bool b0, bool b1) public {
         i0 = _bound(i0, 0, type(uint96).max);
         i1 = _bound(i1, 0, type(uint96).max);
@@ -238,5 +235,30 @@ contract MappingsTest is SoladyTest {
         _setOwnerAliasAndOwnedIndex(uint32MapA, id, ownership, ownedIndex);
         assertEq(_get(uint32MapA, _ownershipIndex(id)), ownership);
         assertEq(_get(uint32MapA, _ownedIndex(id)), ownedIndex);
+    }
+
+    function testAddressPairMapSetAndGet(
+        address[2] memory a0,
+        address[2] memory a1,
+        uint256 v0,
+        uint256 v1
+    ) public {
+        assertEq(_ref(addressPairMapA, _brutalized(a0[0]), _brutalized(a1[0])).value, 0);
+        assertEq(_ref(addressPairMapB, _brutalized(a0[1]), _brutalized(a1[1])).value, 0);
+        _ref(addressPairMapA, a0[0], a1[0]).value = v0;
+        _ref(addressPairMapB, a0[1], a1[1]).value = v1;
+        assertEq(_ref(addressPairMapA, _brutalized(a0[0]), _brutalized(a1[0])).value, v0);
+        assertEq(_ref(addressPairMapB, _brutalized(a0[1]), _brutalized(a1[1])).value, v1);
+        /// @solidity memory-safe-assembly
+        assembly {
+            if gt(mload(0x40), 0xffffffff) { revert(0x00, 0x00) }
+        }
+    }
+
+    function _brutalized(address a) internal pure returns (address result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := or(0xf348aeebbad597df99cf9f4f0000000000000000000000000000000000000000, a)
+        }
     }
 }
