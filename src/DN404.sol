@@ -116,12 +116,12 @@ abstract contract DN404 {
     }
 
     /// @dev A uint32 map in storage.
-    struct Uint32Map {
+    struct DNUint32Map {
         uint256 spacer;
     }
 
-    /// @dev A Bitmap map in storage.
-    struct Bitmap {
+    /// @dev A DNBitmap map in storage.
+    struct DNBitmap {
         uint256 spacer;
     }
 
@@ -150,16 +150,16 @@ abstract contract DN404 {
         mapping(address => mapping(address => bool)) operatorApprovals;
         // Mapping of NFT token approvals to approved operators.
         mapping(uint256 => address) tokenApprovals;
-        // Bitmap of whether a token approval exists.
-        Bitmap tokenApprovalExists;
+        // DNBitmap of whether a token approval exists.
+        DNBitmap tokenApprovalExists;
         // Mapping of user allowances for token spenders.
         mapping(address => mapping(address => Uint256Ref)) allowance;
         // Mapping of NFT token IDs owned by an address.
-        mapping(address => Uint32Map) owned;
+        mapping(address => DNUint32Map) owned;
         // The pool of burned IDs.
-        Uint32Map burnedPool;
+        DNUint32Map burnedPool;
         // Even indices: owner aliases. Odd indices: owned indices.
-        Uint32Map oo;
+        DNUint32Map oo;
         // Mapping of user account AddressData
         mapping(address => AddressData) addressData;
     }
@@ -362,8 +362,8 @@ abstract contract DN404 {
                 toEnd = toBalance / _unit();
             }
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                Uint32Map storage toOwned = $.owned[to];
-                Uint32Map storage oo = $.oo;
+                DNUint32Map storage toOwned = $.owned[to];
+                DNUint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
 
@@ -429,7 +429,7 @@ abstract contract DN404 {
             uint256 totalSupply_ = uint256($.totalSupply) - amount;
             $.totalSupply = uint96(totalSupply_);
 
-            Uint32Map storage fromOwned = $.owned[from];
+            DNUint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
@@ -440,7 +440,7 @@ abstract contract DN404 {
                 $.totalNFTSupply = uint32(totalNFTSupply);
                 bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
 
-                Uint32Map storage oo = $.oo;
+                DNUint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
                 uint256 burnedPoolSize = $.burnedPoolSize;
@@ -514,13 +514,13 @@ abstract contract DN404 {
             $.totalNFTSupply = uint32(t.totalNFTSupply);
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
-            Uint32Map storage oo = $.oo;
+            DNUint32Map storage oo = $.oo;
 
             uint256 burnedPoolSize = $.burnedPoolSize;
             if (t.numNFTBurns != 0) {
                 _packedLogsSet(packedLogs, from, 1);
                 bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
-                Uint32Map storage fromOwned = $.owned[from];
+                DNUint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
@@ -542,7 +542,7 @@ abstract contract DN404 {
             if (t.numNFTMints != 0) {
                 _packedLogsSet(packedLogs, to, 0);
                 uint256 nextTokenId = $.nextTokenId;
-                Uint32Map storage toOwned = $.owned[to];
+                DNUint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
@@ -613,7 +613,7 @@ abstract contract DN404 {
 
         if (to == address(0)) revert TransferToZeroAddress();
 
-        Uint32Map storage oo = $.oo;
+        DNUint32Map storage oo = $.oo;
 
         if (from != $.aliasToAddress[_get(oo, _ownershipIndex(id))]) {
             revert TransferFromIncorrectOwner();
@@ -635,8 +635,8 @@ abstract contract DN404 {
         unchecked {
             toAddressData.balance += uint96(_unit());
 
-            mapping(address => Uint32Map) storage owned = $.owned;
-            Uint32Map storage fromOwned = owned[from];
+            mapping(address => DNUint32Map) storage owned = $.owned;
+            DNUint32Map storage fromOwned = owned[from];
 
             _set(oo, _ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
             if (_get($.tokenApprovalExists, id)) {
@@ -957,8 +957,98 @@ abstract contract DN404 {
     receive() external payable virtual {}
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
-    /*                      PRIVATE HELPERS                       */
+    /*                 INTERNAL / PRIVATE HELPERS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns `i << 1`.
+    function _ownershipIndex(uint256 i) internal pure returns (uint256) {
+        unchecked {
+            return (i - 1) << 1;
+        }
+    }
+
+    /// @dev Returns `((i - 1) << 1) + 1`.
+    function _ownedIndex(uint256 i) internal pure returns (uint256) {
+        unchecked {
+            return ((i - 1) << 1) + 1;
+        }
+    }
+
+    /// @dev Returns the uint32 value at `index` in `map`.
+    function _get(DNUint32Map storage map, uint256 index) internal view returns (uint32 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
+            result := and(0xffffffff, shr(shl(5, and(index, 7)), sload(s)))
+        }
+    }
+
+    /// @dev Updates the uint32 value at `index` in `map`.
+    function _set(DNUint32Map storage map, uint256 index, uint32 value) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
+            let o := shl(5, and(index, 7)) // Storage slot offset (bits).
+            let v := sload(s) // Storage slot value.
+            let m := 0xffffffff // Value mask.
+            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), value)))))
+        }
+    }
+
+    /// @dev Sets the owner alias and the owned index together.
+    function _setOwnerAliasAndOwnedIndex(
+        DNUint32Map storage map,
+        uint256 id,
+        uint32 ownership,
+        uint32 ownedIndex
+    ) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let i := sub(id, 1)
+            let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
+            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
+            let v := sload(s) // Storage slot value.
+            let m := 0xffffffffffffffff // Value mask.
+            let combined := or(shl(32, ownedIndex), and(0xffffffff, ownership))
+            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), combined)))))
+        }
+    }
+
+    /// @dev Wraps the NFT ID.
+    function _wrapNFTId(uint256 id, uint256 maxNFTId) internal pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := gt(id, maxNFTId)
+            result := or(result, mul(iszero(result), id))
+        }
+    }
+
+    /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
+    function _get(DNBitmap storage bitmap, uint256 index) internal view returns (bool isSet) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), shr(8, index))
+            isSet := and(1, shr(and(0xff, index), sload(s)))
+        }
+    }
+
+    /// @dev Updates the bit at `index` in `bitmap` to true.
+    function _set(DNBitmap storage bitmap, uint256 index) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), shr(8, index))
+            sstore(s, or(shl(and(0xff, index), 1), sload(s)))
+        }
+    }
+
+    /// @dev Updates the bit at `index` in `bitmap` to false.
+    function _unset(DNBitmap storage bitmap, uint256 index) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), shr(8, index))
+            sstore(s, and(not(shl(and(0xff, index), 1)), sload(s)))
+        }
+    }
 
     /// @dev Returns whether `amount` is a valid `totalSupply`.
     function _totalSupplyOverflows(uint256 amount) private view returns (uint256) {
@@ -1069,101 +1159,11 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Returns `i << 1`.
-    function _ownershipIndex(uint256 i) private pure returns (uint256) {
-        unchecked {
-            return (i - 1) << 1;
-        }
-    }
-
-    /// @dev Returns `((i - 1) << 1) + 1`.
-    function _ownedIndex(uint256 i) private pure returns (uint256) {
-        unchecked {
-            return ((i - 1) << 1) + 1;
-        }
-    }
-
     /// @dev Returns `b ? 1 : 0`.
     function _toUint(bool b) private pure returns (uint256 result) {
         /// @solidity memory-safe-assembly
         assembly {
             result := iszero(iszero(b))
-        }
-    }
-
-    /// @dev Returns the uint32 value at `index` in `map`.
-    function _get(Uint32Map storage map, uint256 index) private view returns (uint32 result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
-            result := and(0xffffffff, shr(shl(5, and(index, 7)), sload(s)))
-        }
-    }
-
-    /// @dev Updates the uint32 value at `index` in `map`.
-    function _set(Uint32Map storage map, uint256 index, uint32 value) private {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
-            let o := shl(5, and(index, 7)) // Storage slot offset (bits).
-            let v := sload(s) // Storage slot value.
-            let m := 0xffffffff // Value mask.
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), value)))))
-        }
-    }
-
-    /// @dev Sets the owner alias and the owned index together.
-    function _setOwnerAliasAndOwnedIndex(
-        Uint32Map storage map,
-        uint256 id,
-        uint32 ownership,
-        uint32 ownedIndex
-    ) private {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let i := sub(id, 1)
-            let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
-            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
-            let v := sload(s) // Storage slot value.
-            let m := 0xffffffffffffffff // Value mask.
-            let combined := or(shl(32, ownedIndex), and(0xffffffff, ownership))
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), combined)))))
-        }
-    }
-
-    /// @dev Wraps the NFT ID.
-    function _wrapNFTId(uint256 id, uint256 maxNFTId) private pure returns (uint256 result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := gt(id, maxNFTId)
-            result := or(result, mul(iszero(result), id))
-        }
-    }
-
-    /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
-    function _get(Bitmap storage bitmap, uint256 index) private view returns (bool isSet) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, bitmap.slot), shr(8, index))
-            isSet := and(1, shr(and(0xff, index), sload(s)))
-        }
-    }
-
-    /// @dev Updates the bit at `index` in `bitmap` to true.
-    function _set(Bitmap storage bitmap, uint256 index) private {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, bitmap.slot), shr(8, index))
-            sstore(s, or(shl(and(0xff, index), 1), sload(s)))
-        }
-    }
-
-    /// @dev Updates the bit at `index` in `bitmap` to false.
-    function _unset(Bitmap storage bitmap, uint256 index) private {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, bitmap.slot), shr(8, index))
-            sstore(s, and(not(shl(and(0xff, index), 1)), sload(s)))
         }
     }
 }
