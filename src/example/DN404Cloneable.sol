@@ -22,7 +22,7 @@ contract DN404Cloneable is DN404, Ownable, Initializable {
     string private _sym;
     string private _baseURI;
 
-    uint96 private _maxTokenSupply;
+    uint256 private _maxTokenSupply;
 
     // Immutable so clones don't inherit this and proxy calls still read the right value.
     address private immutable dn404mirrorImpl = address(new DN404Mirror(address(this)));
@@ -33,8 +33,8 @@ contract DN404Cloneable is DN404, Ownable, Initializable {
         string calldata symbol_,
         string calldata baseURI_,
         address initialMintTarget_,
-        uint96 initialTokenSupply_,
-        uint96 maxTokenSupply_
+        uint256 initialTokenSupply_,
+        uint256 maxTokenSupply_
     ) external payable initializer {
         _initializeOwner(owner_);
 
