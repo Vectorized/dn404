@@ -5,6 +5,7 @@ import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
+import {LibSort} from "solady/utils/LibSort.sol";
 
 contract DN404Test is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
@@ -338,6 +339,18 @@ contract DN404Test is SoladyTest {
             assertEq(mirror.ownerAt(0), address(0));
             assertEq(mirror.ownerAt(n + 1), address(0));
         } while (_random() % 8 > 0);
+
+        if (_random() % 8 == 0) {
+            uint256[] memory allTokenIds;
+            for (uint256 i; i < 3; ++i) {
+                uint256[] memory tokens = dn.tokensOf(addresses[i]);
+                // Might not be sorted.
+                LibSort.insertionSort(tokens);
+                allTokenIds = LibSort.union(allTokenIds, tokens);
+                assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
+            }
+            assertEq(allTokenIds.length, mirror.totalSupply());
+        }
 
         if (_random() % 4 == 0) {
             uint256 end = n + 1 + n;

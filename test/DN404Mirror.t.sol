@@ -5,6 +5,7 @@ import "./utils/SoladyTest.sol";
 import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
 import {MockDN404Ownable} from "./utils/mocks/MockDN404Ownable.sol";
 import {DN404Mirror, MockDN404Mirror} from "./utils/mocks/MockDN404Mirror.sol";
+import {LibSort} from "solady/utils/LibSort.sol";
 
 contract Invalid721Receiver {}
 
@@ -117,7 +118,8 @@ contract DN404MirrorTest is SoladyTest {
         address alice = address(111);
         address bob = address(222);
 
-        dn.initializeDN404(uint96(uint256(totalNFTSupply) * _WAD), address(this), address(mirror));
+        uint256 initialSupply = uint256(totalNFTSupply) * _WAD;
+        dn.initializeDN404(initialSupply, address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(5));
         assertEq(mirror.balanceOf(alice), 5);
         assertEq(mirror.balanceOf(bob), 0);
@@ -128,6 +130,75 @@ contract DN404MirrorTest is SoladyTest {
         mirror.transferFrom(alice, bob, 1);
         assertEq(mirror.balanceOf(alice), 4);
         assertEq(mirror.balanceOf(bob), 1);
+        assertEq(dn.totalSupply(), initialSupply);
+        assertEq(mirror.totalSupply(), 5);
+
+        vm.prank(bob);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(bob, bob, 1);
+        mirror.transferFrom(bob, bob, 1);
+        assertEq(mirror.balanceOf(alice), 4);
+        assertEq(mirror.balanceOf(bob), 1);
+        assertEq(dn.totalSupply(), initialSupply);
+        assertEq(mirror.totalSupply(), 5);
+        assertEq(dn.balanceOf(alice), 4 * _WAD);
+        assertEq(dn.balanceOf(bob), 1 * _WAD);
+    }
+
+    function testTransferFromMixed(uint256) public {
+        uint256 maxNFTId = _bound(_random(), 50, 100);
+        dn.initializeDN404(maxNFTId * _WAD, address(this), address(mirror));
+
+        uint256 n = _bound(_random(), 1, 5);
+        address[] memory addresses = new address[](n);
+        for (uint256 i; i < n; ++i) {
+            addresses[i] = _randomNonZeroAddress();
+        }
+        LibSort.insertionSort(addresses);
+        LibSort.uniquifySorted(addresses);
+
+        n = addresses.length;
+
+        do {
+            uint256 amount = _bound(_random(), 0, 2) * _WAD;
+            if (dn.balanceOf(address(this)) >= amount) {
+                dn.transfer(addresses[_random() % n], amount);
+            }
+        } while (_random() % 16 > 0);
+
+        uint256 totalNFTSupply = mirror.totalSupply();
+        do {
+            address to = addresses[_random() % n];
+            address from = addresses[_random() % n];
+            if (mirror.balanceOf(from) > 0) {
+                uint256 randomTokenId = dn.randomTokenOf(from, _random());
+                vm.prank(from);
+                mirror.transferFrom(from, to, randomTokenId);
+            }
+        } while (_random() % 4 > 0);
+
+        uint256[] memory allTokenIds;
+        for (uint256 i; i < n; ++i) {
+            uint256[] memory tokens = dn.tokensOf(addresses[i]);
+            // Might not be sorted.
+            LibSort.insertionSort(tokens);
+            allTokenIds = LibSort.union(allTokenIds, tokens);
+            assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
+        }
+        assertTrue(LibSort.isSorted(allTokenIds));
+        assertEq(allTokenIds.length, totalNFTSupply);
+        if (allTokenIds.length != 0) {
+            assertLe(allTokenIds[allTokenIds.length - 1], maxNFTId);
+        }
+
+        if (_random() % 4 == 0) {
+            assertEq(mirror.ownerAt(0), address(0));
+            uint256 totalOwned;
+            for (uint256 i = 1; i <= maxNFTId; ++i) {
+                if (mirror.ownerAt(i) != address(0)) totalOwned++;
+            }
+            assertEq(totalOwned, totalNFTSupply);
+        }
     }
 
     function testSafeTransferFrom(uint32 totalNFTSupply) public {
