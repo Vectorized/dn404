@@ -167,8 +167,8 @@ abstract contract DN404 {
         mapping(uint256 => address) nftApprovals;
         // Bitmap of whether an non-zero NFT approval may exist.
         Bitmap mayHaveNFTApproval;
-        // Bitmap of whether a token ID may exist.
-        Bitmap mayExist;
+        // Bitmap of whether a token ID exists.
+        Bitmap exists;
         // Mapping of user allowances for token spenders.
         AddressPairToUint256RefMap allowance;
         // Mapping of NFT IDs owned by an address.
@@ -382,13 +382,13 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         unchecked {
-            uint256 maxNFTId;
+            uint256 maxId;
             {
                 uint256 totalSupply_ = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
                 uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
                 if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-                maxNFTId = totalSupply_ / _unit();
+                maxId = totalSupply_ / _unit();
             }
             uint256 toEnd;
             {
@@ -417,12 +417,13 @@ abstract contract DN404 {
                         } else {
                             id = nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
-                                id = _findFirstUnset($.mayExist, id + 1, maxNFTId + 1);
-                                id = _wrapNFTId(id, maxNFTId);
+                                id = _useExistsLookup()
+                                    ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                    : _wrapNFTId(id + 1, maxId);
                             }
-                            nextTokenId = _wrapNFTId(id + 1, maxNFTId);
+                            nextTokenId = _wrapNFTId(id + 1, maxId);
                         }
-                        _set($.mayExist, id, true);
+                        if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, id);
@@ -485,10 +486,8 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
-                    _set($.mayExist, id, false);
-                    if (addToBurnedPool) {
-                        _set($.burnedPool, burnedPoolSize++, uint32(id));
-                    }
+                    if (_useExistsLookup()) _set($.exists, id, false);
+                    if (addToBurnedPool) _set($.burnedPool, burnedPoolSize++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
@@ -566,7 +565,7 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
-                    _set($.mayExist, id, false);
+                    if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolSize++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
@@ -582,7 +581,7 @@ abstract contract DN404 {
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxNFTId = t.totalSupply / _unit();
+                uint256 maxId = t.totalSupply / _unit();
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
@@ -592,12 +591,13 @@ abstract contract DN404 {
                     } else {
                         id = nextTokenId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
-                            id = _findFirstUnset($.mayExist, id + 1, maxNFTId + 1);
-                            id = _wrapNFTId(id, maxNFTId);
+                            id = _useExistsLookup()
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                : _wrapNFTId(id + 1, maxId);
                         }
-                        nextTokenId = _wrapNFTId(id + 1, maxNFTId);
+                        nextTokenId = _wrapNFTId(id + 1, maxId);
                     }
-                    _set($.mayExist, id, true);
+                    if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
@@ -630,6 +630,14 @@ abstract contract DN404 {
         // Add to burned pool if the load factor > 50%, and collection is not small.
         uint256 thres = (totalSupplyAfterBurn / _unit()) >> 1;
         return _toUint(totalNFTSupplyAfterBurn > thres) & _toUint(thres > 128) != 0;
+    }
+
+    /// @dev Returns whether to use the exists lookup for more efficient
+    /// scanning of an empty token ID slot. Highly recommended for collections
+    /// with near full load factor `totalNFTSupply * _unit() / totalSupply`.
+    /// The trade off is slightly higher storage write costs.
+    function _useExistsLookup() internal pure virtual returns (bool) {
+        return true;
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
@@ -1139,10 +1147,10 @@ abstract contract DN404 {
     }
 
     /// @dev Wraps the NFT ID.
-    function _wrapNFTId(uint256 id, uint256 maxNFTId) internal pure returns (uint256 result) {
+    function _wrapNFTId(uint256 id, uint256 maxId) internal pure returns (uint256 result) {
         /// @solidity memory-safe-assembly
         assembly {
-            result := or(mul(iszero(gt(id, maxNFTId)), id), gt(id, maxNFTId))
+            result := or(mul(iszero(gt(id, maxId)), id), gt(id, maxId))
         }
     }
 
