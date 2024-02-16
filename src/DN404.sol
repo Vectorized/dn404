@@ -84,7 +84,7 @@ abstract contract DN404 {
     /// @dev Thrown when transferring an NFT and the from address is not the current owner.
     error TransferFromIncorrectOwner();
 
-    /// @dev Thrown when checking the owner or approved address for an non-existent NFT.
+    /// @dev Thrown when checking the owner or approved address for a non-existent NFT.
     error TokenDoesNotExist();
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
