@@ -108,7 +108,7 @@ contract DN404Mirror {
 
     /// @dev Returns the token collection name from the base DN404 contract.
     function name() public view virtual returns (string memory result) {
-        return _readString(0x06fdde03, 0); // `symbol()`.
+        return _readString(0x06fdde03, 0); // `name()`.
     }
 
     /// @dev Returns the token collection symbol from the base DN404 contract.
