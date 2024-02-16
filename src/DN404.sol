@@ -120,7 +120,7 @@ abstract contract DN404 {
         uint256 spacer;
     }
 
-    /// @dev A DNBitmap map in storage.
+    /// @dev A bitmap in storage.
     struct DNBitmap {
         uint256 spacer;
     }
