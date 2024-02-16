@@ -149,14 +149,14 @@ abstract contract DN404 {
         // Mapping of user operator approvals for NFTs.
         mapping(address => mapping(address => bool)) operatorApprovals;
         // Mapping of NFT token approvals to approved operators.
-        mapping(uint256 => address) tokenApprovals;
-        // DNBitmap of whether a token approval exists.
-        DNBitmap tokenApprovalExists;
+        mapping(uint256 => address) nftApprovals;
+        // DNBitmap of whether an non-zero NFT approval may exist.
+        DNBitmap mayHaveNFTApproval;
         // Mapping of user allowances for token spenders.
         mapping(address => mapping(address => Uint256Ref)) allowance;
-        // Mapping of NFT token IDs owned by an address.
+        // Mapping of NFT IDs owned by an address.
         mapping(address => DNUint32Map) owned;
-        // The pool of burned IDs.
+        // The pool of burned NFT IDs.
         DNUint32Map burnedPool;
         // Even indices: owner aliases. Odd indices: owned indices.
         DNUint32Map oo;
@@ -451,9 +451,9 @@ abstract contract DN404 {
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
-                    if (_get($.tokenApprovalExists, id)) {
-                        _unset($.tokenApprovalExists, id);
-                        delete $.tokenApprovals[id];
+                    if (_get($.mayHaveNFTApproval, id)) {
+                        _unset($.mayHaveNFTApproval, id);
+                        delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
 
@@ -531,9 +531,9 @@ abstract contract DN404 {
                     if (addToBurnedPool) {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
-                    if (_get($.tokenApprovalExists, id)) {
-                        _unset($.tokenApprovalExists, id);
-                        delete $.tokenApprovals[id];
+                    if (_get($.mayHaveNFTApproval, id)) {
+                        _unset($.mayHaveNFTApproval, id);
+                        delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
             }
@@ -563,6 +563,7 @@ abstract contract DN404 {
                     _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
                 } while (toIndex != toEnd);
+
                 // Leave some spacing between minted batches for better open addressing.
                 $.nextTokenId = uint32(_wrapNFTId(nextTokenId + 7, maxNFTId));
             }
@@ -620,7 +621,7 @@ abstract contract DN404 {
 
         if (msgSender != from) {
             if (!$.operatorApprovals[from][msgSender]) {
-                if (msgSender != $.tokenApprovals[id]) {
+                if (msgSender != $.nftApprovals[id]) {
                     revert TransferCallerNotOwnerNorApproved();
                 }
             }
@@ -638,9 +639,9 @@ abstract contract DN404 {
             DNUint32Map storage fromOwned = owned[from];
 
             _set(oo, _ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
-            if (_get($.tokenApprovalExists, id)) {
-                _unset($.tokenApprovalExists, id);
-                delete $.tokenApprovals[id];
+            if (_get($.mayHaveNFTApproval, id)) {
+                _unset($.mayHaveNFTApproval, id);
+                delete $.nftApprovals[id];
             }
 
             uint256 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
@@ -758,9 +759,12 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
         addressAlias = toAddressData.addressAlias;
         if (addressAlias == 0) {
-            addressAlias = ++$.numAliases;
+            unchecked {
+                addressAlias = ++$.numAliases;
+            }
             toAddressData.addressAlias = addressAlias;
             $.aliasToAddress[addressAlias] = to;
+            if (addressAlias == 0) revert(); // Overflow.
         }
     }
 
@@ -810,7 +814,7 @@ abstract contract DN404 {
     /// - Token `id` must exist.
     function _getApproved(uint256 id) internal view virtual returns (address) {
         if (!_exists(id)) revert TokenDoesNotExist();
-        return _getDN404Storage().tokenApprovals[id];
+        return _getDN404Storage().nftApprovals[id];
     }
 
     /// @dev Sets `spender` as the approved account to manage token `id`, using `msgSender`.
@@ -832,9 +836,9 @@ abstract contract DN404 {
             }
         }
 
-        $.tokenApprovals[id] = spender;
+        $.nftApprovals[id] = spender;
         if (spender != address(0)) {
-            _set($.tokenApprovalExists, id);
+            _set($.mayHaveNFTApproval, id);
         }
     }
 

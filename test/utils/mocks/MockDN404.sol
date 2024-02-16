@@ -76,4 +76,8 @@ contract MockDN404 is DN404 {
     function setAddToBurnedPool(bool value) public {
         addToBurnedPool = value;
     }
+
+    function setNumAliases(uint32 value) public {
+        _getDN404Storage().numAliases = value;
+    }
 }

@@ -382,4 +382,10 @@ contract DN404Test is SoladyTest {
         vm.startPrank(address(2222));
         dn.transfer(address(1111), 10e18);
     }
+
+    function testNumAliasesOverflowReverts() public {
+        dn.setNumAliases(type(uint32).max);
+        vm.expectRevert();
+        dn.registerAndResolveAlias(address(this));
+    }
 }
