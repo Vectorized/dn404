@@ -130,6 +130,11 @@ abstract contract DN404 {
         uint256 value;
     }
 
+    /// @dev A mapping of an address pair to a Uint256Ref.
+    struct AddressPairToUint256RefMap {
+        uint256 spacer;
+    }
+
     /// @dev Struct containing the base token contract storage.
     struct DN404Storage {
         // Current number of address aliases assigned.
@@ -153,7 +158,7 @@ abstract contract DN404 {
         // Bitmap of whether an non-zero NFT approval may exist.
         Bitmap mayHaveNFTApproval;
         // Mapping of user allowances for token spenders.
-        mapping(address => mapping(address => Uint256Ref)) allowance;
+        AddressPairToUint256RefMap allowance;
         // Mapping of NFT IDs owned by an address.
         mapping(address => Uint32Map) owned;
         // The pool of burned NFT IDs.
@@ -268,7 +273,7 @@ abstract contract DN404 {
 
     /// @dev Returns the amount of tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
-        return _getDN404Storage().allowance[owner][spender].value;
+        return _ref(_getDN404Storage().allowance, owner, spender).value;
     }
 
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -314,7 +319,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
-        Uint256Ref storage a = _getDN404Storage().allowance[from][msg.sender];
+        Uint256Ref storage a = _ref(_getDN404Storage().allowance, from, msg.sender);
         uint256 allowed = a.value;
 
         if (allowed != type(uint256).max) {
@@ -452,7 +457,7 @@ abstract contract DN404 {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
                     if (_get($.mayHaveNFTApproval, id)) {
-                        _unset($.mayHaveNFTApproval, id);
+                        _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
@@ -532,7 +537,7 @@ abstract contract DN404 {
                         _set($.burnedPool, burnedPoolSize++, uint32(id));
                     }
                     if (_get($.mayHaveNFTApproval, id)) {
-                        _unset($.mayHaveNFTApproval, id);
+                        _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
@@ -643,7 +648,7 @@ abstract contract DN404 {
             Uint32Map storage fromOwned = owned[from];
 
             if (_get($.mayHaveNFTApproval, id)) {
-                _unset($.mayHaveNFTApproval, id);
+                _set($.mayHaveNFTApproval, id, false);
                 delete $.nftApprovals[id];
             }
 
@@ -675,7 +680,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function _approve(address owner, address spender, uint256 amount) internal virtual {
-        _getDN404Storage().allowance[owner][spender].value = amount;
+        _ref(_getDN404Storage().allowance, owner, spender).value = amount;
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Approval} event.
@@ -842,9 +847,7 @@ abstract contract DN404 {
         }
 
         $.nftApprovals[id] = spender;
-        if (spender != address(0)) {
-            _set($.mayHaveNFTApproval, id);
-        }
+        _set($.mayHaveNFTApproval, id, spender != address(0));
     }
 
     /// @dev Approve or remove the `operator` as an operator for `msgSender`,
@@ -1022,38 +1025,47 @@ abstract contract DN404 {
         }
     }
 
+    /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
+    function _get(Bitmap storage bitmap, uint256 index) internal view returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), shr(8, index)) // Storage slot.
+            result := and(1, shr(and(0xff, index), sload(s)))
+        }
+    }
+
+    /// @dev Updates the bit at `index` in `bitmap` to `value`.
+    function _set(Bitmap storage bitmap, uint256 index, bool value) internal {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let s := add(shl(96, bitmap.slot), shr(8, index)) // Storage slot.
+            let o := and(0xff, index) // Storage slot offset (bits).
+            sstore(s, or(and(sload(s), not(shl(o, 1))), shl(o, iszero(iszero(value)))))
+        }
+    }
+
+    /// @dev Returns a storage reference to the value at (`a0`, `a1`) in `map`.
+    function _ref(AddressPairToUint256RefMap storage map, address a0, address a1)
+        internal
+        pure
+        returns (Uint256Ref storage ref)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x28, a1)
+            mstore(0x14, a0)
+            mstore(0x00, map.slot)
+            ref.slot := keccak256(0x00, 0x48)
+            // Clear the part of the free memory pointer that was overwritten.
+            mstore(0x28, 0x00)
+        }
+    }
+
     /// @dev Wraps the NFT ID.
     function _wrapNFTId(uint256 id, uint256 maxNFTId) internal pure returns (uint256 result) {
         /// @solidity memory-safe-assembly
         assembly {
             result := or(mul(iszero(gt(id, maxNFTId)), id), gt(id, maxNFTId))
-        }
-    }
-
-    /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
-    function _get(Bitmap storage bitmap, uint256 index) internal view returns (bool isSet) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, bitmap.slot), shr(8, index))
-            isSet := and(1, shr(and(0xff, index), sload(s)))
-        }
-    }
-
-    /// @dev Updates the bit at `index` in `bitmap` to true.
-    function _set(Bitmap storage bitmap, uint256 index) internal {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, bitmap.slot), shr(8, index))
-            sstore(s, or(shl(and(0xff, index), 1), sload(s)))
-        }
-    }
-
-    /// @dev Updates the bit at `index` in `bitmap` to false.
-    function _unset(Bitmap storage bitmap, uint256 index) internal {
-        /// @solidity memory-safe-assembly
-        assembly {
-            let s := add(shl(96, bitmap.slot), shr(8, index))
-            sstore(s, and(not(shl(and(0xff, index), 1)), sload(s)))
         }
     }
 
