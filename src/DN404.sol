@@ -160,7 +160,7 @@ abstract contract DN404 {
         Uint32Map burnedPool;
         // Even indices: owner aliases. Odd indices: owned indices.
         Uint32Map oo;
-        // Mapping of user account AddressData
+        // Mapping of user account AddressData.
         mapping(address => AddressData) addressData;
     }
 
