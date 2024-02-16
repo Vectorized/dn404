@@ -146,7 +146,8 @@ contract DN404MirrorTest is SoladyTest {
     }
 
     function testTransferFromMixed(uint256) public {
-        dn.initializeDN404(10000 * _WAD, address(this), address(mirror));
+        uint256 maxNFTId = _bound(_random(), 50, 100);
+        dn.initializeDN404(maxNFTId * _WAD, address(this), address(mirror));
 
         uint256 n = _bound(_random(), 1, 5);
         address[] memory addresses = new address[](n);
@@ -159,11 +160,23 @@ contract DN404MirrorTest is SoladyTest {
         n = addresses.length;
 
         do {
-            dn.transfer(addresses[_random() % n], _bound(_random(), 0, 2) * _WAD);
-        } while (_random() % 8 > 0);
+            uint256 amount = _bound(_random(), 0, 2) * _WAD;
+            if (dn.balanceOf(address(this)) >= amount) {
+                dn.transfer(addresses[_random() % n], amount);
+            }
+        } while (_random() % 16 > 0);
 
         uint256 totalNFTSupply = mirror.totalSupply();
         do {
+            if (_random() % 2 == 0) {
+                dn.setAddToBurnedPool(_random() % 2 == 0);
+            }
+
+            if (_random() % 2 == 0) {
+                vm.prank(addresses[_random() % n]);
+                dn.setSkipNFT(_random() & 1 == 0);
+            }
+
             address to = addresses[_random() % n];
             address from = addresses[_random() % n];
             if (mirror.balanceOf(from) > 0) {
@@ -181,7 +194,20 @@ contract DN404MirrorTest is SoladyTest {
             allTokenIds = LibSort.union(allTokenIds, tokens);
             assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
         }
+        assertTrue(LibSort.isSorted(allTokenIds));
         assertEq(allTokenIds.length, totalNFTSupply);
+        if (allTokenIds.length != 0) {
+            assertLe(allTokenIds[allTokenIds.length - 1], maxNFTId);
+        }
+
+        if (_random() % 4 == 0) {
+            assertEq(mirror.ownerAt(0), address(0));
+            uint256 totalOwned;
+            for (uint256 i = 1; i <= maxNFTId; ++i) {
+                if (mirror.ownerAt(i) != address(0)) totalOwned++;
+            }
+            assertEq(totalOwned, totalNFTSupply);
+        }
     }
 
     function testSafeTransferFrom(uint32 totalNFTSupply) public {
