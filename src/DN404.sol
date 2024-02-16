@@ -635,7 +635,8 @@ abstract contract DN404 {
     /// @dev Returns whether to use the exists lookup for more efficient
     /// scanning of an empty token ID slot. Highly recommended for collections
     /// with near full load factor `totalNFTSupply * _unit() / totalSupply`.
-    /// The trade off is slightly higher storage write costs.
+    /// The trade off is slightly higher initial storage write costs,
+    /// which will be quickly amortized away.
     function _useExistsLookup() internal pure virtual returns (bool) {
         return true;
     }
