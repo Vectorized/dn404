@@ -1101,24 +1101,18 @@ abstract contract DN404 {
             }
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
             let bucket := shr(8, begin)
-            let firstBucket := bucket
             let lastBucket := shr(8, end)
             let negBits := not(sload(add(shl(96, bitmap.slot), bucket)))
-            for {} 1 {} {
-                negBits := shl(and(0xff, begin), shr(and(0xff, begin), negBits))
-                if eq(bucket, lastBucket) {
-                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
-                }
-                if negBits { break }
-                bucket := add(bucket, 1)
-                for {} iszero(gt(bucket, lastBucket)) { bucket := add(bucket, 1) } {
+            negBits := shl(and(0xff, begin), shr(and(0xff, begin), negBits))
+            if iszero(negBits) {
+                for {} 1 {} {
+                    bucket := add(bucket, 1)
                     negBits := not(sload(add(shl(96, bitmap.slot), bucket)))
-                    if negBits { break }
+                    if or(negBits, gt(bucket, lastBucket)) { break }
                 }
                 if gt(bucket, lastBucket) {
                     negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
                 }
-                break
             }
             if negBits {
                 let i := or(shl(8, bucket), ffs(negBits))
