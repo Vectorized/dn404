@@ -271,8 +271,12 @@ contract DN404Test is SoladyTest {
         addresses[1] = address(222);
         addresses[2] = initialSupplyOwner;
 
-        for (uint256 t; t != 5; ++t) {
-            {
+        do {
+            if (_random() % 4 == 0) {
+                dn.setAddToBurnedPool(_random() % 2 == 0);
+            }
+
+            if (_random() % 16 > 0) {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
 
@@ -324,6 +328,7 @@ contract DN404Test is SoladyTest {
             }
             assertEq(balanceSum, dn.totalSupply());
             assertEq(nftBalanceSum, mirror.totalSupply());
+            assertLe(nftBalanceSum, balanceSum / _WAD);
 
             uint256 numOwned;
             for (uint256 i = 1; i <= n; ++i) {
@@ -332,6 +337,13 @@ contract DN404Test is SoladyTest {
             assertEq(numOwned, nftBalanceSum);
             assertEq(mirror.ownerAt(0), address(0));
             assertEq(mirror.ownerAt(n + 1), address(0));
+        } while (_random() % 8 > 0);
+
+        if (_random() % 4 == 0) {
+            uint256 end = n + 1 + n;
+            for (uint256 i = n + 1; i <= end; ++i) {
+                assertEq(mirror.ownerAt(i), address(0));
+            }
         }
 
         if (_random() % 4 == 0) {
