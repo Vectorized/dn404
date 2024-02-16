@@ -189,9 +189,9 @@ contract MappingsTest is SoladyTest {
     }
 
     function testFindFirstUnset(uint256) public {
-        uint256[] memory m = new uint256[](4);
+        uint256[] memory m = new uint256[](5);
 
-        unchecked {
+        do {
             if (_random() % 4 > 0) {
                 uint256 n = _random() % 32;
                 for (uint256 t; t != n; ++t) {
@@ -220,11 +220,13 @@ contract MappingsTest is SoladyTest {
                 }
             }
             do {
-                uint256 begin = _random() % 1024;
-                uint256 end = _random() % 1024;
-                assertEq(_findFirstUnset(bitmapA, begin, end), _findFirstUnset(m, begin, end));
+                uint256 begin = _random() % (1024 + 10);
+                uint256 end = _random() % (1024 + 10);
+                uint256 actual = _findFirstUnset(bitmapA, begin, end);
+                uint256 expected = _findFirstUnset(m, begin, end);
+                assertEq(actual, expected);
             } while (_random() % 16 > 0);
-        }
+        } while (_random() % 2 == 0);
     }
 
     function _findFirstUnset(uint256[] memory m, uint256 begin, uint256 end)
