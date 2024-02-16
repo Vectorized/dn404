@@ -197,10 +197,10 @@ abstract contract DN404 {
 
         /// @solidity memory-safe-assembly
         assembly {
-            // Make the call to link the mirror contract.
             mstore(0x00, 0x0f4599e5) // `linkMirrorContract(address)`.
             mstore(0x20, caller())
-            if iszero(and(eq(mload(0x00), 1), call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20))) {
+            let success := call(gas(), mirror, 0, 0x1c, 0x24, 0x00, 0x20)
+            if iszero(success) {
                 mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
                 revert(0x1c, 0x04)
             }
