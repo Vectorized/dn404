@@ -208,7 +208,7 @@ abstract contract DN404 {
 
         if (initialTokenSupply != 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (_totalSupplyOverflows(initialTokenSupply) != 0) revert TotalSupplyOverflow();
+            if (_totalSupplyOverflows(initialTokenSupply)) revert TotalSupplyOverflow();
 
             $.totalSupply = uint96(initialTokenSupply);
             AddressData storage initialOwnerAddressData = _addressData(initialSupplyOwner);
@@ -350,9 +350,8 @@ abstract contract DN404 {
             {
                 uint256 totalSupply_ = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
-                if (_totalSupplyOverflows(totalSupply_) | _toUint(totalSupply_ < amount) != 0) {
-                    revert TotalSupplyOverflow();
-                }
+                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
+                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
                 maxNFTId = totalSupply_ / _unit();
             }
             uint256 toEnd;
@@ -742,10 +741,8 @@ abstract contract DN404 {
         d = _getDN404Storage().addressData[owner];
         unchecked {
             if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
-                d.flags = uint8(
-                    (_toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG)
-                        | _ADDRESS_DATA_INITIALIZED_FLAG
-                );
+                uint256 skipNFT = (_toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG);
+                d.flags = uint8(skipNFT | _ADDRESS_DATA_INITIALIZED_FLAG);
             }
         }
     }
@@ -1052,10 +1049,10 @@ abstract contract DN404 {
     }
 
     /// @dev Returns whether `amount` is a valid `totalSupply`.
-    function _totalSupplyOverflows(uint256 amount) internal view returns (uint256) {
+    function _totalSupplyOverflows(uint256 amount) internal view returns (bool) {
         unchecked {
             return _toUint(amount > type(uint96).max)
-                | _toUint(amount / _unit() > type(uint32).max - 1);
+                | _toUint(amount / _unit() > type(uint32).max - 1) != 0;
         }
     }
 
