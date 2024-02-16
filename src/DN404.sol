@@ -116,12 +116,12 @@ abstract contract DN404 {
     }
 
     /// @dev A uint32 map in storage.
-    struct DNUint32Map {
+    struct Uint32Map {
         uint256 spacer;
     }
 
-    /// @dev A DNBitmap map in storage.
-    struct DNBitmap {
+    /// @dev A bitmap in storage.
+    struct Bitmap {
         uint256 spacer;
     }
 
@@ -150,17 +150,17 @@ abstract contract DN404 {
         mapping(address => mapping(address => bool)) operatorApprovals;
         // Mapping of NFT token approvals to approved operators.
         mapping(uint256 => address) nftApprovals;
-        // DNBitmap of whether an non-zero NFT approval may exist.
-        DNBitmap mayHaveNFTApproval;
+        // Bitmap of whether an non-zero NFT approval may exist.
+        Bitmap mayHaveNFTApproval;
         // Mapping of user allowances for token spenders.
         mapping(address => mapping(address => Uint256Ref)) allowance;
         // Mapping of NFT IDs owned by an address.
-        mapping(address => DNUint32Map) owned;
+        mapping(address => Uint32Map) owned;
         // The pool of burned NFT IDs.
-        DNUint32Map burnedPool;
+        Uint32Map burnedPool;
         // Even indices: owner aliases. Odd indices: owned indices.
-        DNUint32Map oo;
-        // Mapping of user account AddressData
+        Uint32Map oo;
+        // Mapping of user account AddressData.
         mapping(address => AddressData) addressData;
     }
 
@@ -361,8 +361,8 @@ abstract contract DN404 {
                 toEnd = toBalance / _unit();
             }
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                DNUint32Map storage toOwned = $.owned[to];
-                DNUint32Map storage oo = $.oo;
+                Uint32Map storage toOwned = $.owned[to];
+                Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
                 _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
 
@@ -428,7 +428,7 @@ abstract contract DN404 {
             uint256 totalSupply_ = uint256($.totalSupply) - amount;
             $.totalSupply = uint96(totalSupply_);
 
-            DNUint32Map storage fromOwned = $.owned[from];
+            Uint32Map storage fromOwned = $.owned[from];
             uint256 fromIndex = fromAddressData.ownedLength;
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
@@ -439,7 +439,7 @@ abstract contract DN404 {
                 $.totalNFTSupply = uint32(totalNFTSupply);
                 bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
 
-                DNUint32Map storage oo = $.oo;
+                Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
                 uint256 burnedPoolSize = $.burnedPoolSize;
@@ -513,13 +513,13 @@ abstract contract DN404 {
             $.totalNFTSupply = uint32(t.totalNFTSupply);
 
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
-            DNUint32Map storage oo = $.oo;
+            Uint32Map storage oo = $.oo;
 
             uint256 burnedPoolSize = $.burnedPoolSize;
             if (t.numNFTBurns != 0) {
                 _packedLogsSet(packedLogs, from, 1);
                 bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
-                DNUint32Map storage fromOwned = $.owned[from];
+                Uint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
                 uint256 fromEnd = fromIndex - t.numNFTBurns;
                 fromAddressData.ownedLength = uint32(fromEnd);
@@ -541,7 +541,7 @@ abstract contract DN404 {
             if (t.numNFTMints != 0) {
                 _packedLogsSet(packedLogs, to, 0);
                 uint256 nextTokenId = $.nextTokenId;
-                DNUint32Map storage toOwned = $.owned[to];
+                Uint32Map storage toOwned = $.owned[to];
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
                 uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
@@ -613,7 +613,7 @@ abstract contract DN404 {
 
         if (to == address(0)) revert TransferToZeroAddress();
 
-        DNUint32Map storage oo = $.oo;
+        Uint32Map storage oo = $.oo;
 
         if (from != $.aliasToAddress[_get(oo, _ownershipIndex(id))]) {
             revert TransferFromIncorrectOwner();
@@ -639,8 +639,8 @@ abstract contract DN404 {
                 fromAddressData.balance = uint96(fromBalance - unit);
                 toAddressData.balance += uint96(unit);
             }
-            mapping(address => DNUint32Map) storage owned = $.owned;
-            DNUint32Map storage fromOwned = owned[from];
+            mapping(address => Uint32Map) storage owned = $.owned;
+            Uint32Map storage fromOwned = owned[from];
 
             if (_get($.mayHaveNFTApproval, id)) {
                 _unset($.mayHaveNFTApproval, id);
@@ -983,7 +983,7 @@ abstract contract DN404 {
     }
 
     /// @dev Returns the uint32 value at `index` in `map`.
-    function _get(DNUint32Map storage map, uint256 index) internal view returns (uint32 result) {
+    function _get(Uint32Map storage map, uint256 index) internal view returns (uint32 result) {
         /// @solidity memory-safe-assembly
         assembly {
             let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
@@ -992,7 +992,7 @@ abstract contract DN404 {
     }
 
     /// @dev Updates the uint32 value at `index` in `map`.
-    function _set(DNUint32Map storage map, uint256 index, uint32 value) internal {
+    function _set(Uint32Map storage map, uint256 index, uint32 value) internal {
         /// @solidity memory-safe-assembly
         assembly {
             let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
@@ -1005,7 +1005,7 @@ abstract contract DN404 {
 
     /// @dev Sets the owner alias and the owned index together.
     function _setOwnerAliasAndOwnedIndex(
-        DNUint32Map storage map,
+        Uint32Map storage map,
         uint256 id,
         uint32 ownership,
         uint32 ownedIndex
@@ -1031,7 +1031,7 @@ abstract contract DN404 {
     }
 
     /// @dev Returns the boolean value of the bit at `index` in `bitmap`.
-    function _get(DNBitmap storage bitmap, uint256 index) internal view returns (bool isSet) {
+    function _get(Bitmap storage bitmap, uint256 index) internal view returns (bool isSet) {
         /// @solidity memory-safe-assembly
         assembly {
             let s := add(shl(96, bitmap.slot), shr(8, index))
@@ -1040,7 +1040,7 @@ abstract contract DN404 {
     }
 
     /// @dev Updates the bit at `index` in `bitmap` to true.
-    function _set(DNBitmap storage bitmap, uint256 index) internal {
+    function _set(Bitmap storage bitmap, uint256 index) internal {
         /// @solidity memory-safe-assembly
         assembly {
             let s := add(shl(96, bitmap.slot), shr(8, index))
@@ -1049,7 +1049,7 @@ abstract contract DN404 {
     }
 
     /// @dev Updates the bit at `index` in `bitmap` to false.
-    function _unset(DNBitmap storage bitmap, uint256 index) internal {
+    function _unset(Bitmap storage bitmap, uint256 index) internal {
         /// @solidity memory-safe-assembly
         assembly {
             let s := add(shl(96, bitmap.slot), shr(8, index))
