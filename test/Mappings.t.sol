@@ -224,7 +224,7 @@ contract MappingsTest is SoladyTest {
                 uint256 begin = _random() % 1024;
                 uint256 end = _random() % 1024;
                 assertEq(_findFirstUnset(bitmapA, begin, end), _findFirstUnset(m, begin, end));
-            } while (_random() % 8 > 0);
+            } while (_random() % 16 > 0);
         }
     }
 
