@@ -97,6 +97,16 @@ abstract contract DN404 {
     /// @dev The flag to denote that the address should skip NFTs.
     uint8 internal constant _ADDRESS_DATA_SKIP_NFT_FLAG = 1 << 1;
 
+    /// @dev The flag to denote that the address has overridden the default Permit2 allowance.
+    uint8 internal constant _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG = 1 << 2;
+
+    /// @dev The canonical Permit2 address.
+    /// For signature-based allowance granting for single transaction ERC20 `transferFrom`.
+    /// To enable, override `_givePermit2DefaultInfiniteAllowance()`.
+    /// [Github](https://github.com/Uniswap/permit2)
+    /// [Etherscan](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
+    address internal constant _PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                          STORAGE                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -273,6 +283,10 @@ abstract contract DN404 {
 
     /// @dev Returns the amount of tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
+        if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
+            uint8 flags = _getDN404Storage().addressData[owner].flags;
+            if (flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG == 0) return type(uint256).max;
+        }
         return _ref(_getDN404Storage().allowance, owner, spender).value;
     }
 
@@ -320,7 +334,11 @@ abstract contract DN404 {
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         Uint256Ref storage a = _ref(_getDN404Storage().allowance, from, msg.sender);
-        uint256 allowed = a.value;
+
+        uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
+            && (_getDN404Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == 0
+            ? type(uint256).max
+            : a.value;
 
         if (allowed != type(uint256).max) {
             if (amount > allowed) revert InsufficientAllowance();
@@ -330,6 +348,17 @@ abstract contract DN404 {
         }
         _transfer(from, to, amount);
         return true;
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                          PERMIT2                           */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Whether Permit2 has infinite allowances by default for all owners.
+    /// For signature-based allowance granting for single transaction ERC20 `transferFrom`.
+    /// To enable, override this function to return true.
+    function _givePermit2DefaultInfiniteAllowance() internal view virtual returns (bool) {
+        return false;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -680,6 +709,9 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function _approve(address owner, address spender, uint256 amount) internal virtual {
+        if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
+            _getDN404Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
+        }
         _ref(_getDN404Storage().allowance, owner, spender).value = amount;
         /// @solidity memory-safe-assembly
         assembly {

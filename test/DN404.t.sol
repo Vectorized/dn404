@@ -10,6 +10,8 @@ import {LibSort} from "solady/utils/LibSort.sol";
 contract DN404Test is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
 
+    address private constant _PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+
     MockDN404 dn;
     DN404Mirror mirror;
 
@@ -400,5 +402,51 @@ contract DN404Test is SoladyTest {
         dn.setNumAliases(type(uint32).max);
         vm.expectRevert();
         dn.registerAndResolveAlias(address(this));
+    }
+
+    function testPermit2() public {
+        address initialSupplyOwner = address(1111);
+        address alice = address(111);
+        address bob = address(222);
+
+        assertEq(dn.allowance(alice, _PERMIT2), 0);
+        dn.setGivePermit2DefaultInfiniteAllowance(true);
+        assertEq(dn.allowance(alice, _PERMIT2), type(uint256).max);
+
+        dn.initializeDN404(5 * _WAD, initialSupplyOwner, address(mirror));
+        vm.prank(initialSupplyOwner);
+        dn.transfer(alice, 5 * _WAD);
+
+        dn.setGivePermit2DefaultInfiniteAllowance(false);
+        assertEq(dn.allowance(alice, _PERMIT2), 0);
+
+        vm.prank(_PERMIT2);
+        vm.expectRevert(DN404.InsufficientAllowance.selector);
+        dn.transferFrom(alice, bob, 1 * _WAD);
+
+        dn.setGivePermit2DefaultInfiniteAllowance(true);
+        assertEq(dn.allowance(alice, _PERMIT2), type(uint256).max);
+
+        vm.prank(_PERMIT2);
+        dn.transferFrom(alice, bob, 1 * _WAD);
+
+        vm.prank(alice);
+        dn.approve(_PERMIT2, 1 * _WAD - 1);
+        assertEq(dn.allowance(alice, _PERMIT2), 1 * _WAD - 1);
+
+        vm.startPrank(_PERMIT2);
+        vm.expectRevert(DN404.InsufficientAllowance.selector);
+        dn.transferFrom(alice, bob, 1 * _WAD);
+        dn.transferFrom(alice, bob, 1 * _WAD - 2);
+        assertEq(dn.allowance(alice, _PERMIT2), 1);
+        dn.transferFrom(alice, bob, 1);
+        assertEq(dn.allowance(alice, _PERMIT2), 0);
+        vm.expectRevert(DN404.InsufficientAllowance.selector);
+        dn.transferFrom(alice, bob, 1);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        dn.approve(_PERMIT2, 1);
+        assertEq(dn.allowance(alice, _PERMIT2), 1);
     }
 }
