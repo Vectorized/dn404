@@ -27,8 +27,6 @@ contract NFTMintDN404 is DN404, Ownable {
     uint256 public constant MAX_PER_WALLET = 5;
     uint256 public constant MAX_SUPPLY = 5000;
 
-    mapping(address => uint256) public mintedCount;
-
     error InvalidProof();
     error InvalidMint();
     error InvalidPrice();
@@ -69,18 +67,19 @@ contract NFTMintDN404 is DN404, Ownable {
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
     }
 
-    function mint(uint256 amount) public payable isValidMint(publicPrice, amount) {
-        if (mintedCount[msg.sender] + amount > MAX_PER_WALLET) {
+    function mint(uint88 amount) public payable isValidMint(publicPrice, amount) {
+        uint88 curMintCount = _getAux(msg.sender);
+        if (curMintCount + amount > MAX_PER_WALLET) {
             revert InvalidMint();
         }
         unchecked {
-            mintedCount[msg.sender] += amount;
+            _setAux(msg.sender, curMintCount + amount);
             ++numMinted;
         }
         _mint(msg.sender, amount * _unit());
     }
 
-    function allowlistMint(uint256 amount, bytes32[] calldata proof)
+    function allowlistMint(uint88 amount, bytes32[] calldata proof)
         public
         payable
         isValidMint(allowlistPrice, amount)
@@ -92,11 +91,12 @@ contract NFTMintDN404 is DN404, Ownable {
         ) {
             revert InvalidProof();
         }
-        if (mintedCount[msg.sender] + amount > MAX_PER_WALLET) {
+        uint88 curMintCount = _getAux(msg.sender);
+        if (curMintCount + amount > MAX_PER_WALLET) {
             revert InvalidMint();
         }
         unchecked {
-            mintedCount[msg.sender] += amount;
+            _setAux(msg.sender, curMintCount + amount);
             ++numMinted;
         }
         _mint(msg.sender, amount * _unit());
