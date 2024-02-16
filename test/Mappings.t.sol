@@ -127,25 +127,15 @@ contract MappingsTest is SoladyTest {
     {
         /// @solidity memory-safe-assembly
         assembly {
-            function ffs(x) -> r {
-                let b := and(x, add(not(x), 1)) // Isolate the least significant bit.
-                r := or(shl(8, iszero(x)), shl(7, lt(0xffffffffffffffffffffffffffffffff, b)))
-                r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, b))))
-                r := or(r, shl(5, lt(0xffffffff, shr(r, b))))
-                // For the remaining 32 bits, use a De Bruijn lookup.
-                // forgefmt: disable-next-item
-                r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
-                    0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
-            }
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
-            let bucket := shr(8, begin)
-            let lastBucket := shr(8, end)
-            let negBits := not(sload(add(shl(96, bitmap.slot), bucket)))
-            negBits := shl(and(0xff, begin), shr(and(0xff, begin), negBits))
+            let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
+            let bucket := add(s, shr(8, begin))
+            let lastBucket := add(s, shr(8, end))
+            let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
                 for {} 1 {} {
                     bucket := add(bucket, 1)
-                    negBits := not(sload(add(shl(96, bitmap.slot), bucket)))
+                    negBits := not(sload(bucket))
                     if or(negBits, gt(bucket, lastBucket)) { break }
                 }
                 if gt(bucket, lastBucket) {
@@ -153,8 +143,17 @@ contract MappingsTest is SoladyTest {
                 }
             }
             if negBits {
-                let i := or(shl(8, bucket), ffs(negBits))
-                unsetBitIndex := or(i, sub(0, or(iszero(lt(i, end)), lt(i, begin))))
+                // Find-first-set routine.
+                let b := and(negBits, add(not(negBits), 1)) // Isolate the least significant bit.
+                let r := shl(7, lt(0xffffffffffffffffffffffffffffffff, b))
+                r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, b))))
+                r := or(r, shl(5, lt(0xffffffff, shr(r, b))))
+                // For the remaining 32 bits, use a De Bruijn lookup.
+                // forgefmt: disable-next-item
+                r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
+                    0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
+                r := or(shl(8, sub(bucket, s)), r)
+                unsetBitIndex := or(r, sub(0, or(iszero(lt(r, end)), lt(r, begin))))
             }
         }
     }
