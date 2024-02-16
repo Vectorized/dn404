@@ -424,8 +424,6 @@ abstract contract DN404 {
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != toEnd);
 
-                    // Leave some spacing between minted batches for better open addressing.
-                    $.nextTokenId = uint32(_wrapNFTId(nextTokenId + 7, maxNFTId));
                     $.burnedPoolSize = uint32(burnedPoolSize);
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
