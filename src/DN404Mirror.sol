@@ -144,7 +144,7 @@ contract DN404Mirror {
     }
 
     /// @dev Returns the owner of token `id` from the base DN404 contract.
-    /// @dev returns address(0) if it is does not exist
+    /// Returns `address(0)` instead of reverting if the token does not exist.
     function ownerAt(uint256 id) public view virtual returns (address result) {
         return address(uint160(_readWord(0x24359879, id, 0))); // `ownerAt(uint256)`.
     }
@@ -371,9 +371,9 @@ contract DN404Mirror {
                         codesize(),
                         0x00,
                         _TRANSFER_EVENT_SIGNATURE,
-                        mul(a, b),
-                        mul(a, iszero(b)),
-                        shr(168, shl(160, d))
+                        mul(a, b), // `from`.
+                        mul(a, iszero(b)), // `to`.
+                        shr(168, shl(160, d)) // `id`.
                     )
                 }
                 mstore(0x00, 0x01)

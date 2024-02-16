@@ -630,29 +630,34 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
 
-        fromAddressData.balance -= uint96(_unit());
+        uint256 unit = _unit();
 
         unchecked {
-            toAddressData.balance += uint96(_unit());
-
+            {
+                uint256 fromBalance = fromAddressData.balance;
+                if (unit > fromBalance) revert InsufficientBalance();
+                fromAddressData.balance = uint96(fromBalance - unit);
+                toAddressData.balance += uint96(unit);
+            }
             mapping(address => DNUint32Map) storage owned = $.owned;
             DNUint32Map storage fromOwned = owned[from];
 
-            _set(oo, _ownershipIndex(id), _registerAndResolveAlias(toAddressData, to));
             if (_get($.mayHaveNFTApproval, id)) {
                 _unset($.mayHaveNFTApproval, id);
                 delete $.nftApprovals[id];
             }
 
-            uint256 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
-            _set(fromOwned, _get(oo, _ownedIndex(id)), uint32(updatedId));
-
-            _set(oo, _ownedIndex(updatedId), _get(oo, _ownedIndex(id)));
-            uint256 n = toAddressData.ownedLength++;
+            {
+                uint32 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
+                uint32 i = _get(oo, _ownedIndex(id));
+                _set(fromOwned, i, updatedId);
+                _set(oo, _ownedIndex(updatedId), i);
+            }
+            uint32 n = toAddressData.ownedLength++;
             _set(owned[to], n, uint32(id));
-            _set(oo, _ownedIndex(id), uint32(n));
+            _setOwnerAliasAndOwnedIndex(oo, id, _registerAndResolveAlias(toAddressData, to), n);
         }
-        uint256 unit = _unit();
+
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Transfer} event.
@@ -702,8 +707,8 @@ abstract contract DN404 {
     /*                     SKIP NFT FUNCTIONS                     */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns true if account `owner` will skip NFT minting on token mints and transfers.
-    /// Returns false if account `owner` will mint NFTs on token mints and transfers.
+    /// @dev Returns true if minting and transferring ERC20s to `owner` will skip minting NFTs.
+    /// Returns false otherwise.
     function getSkipNFT(address owner) public view virtual returns (bool) {
         AddressData storage d = _getDN404Storage().addressData[owner];
         if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) return _hasCode(owner);
@@ -963,17 +968,17 @@ abstract contract DN404 {
     /*                 INTERNAL / PRIVATE HELPERS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns `i << 1`.
+    /// @dev Returns `(i - 1) << 1`.
     function _ownershipIndex(uint256 i) internal pure returns (uint256) {
         unchecked {
-            return (i - 1) << 1;
+            return (i - 1) << 1; // Minus 1 as token IDs start from 1.
         }
     }
 
     /// @dev Returns `((i - 1) << 1) + 1`.
     function _ownedIndex(uint256 i) internal pure returns (uint256) {
         unchecked {
-            return ((i - 1) << 1) + 1;
+            return ((i - 1) << 1) + 1; // Minus 1 as token IDs start from 1.
         }
     }
 
@@ -1007,7 +1012,7 @@ abstract contract DN404 {
     ) internal {
         /// @solidity memory-safe-assembly
         assembly {
-            let i := sub(id, 1)
+            let i := sub(id, 1) // Index of the uint64 combined value.
             let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
             let o := shl(6, and(i, 3)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
@@ -1089,10 +1094,10 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             // Note that `p` implicitly allocates and advances the free memory pointer by
-            // 2 words, which we can safely mutate in `_packedLogsSend`.
+            // 3 words, which we can safely mutate in `_packedLogsSend`.
             let logs := mload(0x40)
             mstore(logs, n) // Store the length.
-            let offset := add(0x20, logs)
+            let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
             mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
             mstore(add(0x40, p), logs) // Set `p.logs`.
             mstore(p, offset) // Set `p.offset`.
@@ -1103,7 +1108,7 @@ abstract contract DN404 {
     function _packedLogsSet(_PackedLogs memory p, address a, uint256 burnBit) private pure {
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(add(p, 0x20), or(shl(96, a), burnBit))
+            mstore(add(p, 0x20), or(shl(96, a), burnBit)) // Set `p.addressAndBit`.
         }
     }
 
@@ -1112,7 +1117,7 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             let offset := mload(p)
-            mstore(offset, or(mload(add(p, 0x20)), shl(8, id)))
+            mstore(offset, or(mload(add(p, 0x20)), shl(8, id))) // `p.addressAndBit | (id << 8)`.
             mstore(p, add(offset, 0x20))
         }
     }

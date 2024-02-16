@@ -80,4 +80,27 @@ contract MockDN404 is DN404 {
     function setNumAliases(uint32 value) public {
         _getDN404Storage().numAliases = value;
     }
+
+    function tokensOf(address owner) public view returns (uint256[] memory result) {
+        result = _tokensOfWithChecks(owner);
+    }
+
+    function _tokensOfWithChecks(address owner) internal view returns (uint256[] memory result) {
+        DN404Storage storage $ = _getDN404Storage();
+        uint256 n = $.addressData[owner].ownedLength;
+        result = new uint256[](n);
+        for (uint256 i; i < n; ++i) {
+            uint256 id = _get($.owned[owner], i);
+            result[i] = id;
+            // Check invariants.
+            require(_ownerAt(id) == owner);
+            require(_get($.oo, _ownedIndex(id)) == i);
+        }
+    }
+
+    function randomTokenOf(address owner, uint256 seed) public view returns (uint256) {
+        DN404Storage storage $ = _getDN404Storage();
+        uint256 n = $.addressData[owner].ownedLength;
+        return _get($.owned[owner], seed % n);
+    }
 }
