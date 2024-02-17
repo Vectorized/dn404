@@ -33,6 +33,27 @@ contract NFTMintDN404 is DN404, Ownable {
     error TotalSupplyReached();
     error NotLive();
 
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        bytes32 allowlistRoot_,
+        uint96 publicPrice_,
+        uint96 allowlistPrice_,
+        uint256 initialTokenSupply,
+        address initialSupplyOwner
+    ) {
+        _initializeOwner(msg.sender);
+
+        _name = name_;
+        _symbol = symbol_;
+        _allowlistRoot = allowlistRoot_;
+        publicPrice = publicPrice_;
+        allowlistPrice = allowlistPrice_;
+
+        address mirror = address(new DN404Mirror(msg.sender));
+        _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
+    }
+
     modifier onlyLive() {
         if (!live) {
             revert NotLive();
@@ -64,27 +85,6 @@ contract NFTMintDN404 is DN404, Ownable {
         }
         _setAux(msg.sender, uint88(updatedMintCount));
         _;
-    }
-
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        bytes32 allowlistRoot_,
-        uint96 publicPrice_,
-        uint96 allowlistPrice_,
-        uint256 initialTokenSupply,
-        address initialSupplyOwner
-    ) {
-        _initializeOwner(msg.sender);
-
-        _name = name_;
-        _symbol = symbol_;
-        _allowlistRoot = allowlistRoot_;
-        publicPrice = publicPrice_;
-        allowlistPrice = allowlistPrice_;
-
-        address mirror = address(new DN404Mirror(msg.sender));
-        _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
     }
 
     function mint(uint256 nftAmount)
