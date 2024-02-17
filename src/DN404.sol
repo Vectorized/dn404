@@ -1128,7 +1128,7 @@ abstract contract DN404 {
     }
 
     /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
-    /// If no set bit is found, returns `type(uint256).max`.
+    /// If no unset bit is found, returns `type(uint256).max`.
     function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
         internal
         view
