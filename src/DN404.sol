@@ -149,9 +149,9 @@ abstract contract DN404 {
     struct DN404Storage {
         // Current number of address aliases assigned.
         uint32 numAliases;
-        // Next token ID to assign for an NFT mint.
+        // Next NFT ID to assign for a mint.
         uint32 nextTokenId;
-        // Total number of IDs in the burned pool.
+        // Total number of NFT IDs in the burned pool.
         uint32 burnedPoolSize;
         // Total supply of minted NFTs.
         uint32 totalNFTSupply;
@@ -163,13 +163,13 @@ abstract contract DN404 {
         mapping(uint32 => address) aliasToAddress;
         // Mapping of user operator approvals for NFTs.
         AddressPairToUint256RefMap operatorApprovals;
-        // Mapping of NFT token approvals to approved operators.
+        // Mapping of NFT approvals to approved operators.
         mapping(uint256 => address) nftApprovals;
         // Bitmap of whether an non-zero NFT approval may exist.
         Bitmap mayHaveNFTApproval;
-        // Bitmap of whether a token ID exists.
+        // Bitmap of whether a NFT ID exists. Ignored if `_useExistsLookup()` returns false.
         Bitmap exists;
-        // Mapping of user allowances for token spenders.
+        // Mapping of user allowances for ERC20 spenders.
         AddressPairToUint256RefMap allowance;
         // Mapping of NFT IDs owned by an address.
         mapping(address => Uint32Map) owned;
