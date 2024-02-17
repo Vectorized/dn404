@@ -624,15 +624,16 @@ abstract contract DN404 {
     }
 
     /// @dev Returns if burns should be added to the burn pool.
+    /// This returns false by default, which means the NFT IDs are re-minted in a cycle.
     function _addToBurnedPool(uint256 totalNFTSupplyAfterBurn, uint256 totalSupplyAfterBurn)
         internal
         view
         virtual
         returns (bool)
     {
-        // Add to burned pool if the load factor > 50%, and collection is not small.
-        uint256 thres = (totalSupplyAfterBurn / _unit()) >> 1;
-        return _toUint(totalNFTSupplyAfterBurn > thres) & _toUint(thres > 128) != 0;
+        totalNFTSupplyAfterBurn = totalNFTSupplyAfterBurn; // Silence compiler warning.
+        totalSupplyAfterBurn = totalSupplyAfterBurn; // Silence compiler warning.
+        return false;
     }
 
     /// @dev Returns whether to use the exists lookup for more efficient
