@@ -404,6 +404,69 @@ contract DN404Test is SoladyTest {
         dn.registerAndResolveAlias(address(this));
     }
 
+    function testOwnedIds() public {
+        dn.initializeDN404(5 * _WAD, address(this), address(mirror));
+
+        address alice = address(111);
+        dn.transfer(alice, 5 * _WAD);
+        assertEq(mirror.balanceOf(alice), 5);
+
+        assertEq(dn.ownedIds(alice, 0, type(uint256).max), _range(1, 6));
+
+        for (uint256 j; j <= 5; ++j) {
+            assertEq(dn.ownedIds(alice, 0, j), _range(1, 1 + j));
+        }
+        for (uint256 j = 6; j <= 10; ++j) {
+            assertEq(dn.ownedIds(alice, 0, j), _range(1, 1 + 5));
+        }
+        for (uint256 j; j <= 5; ++j) {
+            assertEq(dn.ownedIds(alice, j, 5), _range(1 + j, 1 + 5));
+        }
+        for (uint256 j; j <= 5; ++j) {
+            assertEq(dn.ownedIds(alice, j, 10), _range(1 + j, 6));
+        }
+    }
+
+    function testOwnedIds(uint256) public {
+        uint256 totalNFTSupply = _random() % 10;
+        dn.initializeDN404(totalNFTSupply * _WAD, address(this), address(mirror));
+
+        address alice = address(111);
+        dn.transfer(alice, totalNFTSupply * _WAD);
+        assertEq(mirror.balanceOf(alice), totalNFTSupply);
+
+        uint256 begin = _random() % (totalNFTSupply + 2);
+        uint256 end = _random() % (totalNFTSupply + 2);
+        uint256 numExpected;
+        unchecked {
+            uint256 n = totalNFTSupply + 5;
+            for (uint256 i; i < n; ++i) {
+                if (begin <= i && i < end && i < totalNFTSupply) ++numExpected;
+            }
+        }
+        uint256[] memory expected = new uint256[](numExpected);
+        unchecked {
+            uint256 j;
+            uint256 k = begin + 1; // Plus 1 as token IDs start at 1.
+            for (uint256 i; i < numExpected; ++i) {
+                expected[j++] = k++;
+            }
+        }
+        assertEq(dn.ownedIds(alice, begin, end), expected);
+    }
+
+    function _range(uint256 start, uint256 end) internal pure returns (uint256[] memory a) {
+        unchecked {
+            if (start <= end) {
+                uint256 n = end - start;
+                a = new uint256[](n);
+                for (uint256 i; i < n; ++i) {
+                    a[i] = start + i;
+                }
+            }
+        }
+    }
+
     function testPermit2() public {
         address initialSupplyOwner = address(1111);
         address alice = address(111);

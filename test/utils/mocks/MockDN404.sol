@@ -113,4 +113,12 @@ contract MockDN404 is DN404 {
     function _givePermit2DefaultInfiniteAllowance() internal view virtual override returns (bool) {
         return givePermit2DefaultInfiniteAllowance;
     }
+
+    function ownedIds(address owner, uint256 start, uint256 end)
+        public
+        view
+        returns (uint256[] memory)
+    {
+        return _ownedIds(owner, start, end);
+    }
 }
