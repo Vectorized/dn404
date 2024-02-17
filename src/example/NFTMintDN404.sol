@@ -39,7 +39,7 @@ contract NFTMintDN404 is DN404, Ownable {
         bytes32 allowlistRoot_,
         uint96 publicPrice_,
         uint96 allowlistPrice_,
-        uint256 initialTokenSupply,
+        uint96 initialTokenSupply,
         address initialSupplyOwner
     ) {
         _initializeOwner(msg.sender);
