@@ -17,8 +17,8 @@ contract NFTMintDN404Test is SoladyTest {
     bytes32 allowlistRoot;
     bytes32[] allowlistData = new bytes32[](2);
 
-    uint120 publicPrice = 0.02 ether;
-    uint120 allowlistPrice = 0.01 ether;
+    uint96 publicPrice = 0.02 ether;
+    uint96 allowlistPrice = 0.01 ether;
 
     function setUp() public {
         allowlistMerkle = new Merkle();
