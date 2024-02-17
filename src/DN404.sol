@@ -907,6 +907,32 @@ abstract contract DN404 {
         _ref(_getDN404Storage().operatorApprovals, msgSender, operator).value = _toUint(approved);
     }
 
+    /// @dev Returns the NFT IDs of `owner` in range `[begin, end)`.
+    /// Optimized for smaller bytecode size, as this function is intended for off-chain calling.
+    function _ownedIds(address owner, uint256 begin, uint256 end)
+        internal
+        view
+        virtual
+        returns (uint256[] memory ids)
+    {
+        DN404Storage storage $ = _getDN404Storage();
+        Uint32Map storage owned = $.owned[owner];
+        uint256 n = $.addressData[owner].ownedLength;
+        /// @solidity memory-safe-assembly
+        assembly {
+            n := xor(n, mul(lt(end, n), xor(end, n))) // `min(n, end)`.
+            ids := mload(0x40)
+            let i := begin
+            for {} lt(i, n) { i := add(i, 1) } {
+                let s := add(shl(96, owned.slot), shr(3, i)) // Storage slot.
+                let id := and(0xffffffff, shr(shl(5, and(i, 7)), sload(s)))
+                mstore(add(add(ids, 0x20), shl(5, sub(i, begin))), id) // Append to.
+            }
+            mstore(ids, sub(i, begin)) // Store the length.
+            mstore(0x40, add(add(ids, 0x20), shl(5, sub(i, begin)))) // Allocate memory.
+        }
+    }
+
     /// @dev Fallback modifier to dispatch calls from the mirror NFT contract
     /// to internal functions in this contract.
     modifier dn404Fallback() virtual {
@@ -1102,7 +1128,7 @@ abstract contract DN404 {
     }
 
     /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
-    /// If no set bit is found, returns `type(uint256).max`.
+    /// If no unset bit is found, returns `type(uint256).max`.
     function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
         internal
         view
