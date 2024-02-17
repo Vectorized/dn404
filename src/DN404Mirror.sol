@@ -72,6 +72,9 @@ contract DN404Mirror {
     /// been established.
     error NotLinked();
 
+    /// @dev The function selector is not recognized.
+    error FnSelectorNotRecognized();
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                          STORAGE                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -399,9 +402,18 @@ contract DN404Mirror {
     }
 
     /// @dev Fallback function for calls from base DN404 contract.
-    fallback() external payable virtual dn404NFTFallback {}
+    /// Override this if you need to implement your custom
+    /// fallback with utilities like Solady's `LibZip.cdFallback()`.
+    /// And always remember to always wrap the fallback with `dn404NFTFallback`.
+    fallback() external payable virtual dn404NFTFallback {
+        revert FnSelectorNotRecognized(); // Not mandatory. Just for quality of life.
+    }
 
-    receive() external payable virtual {}
+    /// @dev This is to silence the compiler warning.
+    /// Override and remove the revert if you want your contract to receive ETH via receive.
+    receive() external payable virtual {
+        if (msg.value != 0) revert();
+    }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      PRIVATE HELPERS                       */

@@ -34,7 +34,7 @@ contract SimpleDN404Test is SoladyTest {
     }
 
     function testWithdraw() public {
-        payable(address(dn)).transfer(1 ether);
+        vm.deal(address(dn), 1 ether);
         assertEq(address(dn).balance, 1 ether);
         vm.prank(alice);
         dn.withdraw();

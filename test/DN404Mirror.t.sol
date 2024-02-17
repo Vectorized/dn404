@@ -275,4 +275,11 @@ contract DN404MirrorTest is SoladyTest {
         mirror.pullOwner();
         assertEq(mirror.owner(), newOwner);
     }
+
+    function testFnSelectorNotRecognized() public {
+        (bool success, bytes memory result) =
+            address(dn).call(abi.encodeWithSignature("nonSupportedFunction123()"));
+        assertFalse(success);
+        assertEq(result, abi.encodePacked(DN404.FnSelectorNotRecognized.selector));
+    }
 }
