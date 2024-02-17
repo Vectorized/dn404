@@ -69,21 +69,21 @@ contract NFTMintDN404 is DN404, Ownable {
     }
 
     modifier checkAndUpdateTotalMinted(uint256 nftAmount) {
-        uint256 updatedTotalMinted = uint256(totalMinted) + nftAmount;
-        if (updatedTotalMinted > MAX_SUPPLY) {
+        uint256 newTotalMinted = uint256(totalMinted) + nftAmount;
+        if (newTotalMinted > MAX_SUPPLY) {
             revert TotalSupplyReached();
         }
-        totalMinted = uint32(updatedTotalMinted);
+        totalMinted = uint32(newTotalMinted);
         _;
     }
 
     modifier checkAndUpdateBuyerMintCount(uint256 nftAmount) {
         uint256 currentMintCount = _getAux(msg.sender);
-        uint256 updatedMintCount = currentMintCount + nftAmount;
-        if (updatedMintCount > MAX_PER_WALLET) {
+        uint256 newMintCount = currentMintCount + nftAmount;
+        if (newMintCount > MAX_PER_WALLET) {
             revert InvalidMint();
         }
-        _setAux(msg.sender, uint88(updatedMintCount));
+        _setAux(msg.sender, uint88(newMintCount));
         _;
     }
 
@@ -92,8 +92,8 @@ contract NFTMintDN404 is DN404, Ownable {
         payable
         onlyLive
         checkPrice(publicPrice, nftAmount)
-        checkAndUpdateTotalMinted(nftAmount)
         checkAndUpdateBuyerMintCount(nftAmount)
+        checkAndUpdateTotalMinted(nftAmount)
     {
         _mint(msg.sender, nftAmount * _unit());
     }
@@ -103,8 +103,8 @@ contract NFTMintDN404 is DN404, Ownable {
         payable
         onlyLive
         checkPrice(allowlistPrice, nftAmount)
-        checkAndUpdateTotalMinted(nftAmount)
         checkAndUpdateBuyerMintCount(nftAmount)
+        checkAndUpdateTotalMinted(nftAmount)
     {
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         if (!MerkleProofLib.verifyCalldata(proof, _allowlistRoot, leaf)) {
