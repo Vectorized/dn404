@@ -21,11 +21,11 @@ contract NFTMintDN404 is DN404, Ownable {
     bytes32 private _allowlistRoot;
     uint96 public publicPrice; // uint96 is sufficient to represent all ETH in existence.
     uint96 public allowlistPrice; // uint96 is sufficient to represent all ETH in existence.
-    uint32 public totalMinted; // DN404 only supports up to 2**32 - 2 tokens.
+    uint32 public totalMinted; // DN404 only supports up to `2**32 - 2` tokens.
     bool public live;
 
-    uint256 public constant MAX_PER_WALLET = 5;
-    uint256 public constant MAX_SUPPLY = 5000;
+    uint32 public constant MAX_PER_WALLET = 5;
+    uint32 public constant MAX_SUPPLY = 5000;
 
     error InvalidProof();
     error InvalidMint();
@@ -33,16 +33,36 @@ contract NFTMintDN404 is DN404, Ownable {
     error TotalSupplyReached();
     error NotLive();
 
-    modifier isValidMint(uint256 price, uint256 nftAmount) {
+    modifier onlyLive() {
         if (!live) {
             revert NotLive();
         }
+        _;
+    }
+
+    modifier checkPrice(uint256 price, uint256 nftAmount) {
         if (price * nftAmount != msg.value) {
             revert InvalidPrice();
         }
-        if (uint256(totalMinted) + nftAmount > MAX_SUPPLY) {
+        _;
+    }
+
+    modifier checkAndUpdateTotalMinted(uint256 nftAmount) {
+        uint256 updatedTotalMinted = uint256(totalMinted) + nftAmount;
+        if (updatedTotalMinted > MAX_SUPPLY) {
             revert TotalSupplyReached();
         }
+        totalMinted = uint32(updatedTotalMinted);
+        _;
+    }
+
+    modifier checkAndUpdateBuyerMintCount(uint256 nftAmount) {
+        uint256 currentMintCount = _getAux(msg.sender);
+        uint256 updatedMintCount = currentMintCount + nftAmount;
+        if (updatedMintCount > MAX_PER_WALLET) {
+            revert InvalidMint();
+        }
+        _setAux(msg.sender, uint88(updatedMintCount));
         _;
     }
 
@@ -67,36 +87,28 @@ contract NFTMintDN404 is DN404, Ownable {
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirror);
     }
 
-    function mint(uint256 nftAmount) public payable isValidMint(publicPrice, nftAmount) {
-        uint256 currentMintCount = _getAux(msg.sender);
-        uint256 updatedMintCount = currentMintCount + nftAmount;
-        if (updatedMintCount > MAX_PER_WALLET) {
-            revert InvalidMint();
-        }
-        _setAux(msg.sender, uint88(updatedMintCount));
-        unchecked {
-            totalMinted += uint32(nftAmount);
-        }
+    function mint(uint256 nftAmount)
+        public
+        payable
+        onlyLive
+        checkPrice(publicPrice, nftAmount)
+        checkAndUpdateTotalMinted(nftAmount)
+        checkAndUpdateBuyerMintCount(nftAmount)
+    {
         _mint(msg.sender, nftAmount * _unit());
     }
 
     function allowlistMint(uint256 nftAmount, bytes32[] calldata proof)
         public
         payable
-        isValidMint(allowlistPrice, nftAmount)
+        onlyLive
+        checkPrice(allowlistPrice, nftAmount)
+        checkAndUpdateTotalMinted(nftAmount)
+        checkAndUpdateBuyerMintCount(nftAmount)
     {
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         if (!MerkleProofLib.verifyCalldata(proof, _allowlistRoot, leaf)) {
             revert InvalidProof();
-        }
-        uint256 currentMintCount = _getAux(msg.sender);
-        uint256 updatedMintCount = currentMintCount + nftAmount;
-        if (updatedMintCount > MAX_PER_WALLET) {
-            revert InvalidMint();
-        }
-        _setAux(msg.sender, uint88(updatedMintCount));
-        unchecked {
-            totalMinted += uint32(nftAmount);
         }
         _mint(msg.sender, nftAmount * _unit());
     }
