@@ -449,4 +449,11 @@ contract DN404Test is SoladyTest {
         dn.approve(_PERMIT2, 1);
         assertEq(dn.allowance(alice, _PERMIT2), 1);
     }
+
+    function testFnSelectorNotRecognized() public {
+        (bool success, bytes memory result) =
+            address(dn).call(abi.encodeWithSignature("nonSupportedFunction123()"));
+        assertFalse(success);
+        assertEq(result, abi.encodePacked(DN404.FnSelectorNotRecognized.selector));
+    }
 }
