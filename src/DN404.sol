@@ -500,7 +500,7 @@ abstract contract DN404 {
                     }
                 } while (fromIndex != fromEnd);
 
-                $.burnedPoolTail = uint32(burnedPoolTail);
+                if (addToBurnedPool) $.burnedPoolTail = burnedPoolTail;
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
@@ -578,6 +578,8 @@ abstract contract DN404 {
                         delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
+
+                if (addToBurnedPool) $.burnedPoolTail = burnedPoolTail;
             }
 
             uint32 burnedPoolHead = $.burnedPoolHead;
@@ -610,12 +612,11 @@ abstract contract DN404 {
                     _packedLogsAppend(packedLogs, id);
                 } while (toIndex != toEnd);
 
+                $.burnedPoolHead = burnedPoolHead;
                 $.nextTokenId = uint32(nextTokenId);
             }
 
             if (packedLogs.logs.length != 0) {
-                $.burnedPoolHead = burnedPoolHead;
-                $.burnedPoolTail = burnedPoolTail;
                 _packedLogsSend(packedLogs, $.mirrorERC721);
             }
         }
