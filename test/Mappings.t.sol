@@ -118,6 +118,14 @@ contract MappingsTest is SoladyTest {
         }
     }
 
+    /// @dev Returns `id > type(uint32).max ? 0 : id`.
+    function _restrictNFTId(uint256 id) internal pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mul(id, lt(id, 0x100000000))
+        }
+    }
+
     /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
     /// If no set bit is found, returns `type(uint256).max`.
     function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
@@ -376,6 +384,10 @@ contract MappingsTest is SoladyTest {
         assembly {
             if gt(mload(0x40), 0xffffffff) { revert(0x00, 0x00) }
         }
+    }
+
+    function testRestrictNFTId(uint256 id) public {
+        assertEq(_restrictNFTId(id), id > type(uint32).max ? 0 : id);
     }
 
     function _brutalized(address a) internal pure returns (address result) {

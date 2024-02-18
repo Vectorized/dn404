@@ -668,7 +668,7 @@ abstract contract DN404 {
 
         Uint32Map storage oo = $.oo;
 
-        if (from != $.aliasToAddress[_get(oo, _ownershipIndex(id))]) {
+        if (from != $.aliasToAddress[_get(oo, _ownershipIndex(_restrictNFTId(id)))]) {
             revert TransferFromIncorrectOwner();
         }
 
@@ -852,7 +852,7 @@ abstract contract DN404 {
     /// Returns the zero address instead of reverting if the token does not exist.
     function _ownerAt(uint256 id) internal view virtual returns (address) {
         DN404Storage storage $ = _getDN404Storage();
-        return $.aliasToAddress[_get($.oo, _ownershipIndex(id))];
+        return $.aliasToAddress[_get($.oo, _ownershipIndex(_restrictNFTId(id)))];
     }
 
     /// @dev Returns the owner of token `id`.
@@ -889,7 +889,7 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
 
-        owner = $.aliasToAddress[_get($.oo, _ownershipIndex(id))];
+        owner = $.aliasToAddress[_get($.oo, _ownershipIndex(_restrictNFTId(id)))];
 
         if (msgSender != owner) {
             if (_ref($.operatorApprovals, owner, msgSender).value == 0) {
@@ -1192,6 +1192,14 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             result := or(mul(iszero(gt(id, maxId)), id), gt(id, maxId))
+        }
+    }
+
+    /// @dev Returns `id > type(uint32).max ? 0 : id`.
+    function _restrictNFTId(uint256 id) internal pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mul(id, lt(id, 0x100000000))
         }
     }
 
