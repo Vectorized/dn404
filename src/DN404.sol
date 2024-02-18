@@ -382,25 +382,24 @@ abstract contract DN404 {
     function _mint(address to, uint256 amount) internal virtual {
         if (to == address(0)) revert TransferToZeroAddress();
 
+        AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
 
-        AddressData storage toAddressData = _addressData(to);
-
+        uint256 maxId;
         unchecked {
-            uint256 maxId;
-            {
-                uint256 totalSupply_ = uint256($.totalSupply) + amount;
-                $.totalSupply = uint96(totalSupply_);
-                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-                maxId = totalSupply_ / _unit();
-            }
-            uint256 toEnd;
-            {
-                uint256 toBalance = uint256(toAddressData.balance) + amount;
-                toAddressData.balance = uint96(toBalance);
-                toEnd = toBalance / _unit();
-            }
+            uint256 totalSupply_ = uint256($.totalSupply) + amount;
+            $.totalSupply = uint96(totalSupply_);
+            uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
+            if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+            maxId = totalSupply_ / _unit();
+        }
+        uint256 toEnd;
+        unchecked {
+            uint256 toBalance = uint256(toAddressData.balance) + amount;
+            toAddressData.balance = uint96(toBalance);
+            toEnd = toBalance / _unit();
+        }
+        unchecked {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 Uint32Map storage toOwned = $.owned[to];
                 Uint32Map storage oo = $.oo;
@@ -409,12 +408,12 @@ abstract contract DN404 {
 
                 if (packedLogs.logs.length != 0) {
                     _packedLogsSet(packedLogs, to, 0);
+                    $.totalNFTSupply += uint32(packedLogs.logs.length);
+                    toAddressData.ownedLength = uint32(toEnd);
+                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
                     uint32 burnedPoolTail = $.burnedPoolTail;
                     uint256 nextTokenId = $.nextTokenId;
-                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
-                    $.totalNFTSupply += uint32(packedLogs.logs.length);
-                    toAddressData.ownedLength = uint32(toEnd);
                     // Mint loop.
                     do {
                         uint256 id;
@@ -460,9 +459,8 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function _burn(address from, uint256 amount) internal virtual {
-        DN404Storage storage $ = _getDN404Storage();
-
         AddressData storage fromAddressData = _addressData(from);
+        DN404Storage storage $ = _getDN404Storage();
 
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
@@ -582,15 +580,15 @@ abstract contract DN404 {
                 if (addToBurnedPool) $.burnedPoolTail = burnedPoolTail;
             }
 
-            uint32 burnedPoolHead = $.burnedPoolHead;
             if (t.numNFTMints != 0) {
                 _packedLogsSet(packedLogs, to, 0);
                 uint256 nextTokenId = $.nextTokenId;
+                uint32 burnedPoolHead = $.burnedPoolHead;
                 Uint32Map storage toOwned = $.owned[to];
-                uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
+                t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                uint256 maxId = t.totalSupply / _unit();
                 uint256 toIndex = t.toOwnedLength;
                 uint256 toEnd = toIndex + t.numNFTMints;
-                uint256 maxId = t.totalSupply / _unit();
                 toAddressData.ownedLength = uint32(toEnd);
                 // Mint loop.
                 do {
@@ -608,7 +606,7 @@ abstract contract DN404 {
                     }
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
-                    _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
+                    _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
                 } while (toIndex != toEnd);
 
@@ -1146,9 +1144,9 @@ abstract contract DN404 {
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
             let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
             let bucket := add(s, shr(8, begin))
-            let lastBucket := add(s, shr(8, end))
             let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
+                let lastBucket := add(s, shr(8, end))
                 for {} 1 {} {
                     bucket := add(bucket, 1)
                     negBits := not(sload(bucket))
@@ -1289,6 +1287,7 @@ abstract contract DN404 {
         uint256 toOwnedLength;
         uint256 totalSupply;
         uint256 totalNFTSupply;
+        uint32 toAlias;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
