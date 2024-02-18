@@ -393,24 +393,24 @@ abstract contract DN404 {
             if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
             maxId = totalSupply_ / _unit();
         }
-        uint256 toEnd;
+        _DNMintTemps memory t;
         unchecked {
             uint256 toBalance = uint256(toAddressData.balance) + amount;
             toAddressData.balance = uint96(toBalance);
-            toEnd = toBalance / _unit();
+            t.toEnd = toBalance / _unit();
         }
         unchecked {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 Uint32Map storage toOwned = $.owned[to];
                 Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
-                _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(toEnd, toIndex));
+                _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(t.toEnd, toIndex));
 
                 if (packedLogs.logs.length != 0) {
                     _packedLogsSet(packedLogs, to, 0);
                     $.totalNFTSupply += uint32(packedLogs.logs.length);
-                    toAddressData.ownedLength = uint32(toEnd);
-                    uint32 toAlias = _registerAndResolveAlias(toAddressData, to);
+                    toAddressData.ownedLength = uint32(t.toEnd);
+                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
                     uint32 burnedPoolTail = $.burnedPoolTail;
                     uint256 nextTokenId = $.nextTokenId;
@@ -430,9 +430,9 @@ abstract contract DN404 {
                         }
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
-                        _setOwnerAliasAndOwnedIndex(oo, id, toAlias, uint32(toIndex++));
+                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, id);
-                    } while (toIndex != toEnd);
+                    } while (toIndex != t.toEnd);
 
                     $.nextTokenId = uint32(nextTokenId);
                     $.burnedPoolHead = burnedPoolHead;
@@ -532,7 +532,7 @@ abstract contract DN404 {
 
         DN404Storage storage $ = _getDN404Storage();
 
-        _TransferTemps memory t;
+        _DNTransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
         t.totalSupply = $.totalSupply;
@@ -1277,7 +1277,7 @@ abstract contract DN404 {
     }
 
     /// @dev Struct of temporary variables for transfers.
-    struct _TransferTemps {
+    struct _DNTransferTemps {
         uint256 numNFTBurns;
         uint256 numNFTMints;
         uint256 fromBalance;
@@ -1286,6 +1286,12 @@ abstract contract DN404 {
         uint256 toOwnedLength;
         uint256 totalSupply;
         uint256 totalNFTSupply;
+        uint256 toEnd;
+        uint32 toAlias;
+    }
+
+    /// @dev Struct of temporary variables for mints.
+    struct _DNMintTemps {
         uint256 toEnd;
         uint32 toAlias;
     }
