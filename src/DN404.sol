@@ -556,7 +556,7 @@ abstract contract DN404 {
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
 
-            t.burnedPoolTail = $.burnedPoolTail;
+            uint32 burnedPoolTail = $.burnedPoolTail;
             if (t.numNFTBurns != 0) {
                 _packedLogsSet(packedLogs, from, 1);
                 bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
@@ -570,14 +570,14 @@ abstract contract DN404 {
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
                     if (_useExistsLookup()) _set($.exists, id, false);
-                    if (addToBurnedPool) _set($.burnedPool, t.burnedPoolTail++, uint32(id));
+                    if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
 
-                if (addToBurnedPool) $.burnedPoolTail = t.burnedPoolTail;
+                if (addToBurnedPool) $.burnedPoolTail = burnedPoolTail;
             }
 
             if (t.numNFTMints != 0) {
@@ -588,12 +588,11 @@ abstract contract DN404 {
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 maxId = t.totalSupply / _unit();
                 uint256 toIndex = t.toOwnedLength;
-                uint256 toEnd = toIndex + t.numNFTMints;
-                toAddressData.ownedLength = uint32(toEnd);
+                toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
                 // Mint loop.
                 do {
                     uint256 id;
-                    if (burnedPoolHead != t.burnedPoolTail) {
+                    if (burnedPoolHead != burnedPoolTail) {
                         id = _get($.burnedPool, burnedPoolHead++);
                     } else {
                         id = nextTokenId;
@@ -608,7 +607,7 @@ abstract contract DN404 {
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
-                } while (toIndex != toEnd);
+                } while (toIndex != t.toEnd);
 
                 $.burnedPoolHead = burnedPoolHead;
                 $.nextTokenId = uint32(nextTokenId);
@@ -1287,8 +1286,8 @@ abstract contract DN404 {
         uint256 toOwnedLength;
         uint256 totalSupply;
         uint256 totalNFTSupply;
+        uint256 toEnd;
         uint32 toAlias;
-        uint32 burnedPoolTail;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
