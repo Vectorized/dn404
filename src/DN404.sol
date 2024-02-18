@@ -1195,7 +1195,7 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Returns zero if the NFT ID is more the `type(uint32).max`.
+    /// @dev Returns `id > type(uint32).max ? 0 : id`.
     function _restrictNFTId(uint256 id) internal pure returns (uint256 result) {
         /// @solidity memory-safe-assembly
         assembly {
