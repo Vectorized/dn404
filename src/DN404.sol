@@ -556,7 +556,7 @@ abstract contract DN404 {
             _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
 
-            uint32 burnedPoolTail = $.burnedPoolTail;
+            t.burnedPoolTail = $.burnedPoolTail;
             if (t.numNFTBurns != 0) {
                 _packedLogsSet(packedLogs, from, 1);
                 bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
@@ -570,14 +570,14 @@ abstract contract DN404 {
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
                     if (_useExistsLookup()) _set($.exists, id, false);
-                    if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
+                    if (addToBurnedPool) _set($.burnedPool, t.burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
                 } while (fromIndex != fromEnd);
 
-                if (addToBurnedPool) $.burnedPoolTail = burnedPoolTail;
+                if (addToBurnedPool) $.burnedPoolTail = t.burnedPoolTail;
             }
 
             if (t.numNFTMints != 0) {
@@ -593,7 +593,7 @@ abstract contract DN404 {
                 // Mint loop.
                 do {
                     uint256 id;
-                    if (burnedPoolHead != burnedPoolTail) {
+                    if (burnedPoolHead != t.burnedPoolTail) {
                         id = _get($.burnedPool, burnedPoolHead++);
                     } else {
                         id = nextTokenId;
@@ -1288,6 +1288,7 @@ abstract contract DN404 {
         uint256 totalSupply;
         uint256 totalNFTSupply;
         uint32 toAlias;
+        uint32 burnedPoolTail;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
