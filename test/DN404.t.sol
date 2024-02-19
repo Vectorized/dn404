@@ -570,9 +570,9 @@ contract DN404Test is SoladyTest {
             } while (_random() % 2 > 0);
 
             for (uint256 i; i != 2; ++i) {
-                uint256 b = dn.balanceOf(addresses[i]);
+                uint256 b = mirror.balanceOf(addresses[i]);
                 if (b != 0) {
-                    uint256 amount = _random() % b;
+                    uint256 amount = (_random() % b) * _WAD;
                     dn.burn(addresses[i], amount);
                     balances[i] -= amount;
                 }
@@ -593,14 +593,14 @@ contract DN404Test is SoladyTest {
             uint256 balancesSum;
             for (uint256 i; i != 2; ++i) {
                 uint256[] memory tokens = dn.tokensOf(addresses[i]);
-                assertLe(tokens.length, balances[i] / _WAD);
+                assertEq(tokens.length, balances[i] / _WAD);
                 LibSort.insertionSort(tokens);
                 LibSort.uniquifySorted(tokens);
                 allTokens = LibSort.union(allTokens, tokens);
                 balancesSum += balances[i];
                 expectedNFTBalances[i] += tokens.length;
             }
-            assertLe(allTokens.length, balancesSum / _WAD);
+            assertEq(allTokens.length, balancesSum / _WAD);
         }
 
         {
