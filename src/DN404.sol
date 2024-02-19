@@ -555,9 +555,7 @@ abstract contract DN404 {
             Uint32Map storage oo = $.oo;
 
             if (_toUint(_useDirectTransfersIfPossible()) & _toUint(from != to) != 0) {
-                uint256 fromIndex = t.fromOwnedLength;
-                uint256 toIndex = t.toOwnedLength;
-                uint256 n = _min(fromIndex, _min(t.numNFTBurns, t.numNFTMints));
+                uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
                 if (n != 0) {
                     _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
                     t.numNFTBurns -= n;
@@ -567,9 +565,9 @@ abstract contract DN404 {
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     // Direct transfer loop.
                     do {
-                        uint256 id = _get(fromOwned, --fromIndex);
-                        _set(toOwned, toIndex, uint32(id));
-                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                        uint256 id = _get(fromOwned, --t.fromOwnedLength);
+                        _set(toOwned, t.toOwnedLength, uint32(id));
+                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(t.toOwnedLength++));
                         _directLogsAppend(directLogs, id);
                         if (_get($.mayHaveNFTApproval, id)) {
                             _set($.mayHaveNFTApproval, id, false);
@@ -578,8 +576,8 @@ abstract contract DN404 {
                     } while (--n != 0);
 
                     _directLogsSend(directLogs, $.mirrorERC721);
-                    fromAddressData.ownedLength = uint32(t.fromOwnedLength = fromIndex);
-                    toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
+                    fromAddressData.ownedLength = uint32(t.fromOwnedLength);
+                    toAddressData.ownedLength = uint32(t.toOwnedLength);
                 }
             }
 
