@@ -45,6 +45,10 @@ contract MockDN404 is DN404 {
         _mint(to, amount);
     }
 
+    function mintNext(address to, uint256 amount) public {
+        _mintNext(to, amount);
+    }
+
     function burn(address from, uint256 amount) public {
         _burn(from, amount);
     }
