@@ -383,6 +383,35 @@ contract DN404Mirror {
                 return(0x00, 0x20)
             }
         }
+        // ``logDirectTransfer(address,address,uint256[])`.
+        if (fnSelector == 0x144027d3) {
+            if (msg.sender != $.baseERC20) revert SenderNotBase();
+            /// @solidity memory-safe-assembly
+            assembly {
+                // // When returndatacopy copies 1 or more out-of-bounds bytes, it reverts.
+                // returndatacopy(0x00, returndatasize(), lt(calldatasize(), 0x20))
+                // let o := add(0x24, calldataload(0x04)) // Packed logs offset.
+                // returndatacopy(0x00, returndatasize(), lt(calldatasize(), o))
+                // let end := add(o, shl(5, calldataload(sub(o, 0x20))))
+                // returndatacopy(0x00, returndatasize(), lt(calldatasize(), end))
+
+                // for {} iszero(eq(o, end)) { o := add(0x20, o) } {
+                //     let d := calldataload(o) // Entry in the packed logs.
+                //     let a := shr(96, d) // The address.
+                //     let b := and(1, d) // Whether it is a burn.
+                //     log4(
+                //         codesize(),
+                //         0x00,
+                //         _TRANSFER_EVENT_SIGNATURE,
+                //         mul(a, b), // `from`.
+                //         mul(a, iszero(b)), // `to`.
+                //         shr(168, shl(160, d)) // `id`.
+                //     )
+                // }
+                mstore(0x00, 0x01)
+                return(0x00, 0x20)
+            }
+        }
         // `linkMirrorContract(address)`.
         if (fnSelector == 0x0f4599e5) {
             if ($.deployer != address(0)) {

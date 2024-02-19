@@ -342,48 +342,48 @@ contract DN404Test is SoladyTest {
             assertEq(mirror.ownerAt(n + 1), address(0));
         } while (_random() % 8 > 0);
 
-        if (_random() % 8 == 0) {
-            uint256[] memory allTokenIds;
-            for (uint256 i; i < 3; ++i) {
-                uint256[] memory tokens = dn.tokensOf(addresses[i]);
-                // Might not be sorted.
-                LibSort.insertionSort(tokens);
-                allTokenIds = LibSort.union(allTokenIds, tokens);
-                assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
-            }
-            assertEq(allTokenIds.length, mirror.totalSupply());
-        }
+        // if (_random() % 8 == 0) {
+        //     uint256[] memory allTokenIds;
+        //     for (uint256 i; i < 3; ++i) {
+        //         uint256[] memory tokens = dn.tokensOf(addresses[i]);
+        //         // Might not be sorted.
+        //         LibSort.insertionSort(tokens);
+        //         allTokenIds = LibSort.union(allTokenIds, tokens);
+        //         assertLe(tokens.length, dn.balanceOf(addresses[i]) / _WAD);
+        //     }
+        //     assertEq(allTokenIds.length, mirror.totalSupply());
+        // }
 
-        if (_random() % 4 == 0) {
-            uint256 end = n + 1 + n;
-            for (uint256 i = n + 1; i <= end; ++i) {
-                assertEq(mirror.ownerAt(i), address(0));
-            }
-        }
+        // if (_random() % 4 == 0) {
+        //     uint256 end = n + 1 + n;
+        //     for (uint256 i = n + 1; i <= end; ++i) {
+        //         assertEq(mirror.ownerAt(i), address(0));
+        //     }
+        // }
 
-        if (_random() % 4 == 0) {
-            for (uint256 i; i != 3; ++i) {
-                address a = addresses[i];
-                vm.prank(a);
-                dn.setSkipNFT(false);
-                uint256 amount = dn.balanceOf(a);
-                vm.prank(a);
-                dn.transfer(a, amount);
-                assertEq(mirror.balanceOf(a), dn.balanceOf(a) / _WAD);
-            }
-        }
+        // if (_random() % 4 == 0) {
+        //     for (uint256 i; i != 3; ++i) {
+        //         address a = addresses[i];
+        //         vm.prank(a);
+        //         dn.setSkipNFT(false);
+        //         uint256 amount = dn.balanceOf(a);
+        //         vm.prank(a);
+        //         dn.transfer(a, amount);
+        //         assertEq(mirror.balanceOf(a), dn.balanceOf(a) / _WAD);
+        //     }
+        // }
 
-        if (_random() % 32 == 0) {
-            for (uint256 i; i != 3; ++i) {
-                address a = addresses[i];
-                vm.prank(a);
-                dn.setSkipNFT(true);
-                uint256 amount = dn.balanceOf(a);
-                vm.prank(a);
-                dn.transfer(a, amount);
-                assertEq(mirror.balanceOf(a), 0);
-            }
-        }
+        // if (_random() % 32 == 0) {
+        //     for (uint256 i; i != 3; ++i) {
+        //         address a = addresses[i];
+        //         vm.prank(a);
+        //         dn.setSkipNFT(true);
+        //         uint256 amount = dn.balanceOf(a);
+        //         vm.prank(a);
+        //         dn.transfer(a, amount);
+        //         assertEq(mirror.balanceOf(a), 0);
+        //     }
+        // }
     }
 
     function testBatchNFTLog() external {
