@@ -12,6 +12,8 @@ contract MockDN404 is DN404 {
 
     bool addToBurnedPool;
 
+    bool useDirectTransfersIfPossible;
+
     bool givePermit2DefaultInfiniteAllowance;
 
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
@@ -112,6 +114,14 @@ contract MockDN404 is DN404 {
 
     function _givePermit2DefaultInfiniteAllowance() internal view virtual override returns (bool) {
         return givePermit2DefaultInfiniteAllowance;
+    }
+
+    function setUseDirectTransfersIfPossible(bool value) public {
+        useDirectTransfersIfPossible = value;
+    }
+
+    function _useDirectTransfersIfPossible() internal view virtual override returns (bool) {
+        return useDirectTransfersIfPossible;
     }
 
     function ownedIds(address owner, uint256 start, uint256 end)

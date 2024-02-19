@@ -552,26 +552,30 @@ abstract contract DN404 {
             t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
             $.totalNFTSupply = uint32(t.totalNFTSupply);
 
-            if (_useDirectTransfersIfPossible() && from != to) {
+            if (_toUint(_useDirectTransfersIfPossible()) & _toUint(from != to) != 0) {
                 uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
                 if (n != 0) {
-                    // require(n <= t.numNFTMints && n <= t.numNFTBurns && n <= t.fromOwnedLength, "WTF?");
-                    // _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
+                    _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
                     t.numNFTBurns -= n;
                     t.numNFTMints -= n;
                     Uint32Map storage fromOwned = $.owned[from];
                     Uint32Map storage toOwned = $.owned[to];
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                    // Direct transfer loop.
                     do {
                         uint256 id = _get(fromOwned, --t.fromOwnedLength);
                         _set(toOwned, t.toOwnedLength, uint32(id));
                         _setOwnerAliasAndOwnedIndex($.oo, id, t.toAlias, uint32(t.toOwnedLength++));
+                        _directLogsAppend(directLogs, id);
                         if (_get($.mayHaveNFTApproval, id)) {
                             _set($.mayHaveNFTApproval, id, false);
                             delete $.nftApprovals[id];
                         }
                     } while (--n != 0);
 
+                    _directLogsSend(directLogs, $.mirrorERC721);
+                    fromAddressData.ownedLength = uint32(t.fromOwnedLength);
+                    toAddressData.ownedLength = uint32(t.toOwnedLength);
                 }
             }
 
@@ -1270,7 +1274,11 @@ abstract contract DN404 {
         uint256[] logs;
     }
 
-    function _directLogsMalloc(uint256 n, address from, address to) private pure returns (_DNDirectLogs memory p) {
+    function _directLogsMalloc(uint256 n, address from, address to)
+        private
+        pure
+        returns (_DNDirectLogs memory p)
+    {
         /// @solidity memory-safe-assembly
         assembly {
             // Note that `p` implicitly allocates and advances the free memory pointer by
@@ -1297,7 +1305,7 @@ abstract contract DN404 {
     }
 
     /// @dev Calls the `mirror` NFT contract to emit {Transfer} events for packed logs `p`.
-    function _directLogsSend(_DNPackedLogs memory p, address mirror) private {
+    function _directLogsSend(_DNDirectLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
             let logs := mload(add(p, 0x60))
