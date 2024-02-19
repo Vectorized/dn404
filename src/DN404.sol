@@ -652,7 +652,8 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers if possible.
+    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
+    /// whenever possible, instead of burning and re-minting.
     function _useDirectTransfersIfPossible() internal view virtual returns (bool) {
         return true;
     }

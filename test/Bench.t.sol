@@ -380,6 +380,7 @@ contract BenchTest is SoladyTest {
 
         pandora.setWhitelist(address(this), true);
         dn.initializeDN404(10000 * 10 ** 18, address(this), address(mirror));
+        dn.setUseDirectTransfersIfPossible(true);
     }
 
     modifier mint(address a, uint256 amount) {
