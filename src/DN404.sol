@@ -404,7 +404,7 @@ abstract contract DN404 {
                 Uint32Map storage toOwned = $.owned[to];
                 Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
-                _PackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(t.toEnd, toIndex));
+                _DNPackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(t.toEnd, toIndex));
 
                 if (packedLogs.logs.length != 0) {
                     _packedLogsSet(packedLogs, to, 0);
@@ -475,7 +475,7 @@ abstract contract DN404 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                _PackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
+                _DNPackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 _packedLogsSet(packedLogs, from, 1);
                 uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
                 $.totalNFTSupply = uint32(totalNFTSupply);
@@ -552,8 +552,36 @@ abstract contract DN404 {
             t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
             $.totalNFTSupply = uint32(t.totalNFTSupply);
 
-            _PackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
             Uint32Map storage oo = $.oo;
+
+            if (_toUint(_useDirectTransfersIfPossible()) & _toUint(from != to) != 0) {
+                uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
+                if (n != 0) {
+                    _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
+                    t.numNFTBurns -= n;
+                    t.numNFTMints -= n;
+                    Uint32Map storage fromOwned = $.owned[from];
+                    Uint32Map storage toOwned = $.owned[to];
+                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                    // Direct transfer loop.
+                    do {
+                        uint256 id = _get(fromOwned, --t.fromOwnedLength);
+                        _set(toOwned, t.toOwnedLength, uint32(id));
+                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(t.toOwnedLength++));
+                        _directLogsAppend(directLogs, id);
+                        if (_get($.mayHaveNFTApproval, id)) {
+                            _set($.mayHaveNFTApproval, id, false);
+                            delete $.nftApprovals[id];
+                        }
+                    } while (--n != 0);
+
+                    _directLogsSend(directLogs, $.mirrorERC721);
+                    fromAddressData.ownedLength = uint32(t.fromOwnedLength);
+                    toAddressData.ownedLength = uint32(t.toOwnedLength);
+                }
+            }
+
+            _DNPackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
 
             t.burnedPoolTail = $.burnedPoolTail;
             if (t.numNFTBurns != 0) {
@@ -623,6 +651,12 @@ abstract contract DN404 {
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
+    }
+
+    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
+    /// whenever possible, instead of burning and re-minting.
+    function _useDirectTransfersIfPossible() internal view virtual returns (bool) {
+        return true;
     }
 
     /// @dev Returns if burns should be added to the burn pool.
@@ -1219,6 +1253,14 @@ abstract contract DN404 {
         }
     }
 
+    /// @dev Returns `x < y ? x : y`.
+    function _min(uint256 x, uint256 y) internal pure returns (uint256 z) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            z := xor(x, mul(xor(x, y), lt(y, x)))
+        }
+    }
+
     /// @dev Returns `b ? 1 : 0`.
     function _toUint(bool b) internal pure returns (uint256 result) {
         /// @solidity memory-safe-assembly
@@ -1227,16 +1269,73 @@ abstract contract DN404 {
         }
     }
 
+    /// @dev Struct containing direct transfer log data for {Transfer} events to be
+    /// emitted by the mirror NFT contract.
+    struct _DNDirectLogs {
+        uint256 offset;
+        address from;
+        address to;
+        uint256[] logs;
+    }
+
+    /// @dev Initiates memory allocation for direct logs with `n` log items.
+    function _directLogsMalloc(uint256 n, address from, address to)
+        private
+        pure
+        returns (_DNDirectLogs memory p)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Note that `p` implicitly allocates and advances the free memory pointer by
+            // 4 words, which we can safely mutate in `_packedLogsSend`.
+            let logs := mload(0x40)
+            mstore(logs, n) // Store the length.
+            let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
+            mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
+            mstore(add(0x60, p), logs) // Set `p.logs`.
+            mstore(add(0x40, p), to) // Set `p.to`.
+            mstore(add(0x20, p), from) // Set `p.from`.
+            mstore(p, offset) // Set `p.offset`.
+        }
+    }
+
+    /// @dev Adds a direct log item to `p` with token `id`.
+    function _directLogsAppend(_DNDirectLogs memory p, uint256 id) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let offset := mload(p)
+            mstore(offset, id)
+            mstore(p, add(offset, 0x20))
+        }
+    }
+
+    /// @dev Calls the `mirror` NFT contract to emit {Transfer} events for packed logs `p`.
+    function _directLogsSend(_DNDirectLogs memory p, address mirror) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let logs := mload(add(p, 0x60))
+            let n := add(0x84, shl(5, mload(logs))) // Length of calldata to send.
+            let o := sub(logs, 0x80) // Start of calldata to send.
+            mstore(o, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
+            mstore(add(o, 0x20), mload(add(0x20, p)))
+            mstore(add(o, 0x40), mload(add(0x40, p)))
+            mstore(add(o, 0x60), 0x60) // Offset of `logs` in the calldata to send.
+            if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
+                revert(o, 0x00)
+            }
+        }
+    }
+
     /// @dev Struct containing packed log data for {Transfer} events to be
     /// emitted by the mirror NFT contract.
-    struct _PackedLogs {
+    struct _DNPackedLogs {
         uint256 offset;
         uint256 addressAndBit;
         uint256[] logs;
     }
 
     /// @dev Initiates memory allocation for packed logs with `n` log items.
-    function _packedLogsMalloc(uint256 n) private pure returns (_PackedLogs memory p) {
+    function _packedLogsMalloc(uint256 n) private pure returns (_DNPackedLogs memory p) {
         /// @solidity memory-safe-assembly
         assembly {
             // Note that `p` implicitly allocates and advances the free memory pointer by
@@ -1251,7 +1350,7 @@ abstract contract DN404 {
     }
 
     /// @dev Set the current address and the burn bit.
-    function _packedLogsSet(_PackedLogs memory p, address a, uint256 burnBit) private pure {
+    function _packedLogsSet(_DNPackedLogs memory p, address a, uint256 burnBit) private pure {
         /// @solidity memory-safe-assembly
         assembly {
             mstore(add(p, 0x20), or(shl(96, a), burnBit)) // Set `p.addressAndBit`.
@@ -1259,7 +1358,7 @@ abstract contract DN404 {
     }
 
     /// @dev Adds a packed log item to `p` with token `id`.
-    function _packedLogsAppend(_PackedLogs memory p, uint256 id) private pure {
+    function _packedLogsAppend(_DNPackedLogs memory p, uint256 id) private pure {
         /// @solidity memory-safe-assembly
         assembly {
             let offset := mload(p)
@@ -1269,7 +1368,7 @@ abstract contract DN404 {
     }
 
     /// @dev Calls the `mirror` NFT contract to emit {Transfer} events for packed logs `p`.
-    function _packedLogsSend(_PackedLogs memory p, address mirror) private {
+    function _packedLogsSend(_DNPackedLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
             let logs := mload(add(p, 0x40))

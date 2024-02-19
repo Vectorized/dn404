@@ -256,6 +256,31 @@ contract DN404MirrorTest is SoladyTest {
         assertTrue(success);
     }
 
+    function testLogDirectTransfers() public {
+        dn.initializeDN404(5 * _WAD, address(this), address(mirror));
+        dn.setUseDirectTransfersIfPossible(true);
+        address alice = address(111);
+        address bob = address(222);
+
+        dn.transfer(alice, 5 * _WAD);
+
+        vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        for (uint256 i = 5; i != 0; --i) {
+            emit Transfer(alice, bob, i);
+        }
+        dn.transfer(bob, 5 * _WAD);
+
+        vm.prank(address(dn));
+        uint256[] memory directLogs = new uint256[](0);
+        (bool success,) = address(mirror).call(
+            abi.encodeWithSignature(
+                "logDirectTransfer(address,address,uint256[])", alice, bob, directLogs
+            )
+        );
+        assertTrue(success);
+    }
+
     function testPullOwner() public {
         dn.initializeDN404(1000, address(this), address(mirror));
         assertEq(mirror.owner(), address(0));

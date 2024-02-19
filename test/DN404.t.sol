@@ -279,6 +279,10 @@ contract DN404Test is SoladyTest {
                 dn.setAddToBurnedPool(_random() % 2 == 0);
             }
 
+            if (_random() % 4 == 0) {
+                dn.setUseDirectTransfersIfPossible(_random() % 2 == 0);
+            }
+
             if (_random() % 16 > 0) {
                 address from = addresses[_random() % 3];
                 address to = addresses[_random() % 3];
@@ -286,6 +290,10 @@ contract DN404Test is SoladyTest {
                 uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
                 vm.prank(from);
                 dn.transfer(to, amount);
+            }
+
+            if (_random() % 4 == 0) {
+                dn.setUseDirectTransfersIfPossible(_random() % 2 == 0);
             }
 
             if (_random() % 4 == 0) {
