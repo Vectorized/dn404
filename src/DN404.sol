@@ -1271,6 +1271,8 @@ abstract contract DN404 {
         }
     }
 
+    /// @dev Struct containing direct transfer log data for {Transfer} events to be
+    /// emitted by the mirror NFT contract.
     struct _DNDirectLogs {
         uint256 offset;
         address from;
@@ -1278,6 +1280,7 @@ abstract contract DN404 {
         uint256[] logs;
     }
 
+    /// @dev Initiates memory allocation for direct logs with `n` log items.
     function _directLogsMalloc(uint256 n, address from, address to)
         private
         pure
