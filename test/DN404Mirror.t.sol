@@ -258,6 +258,7 @@ contract DN404MirrorTest is SoladyTest {
 
     function testLogDirectTransfers() public {
         dn.initializeDN404(5 * _WAD, address(this), address(mirror));
+        dn.setUseDirectTransfersIfPossible(true);
         address alice = address(111);
         address bob = address(222);
 
