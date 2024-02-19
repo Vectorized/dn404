@@ -554,30 +554,34 @@ abstract contract DN404 {
 
             Uint32Map storage oo = $.oo;
 
-            if (_toUint(_useDirectTransfersIfPossible()) & _toUint(from != to) != 0) {
+            if (_useDirectTransfersIfPossible()) {
                 uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
                 if (n != 0) {
-                    _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
                     t.numNFTBurns -= n;
                     t.numNFTMints -= n;
-                    Uint32Map storage fromOwned = $.owned[from];
-                    Uint32Map storage toOwned = $.owned[to];
-                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                    // Direct transfer loop.
-                    do {
-                        uint256 id = _get(fromOwned, --t.fromOwnedLength);
-                        _set(toOwned, t.toOwnedLength, uint32(id));
-                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(t.toOwnedLength++));
-                        _directLogsAppend(directLogs, id);
-                        if (_get($.mayHaveNFTApproval, id)) {
-                            _set($.mayHaveNFTApproval, id, false);
-                            delete $.nftApprovals[id];
-                        }
-                    } while (--n != 0);
+                    if (from != to) {
+                        _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
+                        Uint32Map storage fromOwned = $.owned[from];
+                        Uint32Map storage toOwned = $.owned[to];
+                        t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                        uint256 fromIndex = t.fromOwnedLength;
+                        uint256 toIndex = t.toOwnedLength;
+                        // Direct transfer loop.
+                        do {
+                            uint256 id = _get(fromOwned, --fromIndex);
+                            _set(toOwned, toIndex, uint32(id));
+                            _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                            _directLogsAppend(directLogs, id);
+                            if (_get($.mayHaveNFTApproval, id)) {
+                                _set($.mayHaveNFTApproval, id, false);
+                                delete $.nftApprovals[id];
+                            }
+                        } while (--n != 0);
 
-                    _directLogsSend(directLogs, $.mirrorERC721);
-                    fromAddressData.ownedLength = uint32(t.fromOwnedLength);
-                    toAddressData.ownedLength = uint32(t.toOwnedLength);
+                        _directLogsSend(directLogs, $.mirrorERC721);
+                        fromAddressData.ownedLength = uint32(t.fromOwnedLength = fromIndex);
+                        toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
+                    }
                 }
             }
 
