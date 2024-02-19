@@ -527,4 +527,94 @@ contract DN404Test is SoladyTest {
         assertFalse(success);
         assertEq(result, abi.encodePacked(DN404.FnSelectorNotRecognized.selector));
     }
+
+    function testMintNext() public {
+        address alice = address(111);
+        address bob = address(222);
+
+        dn.initializeDN404(10 * _WAD, address(this), address(mirror));
+        dn.mintNext(alice, 10 * _WAD);
+        for (uint256 i = 11; i <= 20; ++i) {
+            assertEq(mirror.ownerAt(i), alice);
+        }
+
+        vm.prank(alice);
+        dn.transfer(bob, 10 * _WAD);
+
+        dn.mintNext(alice, 10 * _WAD);
+        for (uint256 i = 21; i <= 30; ++i) {
+            assertEq(mirror.ownerAt(i), alice);
+        }
+    }
+
+    function testMintNextMixed(uint256) public {
+        address[] memory addresses = new address[](2);
+        addresses[0] = address(111);
+        addresses[1] = address(222);
+        uint256[] memory balances = new uint256[](2);
+        uint256 totalMinted = (_random() % 4) * _WAD;
+
+        dn.initializeDN404(totalMinted, address(this), address(mirror));
+
+        do {
+            if (_random() % 2 == 0) {
+                dn.setAddToBurnedPool(_random() % 2 == 0);
+            }
+
+            do {
+                uint256 i = _random() % 2;
+                uint256 amount = (_random() % 4) * _WAD;
+                balances[i] += amount;
+                dn.mintNext(addresses[i], amount);
+                totalMinted += amount;
+            } while (_random() % 2 > 0);
+
+            for (uint256 i; i != 2; ++i) {
+                uint256 b = mirror.balanceOf(addresses[i]);
+                if (b != 0) {
+                    uint256 amount = (_random() % b) * _WAD;
+                    dn.burn(addresses[i], amount);
+                    balances[i] -= amount;
+                }
+            }
+
+            do {
+                uint256 i = _random() % 2;
+                uint256 amount = (_random() % 4) * _WAD;
+                balances[i] += amount;
+                dn.mintNext(addresses[i], amount);
+                totalMinted += amount;
+            } while (_random() % 2 > 0);
+        } while (_random() % 2 > 0);
+
+        uint256[] memory expectedNFTBalances = new uint256[](2);
+        {
+            uint256[] memory allTokens;
+            uint256 balancesSum;
+            for (uint256 i; i != 2; ++i) {
+                uint256[] memory tokens = dn.tokensOf(addresses[i]);
+                assertEq(tokens.length, balances[i] / _WAD);
+                LibSort.insertionSort(tokens);
+                LibSort.uniquifySorted(tokens);
+                allTokens = LibSort.union(allTokens, tokens);
+                balancesSum += balances[i];
+                expectedNFTBalances[i] += tokens.length;
+            }
+            assertEq(allTokens.length, balancesSum / _WAD);
+        }
+
+        {
+            uint256[] memory nftBalances = new uint256[](2);
+            uint256 n = totalMinted / _WAD + 1;
+            for (uint256 i; i != n; ++i) {
+                address owner = mirror.ownerAt(i);
+                for (uint256 j; j != 2; ++j) {
+                    if (owner == addresses[j]) nftBalances[j]++;
+                }
+            }
+            for (uint256 j; j != 2; ++j) {
+                assertEq(nftBalances[j], expectedNFTBalances[j]);
+            }
+        }
+    }
 }

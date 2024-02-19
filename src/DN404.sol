@@ -448,6 +448,77 @@ abstract contract DN404 {
         }
     }
 
+    /// @dev Mints `amount` tokens to `to`, increasing the total supply.
+    /// This variant mints NFT tokens starting from ID `preTotalSupply / _unit() + 1`.
+    /// It will skip the burned pool.
+    ///
+    /// Will mint NFTs to `to` if the recipient's new balance supports
+    /// additional NFTs ***AND*** the `to` address's skipNFT flag is
+    /// set to false.
+    ///
+    /// Emits a {Transfer} event.
+    function _mintNext(address to, uint256 amount) internal virtual {
+        if (to == address(0)) revert TransferToZeroAddress();
+
+        AddressData storage toAddressData = _addressData(to);
+        DN404Storage storage $ = _getDN404Storage();
+
+        _DNMintTemps memory t;
+        unchecked {
+            uint256 toBalance = uint256(toAddressData.balance) + amount;
+            toAddressData.balance = uint96(toBalance);
+            t.toEnd = toBalance / _unit();
+        }
+        uint256 startId;
+        uint256 maxId;
+        unchecked {
+            uint256 preTotalSupply = uint256($.totalSupply);
+            startId = preTotalSupply / _unit() + 1;
+            uint256 totalSupply_ = uint256(preTotalSupply) + amount;
+            $.totalSupply = uint96(totalSupply_);
+            uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
+            if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+            maxId = totalSupply_ / _unit();
+        }
+        unchecked {
+            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                Uint32Map storage toOwned = $.owned[to];
+                Uint32Map storage oo = $.oo;
+                uint256 toIndex = toAddressData.ownedLength;
+                _DNPackedLogs memory packedLogs = _packedLogsMalloc(_zeroFloorSub(t.toEnd, toIndex));
+
+                if (packedLogs.logs.length != 0) {
+                    _packedLogsSet(packedLogs, to, 0);
+                    $.totalNFTSupply += uint32(packedLogs.logs.length);
+                    toAddressData.ownedLength = uint32(t.toEnd);
+                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                    // Mint loop.
+                    do {
+                        uint256 id = startId;
+                        while (_get(oo, _ownershipIndex(id)) != 0) {
+                            id = _useExistsLookup()
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                : _wrapNFTId(id + 1, maxId);
+                        }
+                        startId = _wrapNFTId(id + 1, maxId);
+                        if (_useExistsLookup()) _set($.exists, id, true);
+                        _set(toOwned, toIndex, uint32(id));
+                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                        _packedLogsAppend(packedLogs, id);
+                    } while (toIndex != t.toEnd);
+
+                    _packedLogsSend(packedLogs, $.mirrorERC721);
+                }
+            }
+        }
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, amount)
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, to)))
+        }
+    }
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                  INTERNAL BURN FUNCTIONS                   */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
