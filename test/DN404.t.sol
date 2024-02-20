@@ -265,14 +265,15 @@ contract DN404Test is SoladyTest {
     }
 
     function testMixed(uint256) public {
-        address initialSupplyOwner = address(1111);
+        dn.setUseExistsLookup(_random() % 2 == 0);
+
         uint256 n = _bound(_random(), 0, 16);
-        dn.initializeDN404(n * _WAD, initialSupplyOwner, address(mirror));
+        dn.initializeDN404(n * _WAD, address(1111), address(mirror));
 
         address[] memory addresses = new address[](3);
         addresses[0] = address(111);
         addresses[1] = address(222);
-        addresses[2] = initialSupplyOwner;
+        addresses[2] = address(1111);
 
         do {
             if (_random() % 4 == 0) {
@@ -327,27 +328,31 @@ contract DN404Test is SoladyTest {
                 }
             }
 
-            uint256 balanceSum;
             uint256 nftBalanceSum;
-            for (uint256 i; i != 3; ++i) {
-                address a = addresses[i];
-                uint256 balance = dn.balanceOf(a);
-                balanceSum += balance;
-                uint256 nftBalance = mirror.balanceOf(a);
-                assertLe(nftBalance, balance / _WAD);
-                nftBalanceSum += nftBalance;
+            unchecked {
+                uint256 balanceSum;
+                for (uint256 i; i != 3; ++i) {
+                    address a = addresses[i];
+                    uint256 balance = dn.balanceOf(a);
+                    balanceSum += balance;
+                    uint256 nftBalance = mirror.balanceOf(a);
+                    assertLe(nftBalance, balance / _WAD);
+                    nftBalanceSum += nftBalance;
+                }
+                assertEq(balanceSum, dn.totalSupply());
+                assertEq(nftBalanceSum, mirror.totalSupply());
+                assertLe(nftBalanceSum, balanceSum / _WAD);
             }
-            assertEq(balanceSum, dn.totalSupply());
-            assertEq(nftBalanceSum, mirror.totalSupply());
-            assertLe(nftBalanceSum, balanceSum / _WAD);
 
-            uint256 numOwned;
-            for (uint256 i = 1; i <= n; ++i) {
-                if (mirror.ownerAt(i) != address(0)) numOwned++;
+            unchecked {
+                uint256 numOwned;
+                for (uint256 i = 1; i <= n; ++i) {
+                    if (mirror.ownerAt(i) != address(0)) numOwned++;
+                }
+                assertEq(numOwned, nftBalanceSum);
+                assertEq(mirror.ownerAt(0), address(0));
+                assertEq(mirror.ownerAt(n + 1), address(0));
             }
-            assertEq(numOwned, nftBalanceSum);
-            assertEq(mirror.ownerAt(0), address(0));
-            assertEq(mirror.ownerAt(n + 1), address(0));
         } while (_random() % 8 > 0);
 
         if (_random() % 8 == 0) {

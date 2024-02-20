@@ -16,6 +16,8 @@ contract MockDN404 is DN404 {
 
     bool givePermit2DefaultInfiniteAllowance;
 
+    bool useExistsLookup;
+
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
         _name = name_;
         _symbol = symbol_;
@@ -126,6 +128,14 @@ contract MockDN404 is DN404 {
 
     function _useDirectTransfersIfPossible() internal view virtual override returns (bool) {
         return useDirectTransfersIfPossible;
+    }
+
+    function setUseExistsLookup(bool value) public {
+        useExistsLookup = value;
+    }
+
+    function _useExistsLookup() internal view virtual override returns (bool) {
+        return useExistsLookup;
     }
 
     function ownedIds(address owner, uint256 start, uint256 end)

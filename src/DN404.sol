@@ -158,7 +158,7 @@ abstract contract DN404 {
         uint32 burnedPoolHead;
         // The tail of the burned pool.
         uint32 burnedPoolTail;
-        // Total supply of minted NFTs.
+        // Total number of NFTs in existence.
         uint32 totalNFTSupply;
         // Total supply of tokens.
         uint96 totalSupply;
@@ -270,6 +270,39 @@ abstract contract DN404 {
     function tokenURI(uint256 id) public view virtual returns (string memory);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                       CONFIGURABLES                        */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
+    /// whenever possible, instead of burning and re-minting.
+    function _useDirectTransfersIfPossible() internal view virtual returns (bool) {
+        return true;
+    }
+
+    /// @dev Returns if burns should be added to the burn pool.
+    /// This returns false by default, which means the NFT IDs are re-minted in a cycle.
+    function _addToBurnedPool(uint256 totalNFTSupplyAfterBurn, uint256 totalSupplyAfterBurn)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
+        // Silence unused variable compiler warning.
+        totalSupplyAfterBurn = totalNFTSupplyAfterBurn;
+        return false;
+    }
+
+    /// @dev Returns whether to use the exists bitmap for more efficient
+    /// scanning of an empty token ID slot.
+    /// Recommended for collections that do not use the burn pool,
+    /// and are expected to have nearly all possible NFTs materialized.
+    ///
+    /// Note: The returned value must be constant after initialization.
+    function _useExistsLookup() internal view virtual returns (bool) {
+        return true;
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
@@ -375,8 +408,7 @@ abstract contract DN404 {
     /// @dev Mints `amount` tokens to `to`, increasing the total supply.
     ///
     /// Will mint NFTs to `to` if the recipient's new balance supports
-    /// additional NFTs ***AND*** the `to` address's skipNFT flag is
-    /// set to false.
+    /// additional NFTs ***AND*** the `to` address's skipNFT flag is set to false.
     ///
     /// Emits a {Transfer} event.
     function _mint(address to, uint256 amount) internal virtual {
@@ -412,21 +444,21 @@ abstract contract DN404 {
                     toAddressData.ownedLength = uint32(t.toEnd);
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
-                    uint32 burnedPoolTail = $.burnedPoolTail;
-                    uint256 nextTokenId = $.nextTokenId;
+                    t.burnedPoolTail = $.burnedPoolTail;
+                    t.nextTokenId = $.nextTokenId;
                     // Mint loop.
                     do {
                         uint256 id;
-                        if (burnedPoolHead != burnedPoolTail) {
+                        if (burnedPoolHead != t.burnedPoolTail) {
                             id = _get($.burnedPool, burnedPoolHead++);
                         } else {
-                            id = nextTokenId;
+                            id = t.nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
                                 id = _useExistsLookup()
                                     ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
                                     : _wrapNFTId(id + 1, maxId);
                             }
-                            nextTokenId = _wrapNFTId(id + 1, maxId);
+                            t.nextTokenId = _wrapNFTId(id + 1, maxId);
                         }
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
@@ -434,7 +466,7 @@ abstract contract DN404 {
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != t.toEnd);
 
-                    $.nextTokenId = uint32(nextTokenId);
+                    $.nextTokenId = uint32(t.nextTokenId);
                     $.burnedPoolHead = burnedPoolHead;
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
@@ -450,11 +482,10 @@ abstract contract DN404 {
 
     /// @dev Mints `amount` tokens to `to`, increasing the total supply.
     /// This variant mints NFT tokens starting from ID `preTotalSupply / _unit() + 1`.
-    /// It will skip the burned pool.
+    /// This variant will not touch the `burnedPool` and `nextTokenId`.
     ///
     /// Will mint NFTs to `to` if the recipient's new balance supports
-    /// additional NFTs ***AND*** the `to` address's skipNFT flag is
-    /// set to false.
+    /// additional NFTs ***AND*** the `to` address's skipNFT flag is set to false.
     ///
     /// Emits a {Transfer} event.
     function _mintNext(address to, uint256 amount) internal virtual {
@@ -620,38 +651,42 @@ abstract contract DN404 {
                 t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedLength);
             }
 
+            if (_useDirectTransfersIfPossible()) {
+                uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
+                if (n != 0) {
+                    t.numNFTBurns -= n;
+                    t.numNFTMints -= n;
+                    if (from == to) {
+                        t.toOwnedLength += n;
+                    } else {
+                        _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
+                        Uint32Map storage fromOwned = $.owned[from];
+                        Uint32Map storage toOwned = $.owned[to];
+                        t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                        uint256 toIndex = t.toOwnedLength;
+                        // Direct transfer loop.
+                        do {
+                            uint256 id = _get(fromOwned, --t.fromOwnedLength);
+                            _set(toOwned, toIndex, uint32(id));
+                            _setOwnerAliasAndOwnedIndex($.oo, id, t.toAlias, uint32(toIndex++));
+                            _directLogsAppend(directLogs, id);
+                            if (_get($.mayHaveNFTApproval, id)) {
+                                _set($.mayHaveNFTApproval, id, false);
+                                delete $.nftApprovals[id];
+                            }
+                        } while (--n != 0);
+
+                        toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
+                        fromAddressData.ownedLength = uint32(t.fromOwnedLength);
+                        _directLogsSend(directLogs, $.mirrorERC721);
+                    }
+                }
+            }
+
             t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
             $.totalNFTSupply = uint32(t.totalNFTSupply);
 
             Uint32Map storage oo = $.oo;
-
-            if (_toUint(_useDirectTransfersIfPossible()) & _toUint(from != to) != 0) {
-                uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
-                if (n != 0) {
-                    _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
-                    t.numNFTBurns -= n;
-                    t.numNFTMints -= n;
-                    Uint32Map storage fromOwned = $.owned[from];
-                    Uint32Map storage toOwned = $.owned[to];
-                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                    // Direct transfer loop.
-                    do {
-                        uint256 id = _get(fromOwned, --t.fromOwnedLength);
-                        _set(toOwned, t.toOwnedLength, uint32(id));
-                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(t.toOwnedLength++));
-                        _directLogsAppend(directLogs, id);
-                        if (_get($.mayHaveNFTApproval, id)) {
-                            _set($.mayHaveNFTApproval, id, false);
-                            delete $.nftApprovals[id];
-                        }
-                    } while (--n != 0);
-
-                    _directLogsSend(directLogs, $.mirrorERC721);
-                    fromAddressData.ownedLength = uint32(t.fromOwnedLength);
-                    toAddressData.ownedLength = uint32(t.toOwnedLength);
-                }
-            }
-
             _DNPackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
 
             t.burnedPoolTail = $.burnedPoolTail;
@@ -711,9 +746,7 @@ abstract contract DN404 {
                 $.nextTokenId = uint32(t.nextTokenId);
             }
 
-            if (packedLogs.logs.length != 0) {
-                _packedLogsSend(packedLogs, $.mirrorERC721);
-            }
+            if (packedLogs.logs.length != 0) _packedLogsSend(packedLogs, $.mirrorERC721);
         }
         /// @solidity memory-safe-assembly
         assembly {
@@ -722,34 +755,6 @@ abstract contract DN404 {
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
-    }
-
-    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
-    /// whenever possible, instead of burning and re-minting.
-    function _useDirectTransfersIfPossible() internal view virtual returns (bool) {
-        return true;
-    }
-
-    /// @dev Returns if burns should be added to the burn pool.
-    /// This returns false by default, which means the NFT IDs are re-minted in a cycle.
-    function _addToBurnedPool(uint256 totalNFTSupplyAfterBurn, uint256 totalSupplyAfterBurn)
-        internal
-        view
-        virtual
-        returns (bool)
-    {
-        totalNFTSupplyAfterBurn = totalNFTSupplyAfterBurn; // Silence compiler warning.
-        totalSupplyAfterBurn = totalSupplyAfterBurn; // Silence compiler warning.
-        return false;
-    }
-
-    /// @dev Returns whether to use the exists lookup for more efficient
-    /// scanning of an empty token ID slot. Highly recommended for collections
-    /// with near full load factor `totalNFTSupply * _unit() / totalSupply`.
-    /// The trade off is slightly higher initial storage write costs,
-    /// which will be quickly amortized away.
-    function _useExistsLookup() internal pure virtual returns (bool) {
-        return true;
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
@@ -1025,10 +1030,9 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
         Uint32Map storage owned = $.owned[owner];
-        uint256 n = $.addressData[owner].ownedLength;
+        uint256 n = _min($.addressData[owner].ownedLength, end);
         /// @solidity memory-safe-assembly
         assembly {
-            n := xor(n, mul(lt(end, n), xor(end, n))) // `min(n, end)`.
             ids := mload(0x40)
             let i := begin
             for {} lt(i, n) { i := add(i, 1) } {
@@ -1047,94 +1051,72 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
+        address mirror = $.mirrorERC721;
 
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x84) revert();
-
-            address from = address(uint160(_calldataload(0x04)));
-            address to = address(uint160(_calldataload(0x24)));
-            uint256 id = _calldataload(0x44);
-            address msgSender = address(uint160(_calldataload(0x64)));
-
-            _transferFromNFT(from, to, id, msgSender);
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _transferFromNFT(
+                address(uint160(_calldataload(0x04))), // `from`.
+                address(uint160(_calldataload(0x24))), // `to`.
+                _calldataload(0x44), // `id`.
+                address(uint160(_calldataload(0x64))) // `msgSender`.
+            );
             _return(1);
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x64) revert();
-
-            address spender = address(uint160(_calldataload(0x04)));
-            bool status = _calldataload(0x24) != 0;
-            address msgSender = address(uint160(_calldataload(0x44)));
-
-            _setApprovalForAll(spender, status, msgSender);
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _setApprovalForAll(
+                address(uint160(_calldataload(0x04))), // `spender`.
+                _calldataload(0x24) != 0, // `status`.
+                address(uint160(_calldataload(0x44))) // `msgSender`.
+            );
             _return(1);
         }
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x44) revert();
-
-            address owner = address(uint160(_calldataload(0x04)));
-            address operator = address(uint160(_calldataload(0x24)));
-
-            _return(_ref($.operatorApprovals, owner, operator).value);
+            if (msg.sender != mirror) revert SenderNotMirror();
+            Uint256Ref storage ref = _ref(
+                $.operatorApprovals,
+                address(uint160(_calldataload(0x04))), // `owner`.
+                address(uint160(_calldataload(0x24))) // `operator`.
+            );
+            _return(ref.value);
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            uint256 id = _calldataload(0x04);
-
-            _return(uint160(_ownerOf(id)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(uint160(_ownerOf(_calldataload(0x04))));
         }
         // `ownerAt(uint256)`.
         if (fnSelector == 0x24359879) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            uint256 id = _calldataload(0x04);
-
-            _return(uint160(_ownerAt(id)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(uint160(_ownerAt(_calldataload(0x04))));
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x64) revert();
-
-            address spender = address(uint160(_calldataload(0x04)));
-            uint256 id = _calldataload(0x24);
-            address msgSender = address(uint160(_calldataload(0x44)));
-
-            _return(uint160(_approveNFT(spender, id, msgSender)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            address owner = _approveNFT(
+                address(uint160(_calldataload(0x04))), // `spender`.
+                _calldataload(0x24), // `id`.
+                address(uint160(_calldataload(0x44))) // `msgSender`.
+            );
+            _return(uint160(owner));
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            uint256 id = _calldataload(0x04);
-
-            _return(uint160(_getApproved(id)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(uint160(_getApproved(_calldataload(0x04))));
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            address owner = address(uint160(_calldataload(0x04)));
-
-            _return(_balanceOfNFT(owner));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(_balanceOfNFT(address(uint160(_calldataload(0x04)))));
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x04) revert();
-
+            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_totalNFTSupply());
         }
         // `implementsDN404()`.
@@ -1192,8 +1174,7 @@ abstract contract DN404 {
             let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
             let o := shl(5, and(index, 7)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
-            let m := 0xffffffff // Value mask.
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), value)))))
+            sstore(s, xor(v, shl(o, and(0xffffffff, xor(value, shr(o, v))))))
         }
     }
 
@@ -1208,11 +1189,10 @@ abstract contract DN404 {
         assembly {
             let i := sub(id, 1) // Index of the uint64 combined value.
             let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
-            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
-            let m := 0xffffffffffffffff // Value mask.
+            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
             let combined := or(shl(32, ownedIndex), and(0xffffffff, ownership))
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), combined)))))
+            sstore(s, xor(v, shl(o, and(0xffffffffffffffff, xor(shr(o, v), combined)))))
         }
     }
 
@@ -1309,10 +1289,11 @@ abstract contract DN404 {
     }
 
     /// @dev Returns whether `amount` is a valid `totalSupply`.
-    function _totalSupplyOverflows(uint256 amount) internal view returns (bool) {
-        unchecked {
-            return _toUint(amount > type(uint96).max)
-                | _toUint(amount / _unit() > type(uint32).max - 1) != 0;
+    function _totalSupplyOverflows(uint256 amount) internal view returns (bool result) {
+        uint256 unit = _unit();
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(or(shr(96, amount), lt(0xfffffffe, div(amount, unit)))))
         }
     }
 
@@ -1358,7 +1339,7 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             // Note that `p` implicitly allocates and advances the free memory pointer by
-            // 4 words, which we can safely mutate in `_packedLogsSend`.
+            // 4 words, which we can safely mutate in `_directLogsSend`.
             let logs := mload(0x40)
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
@@ -1388,8 +1369,10 @@ abstract contract DN404 {
             let n := add(0x84, shl(5, mload(logs))) // Length of calldata to send.
             let o := sub(logs, 0x80) // Start of calldata to send.
             mstore(o, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
-            mstore(add(o, 0x20), mload(add(0x20, p)))
-            mstore(add(o, 0x40), mload(add(0x40, p)))
+            let from := mload(add(0x20, p))
+            let to := mload(add(0x40, p))
+            mstore(add(o, 0x20), from)
+            mstore(add(o, 0x40), to)
             mstore(add(o, 0x60), 0x60) // Offset of `logs` in the calldata to send.
             if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
                 revert(o, 0x00)
@@ -1472,6 +1455,8 @@ abstract contract DN404 {
 
     /// @dev Struct of temporary variables for mints.
     struct _DNMintTemps {
+        uint256 nextTokenId;
+        uint32 burnedPoolTail;
         uint256 toEnd;
         uint32 toAlias;
     }
