@@ -328,9 +328,9 @@ contract DN404Test is SoladyTest {
                 }
             }
 
+            uint256 nftBalanceSum;
             {
                 uint256 balanceSum;
-                uint256 nftBalanceSum;
                 for (uint256 i; i != 3; ++i) {
                     address a = addresses[i];
                     uint256 balance = dn.balanceOf(a);
