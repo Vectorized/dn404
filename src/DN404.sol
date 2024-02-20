@@ -414,7 +414,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        require($.mirrorERC721 != address(0));
+        if ($.mirrorERC721 == address(0)) revert();
 
         _DNMintTemps memory t;
         unchecked {
@@ -492,7 +492,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        require($.mirrorERC721 != address(0));
+        if ($.mirrorERC721 == address(0)) revert();
 
         _DNMintTemps memory t;
         unchecked {
@@ -563,7 +563,7 @@ abstract contract DN404 {
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
         DN404Storage storage $ = _getDN404Storage();
-        require($.mirrorERC721 != address(0));
+        if ($.mirrorERC721 == address(0)) revert();
 
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
@@ -633,7 +633,7 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        require($.mirrorERC721 != address(0));
+        if ($.mirrorERC721 == address(0)) revert();
 
         _DNTransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
@@ -777,7 +777,7 @@ abstract contract DN404 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
-        require($.mirrorERC721 != address(0));
+        if ($.mirrorERC721 == address(0)) revert();
 
         Uint32Map storage oo = $.oo;
 
