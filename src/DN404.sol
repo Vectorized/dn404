@@ -158,7 +158,7 @@ abstract contract DN404 {
         uint32 burnedPoolHead;
         // The tail of the burned pool.
         uint32 burnedPoolTail;
-        // Total supply of minted NFTs.
+        // Total number of NFTs in existence.
         uint32 totalNFTSupply;
         // Total supply of tokens.
         uint96 totalSupply;
@@ -375,8 +375,7 @@ abstract contract DN404 {
     /// @dev Mints `amount` tokens to `to`, increasing the total supply.
     ///
     /// Will mint NFTs to `to` if the recipient's new balance supports
-    /// additional NFTs ***AND*** the `to` address's skipNFT flag is
-    /// set to false.
+    /// additional NFTs ***AND*** the `to` address's skipNFT flag is set to false.
     ///
     /// Emits a {Transfer} event.
     function _mint(address to, uint256 amount) internal virtual {
@@ -450,11 +449,10 @@ abstract contract DN404 {
 
     /// @dev Mints `amount` tokens to `to`, increasing the total supply.
     /// This variant mints NFT tokens starting from ID `preTotalSupply / _unit() + 1`.
-    /// It will skip the burned pool.
+    /// This variant will not touch the `burnedPool` and `nextTokenId`.
     ///
     /// Will mint NFTs to `to` if the recipient's new balance supports
-    /// additional NFTs ***AND*** the `to` address's skipNFT flag is
-    /// set to false.
+    /// additional NFTs ***AND*** the `to` address's skipNFT flag is set to false.
     ///
     /// Emits a {Transfer} event.
     function _mintNext(address to, uint256 amount) internal virtual {
@@ -634,7 +632,6 @@ abstract contract DN404 {
                         t.toOwnedLength += n;
                     } else {
                         _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
-
                         Uint32Map storage fromOwned = $.owned[from];
                         Uint32Map storage toOwned = $.owned[to];
                         t.toAlias = _registerAndResolveAlias(toAddressData, to);
@@ -651,9 +648,9 @@ abstract contract DN404 {
                             }
                         } while (--n != 0);
 
-                        _directLogsSend(directLogs, $.mirrorERC721);
-                        fromAddressData.ownedLength = uint32(t.fromOwnedLength);
                         toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
+                        fromAddressData.ownedLength = uint32(t.fromOwnedLength);
+                        _directLogsSend(directLogs, $.mirrorERC721);
                     }
                 }
             }
@@ -717,9 +714,7 @@ abstract contract DN404 {
                 $.nextTokenId = uint32(t.nextTokenId);
             }
 
-            if (packedLogs.logs.length != 0) {
-                _packedLogsSend(packedLogs, $.mirrorERC721);
-            }
+            if (packedLogs.logs.length != 0) _packedLogsSend(packedLogs, $.mirrorERC721);
         }
         /// @solidity memory-safe-assembly
         assembly {
@@ -1364,7 +1359,7 @@ abstract contract DN404 {
         /// @solidity memory-safe-assembly
         assembly {
             // Note that `p` implicitly allocates and advances the free memory pointer by
-            // 4 words, which we can safely mutate in `_packedLogsSend`.
+            // 4 words, which we can safely mutate in `_directLogsSend`.
             let logs := mload(0x40)
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
