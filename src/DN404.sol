@@ -1026,10 +1026,9 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
         Uint32Map storage owned = $.owned[owner];
-        uint256 n = $.addressData[owner].ownedLength;
+        uint256 n = _min($.addressData[owner].ownedLength, end);
         /// @solidity memory-safe-assembly
         assembly {
-            n := xor(n, mul(lt(end, n), xor(end, n))) // `min(n, end)`.
             ids := mload(0x40)
             let i := begin
             for {} lt(i, n) { i := add(i, 1) } {
@@ -1048,94 +1047,72 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
+        address mirror = $.mirrorERC721;
 
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x84) revert();
-
-            address from = address(uint160(_calldataload(0x04)));
-            address to = address(uint160(_calldataload(0x24)));
-            uint256 id = _calldataload(0x44);
-            address msgSender = address(uint160(_calldataload(0x64)));
-
-            _transferFromNFT(from, to, id, msgSender);
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _transferFromNFT(
+                address(uint160(_calldataload(0x04))), // `from`.
+                address(uint160(_calldataload(0x24))), // `to`.
+                _calldataload(0x44), // `id`.
+                address(uint160(_calldataload(0x64))) // `msgSender`.
+            );
             _return(1);
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x64) revert();
-
-            address spender = address(uint160(_calldataload(0x04)));
-            bool status = _calldataload(0x24) != 0;
-            address msgSender = address(uint160(_calldataload(0x44)));
-
-            _setApprovalForAll(spender, status, msgSender);
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _setApprovalForAll(
+                address(uint160(_calldataload(0x04))), // `spender`.
+                _calldataload(0x24) != 0, // `status`.
+                address(uint160(_calldataload(0x44))) // `msgSender`.
+            );
             _return(1);
         }
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x44) revert();
-
-            address owner = address(uint160(_calldataload(0x04)));
-            address operator = address(uint160(_calldataload(0x24)));
-
-            _return(_ref($.operatorApprovals, owner, operator).value);
+            if (msg.sender != mirror) revert SenderNotMirror();
+            Uint256Ref storage ref = _ref(
+                $.operatorApprovals,
+                address(uint160(_calldataload(0x04))), // `owner`.
+                address(uint160(_calldataload(0x24))) // `operator`.
+            );
+            _return(ref.value);
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            uint256 id = _calldataload(0x04);
-
-            _return(uint160(_ownerOf(id)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(uint160(_ownerOf(_calldataload(0x04))));
         }
         // `ownerAt(uint256)`.
         if (fnSelector == 0x24359879) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            uint256 id = _calldataload(0x04);
-
-            _return(uint160(_ownerAt(id)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(uint160(_ownerAt(_calldataload(0x04))));
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x64) revert();
-
-            address spender = address(uint160(_calldataload(0x04)));
-            uint256 id = _calldataload(0x24);
-            address msgSender = address(uint160(_calldataload(0x44)));
-
-            _return(uint160(_approveNFT(spender, id, msgSender)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            address owner = _approveNFT(
+                address(uint160(_calldataload(0x04))), // `spender`.
+                _calldataload(0x24), // `id`.
+                address(uint160(_calldataload(0x44))) // `msgSender`.
+            );
+            _return(uint160(owner));
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            uint256 id = _calldataload(0x04);
-
-            _return(uint160(_getApproved(id)));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(uint160(_getApproved(_calldataload(0x04))));
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x24) revert();
-
-            address owner = address(uint160(_calldataload(0x04)));
-
-            _return(_balanceOfNFT(owner));
+            if (msg.sender != mirror) revert SenderNotMirror();
+            _return(_balanceOfNFT(address(uint160(_calldataload(0x04)))));
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
-            if (msg.data.length < 0x04) revert();
-
+            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_totalNFTSupply());
         }
         // `implementsDN404()`.
