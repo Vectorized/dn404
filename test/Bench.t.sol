@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
-import {DN404, MockDN404} from "./utils/mocks/MockDN404.sol";
+import {DN404, MockDN404Slim} from "./utils/mocks/MockDN404Slim.sol";
 import {DN404Mirror} from "../src/DN404Mirror.sol";
 
 abstract contract Ownable {
@@ -370,17 +370,16 @@ interface IERC20 {
 
 contract BenchTest is SoladyTest {
     Pandora pandora;
-    MockDN404 dn;
+    MockDN404Slim dn;
     DN404Mirror mirror;
 
     function setUp() public {
         pandora = new Pandora(address(this));
-        dn = new MockDN404();
+        dn = new MockDN404Slim();
         mirror = new DN404Mirror(address(this));
 
         pandora.setWhitelist(address(this), true);
         dn.initializeDN404(10000 * 10 ** 18, address(this), address(mirror));
-        dn.setUseDirectTransfersIfPossible(true);
     }
 
     modifier mint(address a, uint256 amount) {

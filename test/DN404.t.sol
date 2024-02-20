@@ -265,6 +265,8 @@ contract DN404Test is SoladyTest {
     }
 
     function testMixed(uint256) public {
+        dn.setUseExistsLookup(_random() % 2 == 0);
+
         address initialSupplyOwner = address(1111);
         uint256 n = _bound(_random(), 0, 16);
         dn.initializeDN404(n * _WAD, initialSupplyOwner, address(mirror));
