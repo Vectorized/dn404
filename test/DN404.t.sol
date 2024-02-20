@@ -329,7 +329,7 @@ contract DN404Test is SoladyTest {
             }
 
             uint256 nftBalanceSum;
-            {
+            unchecked {
                 uint256 balanceSum;
                 for (uint256 i; i != 3; ++i) {
                     address a = addresses[i];
@@ -344,7 +344,7 @@ contract DN404Test is SoladyTest {
                 assertLe(nftBalanceSum, balanceSum / _WAD);
             }
 
-            {
+            unchecked {
                 uint256 numOwned;
                 for (uint256 i = 1; i <= n; ++i) {
                     if (mirror.ownerAt(i) != address(0)) numOwned++;
