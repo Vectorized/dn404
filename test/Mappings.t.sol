@@ -390,6 +390,35 @@ contract MappingsTest is SoladyTest {
         assertEq(_restrictNFTId(id), id > type(uint32).max ? 0 : id);
     }
 
+    function _totalSupplyOverflows(uint256 amount, uint256 unit)
+        internal
+        pure
+        returns (bool result)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(or(shr(96, amount), lt(0xfffffffe, div(amount, unit)))))
+        }
+    }
+
+    function testWrapNFTIdWithOverflowCheck(uint256 id, uint256 totalSupply, uint256 unit) public {
+        if (unit == 0) unit = 1;
+        id = _bound(id, 0, type(uint32).max);
+
+        if (!_totalSupplyOverflows(totalSupply, unit)) {
+            uint256 maxId = totalSupply / unit;
+            id = _wrapNFTId(id + 1, maxId);
+            assertTrue(id != 0 && id <= 0xffffffff);
+        }
+    }
+
+    function _wrapNFTId(uint256 id, uint256 maxId) internal pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := or(mul(iszero(gt(id, maxId)), id), gt(id, maxId))
+        }
+    }
+
     function _brutalized(address a) internal pure returns (address result) {
         /// @solidity memory-safe-assembly
         assembly {
