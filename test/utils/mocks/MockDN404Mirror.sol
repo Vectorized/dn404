@@ -51,7 +51,7 @@ contract MockDN404Mirror is DN404Mirror {
         result = DN404Mirror.ownerOf(id);
     }
 
-    function approve(address spender, uint256 id) public virtual override brutalizeMemory {
+    function approve(address spender, uint256 id) public payable virtual override brutalizeMemory {
         DN404Mirror.approve(_brutalized(spender), id);
     }
 
@@ -88,6 +88,7 @@ contract MockDN404Mirror is DN404Mirror {
 
     function transferFrom(address from, address to, uint256 id)
         public
+        payable
         virtual
         override
         brutalizeMemory
