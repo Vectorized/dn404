@@ -621,8 +621,6 @@ abstract contract DN404 {
             t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
             $.totalNFTSupply = uint32(t.totalNFTSupply);
 
-            Uint32Map storage oo = $.oo;
-
             if (_useDirectTransfersIfPossible()) {
                 uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
                 if (n != 0) {
@@ -635,13 +633,12 @@ abstract contract DN404 {
                         Uint32Map storage fromOwned = $.owned[from];
                         Uint32Map storage toOwned = $.owned[to];
                         t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                        uint256 toIndex = t.toOwnedLength;
                         // Direct transfer loop.
                         do {
                             uint256 id = _get(fromOwned, --t.fromOwnedLength);
-                            _set(toOwned, t.toOwnedLength, uint32(id));
-                            _setOwnerAliasAndOwnedIndex(
-                                oo, id, t.toAlias, uint32(t.toOwnedLength++)
-                            );
+                            _set(toOwned, toIndex, uint32(id));
+                            _setOwnerAliasAndOwnedIndex($.oo, id, t.toAlias, uint32(toIndex++));
                             _directLogsAppend(directLogs, id);
                             if (_get($.mayHaveNFTApproval, id)) {
                                 _set($.mayHaveNFTApproval, id, false);
@@ -649,13 +646,14 @@ abstract contract DN404 {
                             }
                         } while (--n != 0);
 
-                        toAddressData.ownedLength = uint32(t.toOwnedLength);
+                        toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
                         fromAddressData.ownedLength = uint32(t.fromOwnedLength);
                         _directLogsSend(directLogs, $.mirrorERC721);
                     }
                 }
             }
 
+            Uint32Map storage oo = $.oo;
             _DNPackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
 
             t.burnedPoolTail = $.burnedPoolTail;
@@ -1292,7 +1290,7 @@ abstract contract DN404 {
         uint256 unit = _unit();
         /// @solidity memory-safe-assembly
         assembly {
-            result := iszero(iszero(or(shr(96, amount), gt(div(amount, unit), 0xfffffffe))))
+            result := iszero(iszero(or(shr(96, amount), lt(0xfffffffe, div(amount, unit)))))
         }
     }
 
