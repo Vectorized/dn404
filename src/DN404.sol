@@ -1287,10 +1287,11 @@ abstract contract DN404 {
     }
 
     /// @dev Returns whether `amount` is a valid `totalSupply`.
-    function _totalSupplyOverflows(uint256 amount) internal view returns (bool) {
-        unchecked {
-            return _toUint(amount > type(uint96).max)
-                | _toUint(amount / _unit() > type(uint32).max - 1) != 0;
+    function _totalSupplyOverflows(uint256 amount) internal view returns (bool result) {
+        uint256 unit = _unit();
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(or(shr(96, amount), gt(div(amount, unit), 0xfffffffe))))
         }
     }
 
