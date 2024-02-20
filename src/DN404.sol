@@ -270,6 +270,39 @@ abstract contract DN404 {
     function tokenURI(uint256 id) public view virtual returns (string memory);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                       CONFIGURABLES                        */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
+    /// whenever possible, instead of burning and re-minting.
+    function _useDirectTransfersIfPossible() internal view virtual returns (bool) {
+        return true;
+    }
+
+    /// @dev Returns if burns should be added to the burn pool.
+    /// This returns false by default, which means the NFT IDs are re-minted in a cycle.
+    function _addToBurnedPool(uint256 totalNFTSupplyAfterBurn, uint256 totalSupplyAfterBurn)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
+        totalNFTSupplyAfterBurn = totalNFTSupplyAfterBurn; // Silence compiler warning.
+        totalSupplyAfterBurn = totalSupplyAfterBurn; // Silence compiler warning.
+        return false;
+    }
+
+    /// @dev Returns whether to use the exists bitmap for more efficient
+    /// scanning of an empty token ID slot.
+    /// Recommended for collections that do not use the burn pool,
+    /// and are expected to have nearly all possible NFTs materialized.
+    ///
+    /// Note: The returned value must be constant after initialization.
+    function _useExistsLookup() internal view virtual returns (bool) {
+        return true;
+    }
+
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
@@ -722,34 +755,6 @@ abstract contract DN404 {
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
-    }
-
-    /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
-    /// whenever possible, instead of burning and re-minting.
-    function _useDirectTransfersIfPossible() internal view virtual returns (bool) {
-        return true;
-    }
-
-    /// @dev Returns if burns should be added to the burn pool.
-    /// This returns false by default, which means the NFT IDs are re-minted in a cycle.
-    function _addToBurnedPool(uint256 totalNFTSupplyAfterBurn, uint256 totalSupplyAfterBurn)
-        internal
-        view
-        virtual
-        returns (bool)
-    {
-        totalNFTSupplyAfterBurn = totalNFTSupplyAfterBurn; // Silence compiler warning.
-        totalSupplyAfterBurn = totalSupplyAfterBurn; // Silence compiler warning.
-        return false;
-    }
-
-    /// @dev Returns whether to use the exists lookup for more efficient
-    /// scanning of an empty token ID slot. Highly recommended for collections
-    /// with near full load factor `totalNFTSupply * _unit() / totalSupply`.
-    /// The trade off is slightly higher initial storage write costs,
-    /// which will be quickly amortized away.
-    function _useExistsLookup() internal pure virtual returns (bool) {
-        return true;
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
