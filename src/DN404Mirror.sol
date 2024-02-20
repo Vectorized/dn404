@@ -81,8 +81,12 @@ contract DN404Mirror {
 
     /// @dev Struct contain the NFT mirror contract storage.
     struct DN404NFTStorage {
+        // Address of the ERC20 base contract.
         address baseERC20;
+        // The deployer, if provided. If non-zero, the initialization of the
+        // ERC20 <-> ERC721 link can only be done be the deployer via the ERC20 base contract.
         address deployer;
+        // The owner of the ERC20 base contract. For marketplace signaling.
         address owner;
     }
 
@@ -161,7 +165,7 @@ contract DN404Mirror {
     ///   or an approved operator for the token owner.
     ///
     /// Emits an {Approval} event.
-    function approve(address spender, uint256 id) public virtual {
+    function approve(address spender, uint256 id) public payable virtual {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
@@ -172,8 +176,8 @@ contract DN404Mirror {
             mstore(0x40, id)
             mstore(0x60, caller())
             if iszero(
-                and(
-                    gt(returndatasize(), 0x1f),
+                and( // Arguments of `and` are evaluated last to first.
+                    gt(returndatasize(), 0x1f), // The call must return at least 32 bytes.
                     call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20)
                 )
             ) {
@@ -211,7 +215,10 @@ contract DN404Mirror {
             mstore(0x40, iszero(iszero(approved)))
             mstore(0x60, caller())
             if iszero(
-                and(eq(mload(0x00), 1), call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20))
+                and( // Arguments of `and` are evaluated last to first.
+                    eq(mload(0x00), 1), // The call must return 1.
+                    call(gas(), base, callvalue(), 0x1c, 0x64, 0x00, 0x20)
+                )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
@@ -246,7 +253,7 @@ contract DN404Mirror {
     /// - The caller must be the owner of the token, or be approved to manage the token.
     ///
     /// Emits a {Transfer} event.
-    function transferFrom(address from, address to, uint256 id) public virtual {
+    function transferFrom(address from, address to, uint256 id) public payable virtual {
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
@@ -259,7 +266,10 @@ contract DN404Mirror {
             mstore(add(m, 0x60), id)
             mstore(add(m, 0x80), caller())
             if iszero(
-                and(eq(mload(m), 1), call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20))
+                and( // Arguments of `and` are evaluated last to first.
+                    eq(mload(m), 1), // The call must return 1.
+                    call(gas(), base, callvalue(), add(m, 0x1c), 0x84, m, 0x20)
+                )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
@@ -272,7 +282,6 @@ contract DN404Mirror {
     /// @dev Equivalent to `safeTransferFrom(from, to, id, "")`.
     function safeTransferFrom(address from, address to, uint256 id) public payable virtual {
         transferFrom(from, to, id);
-
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, "");
     }
 
@@ -290,10 +299,10 @@ contract DN404Mirror {
     /// Emits a {Transfer} event.
     function safeTransferFrom(address from, address to, uint256 id, bytes calldata data)
         public
+        payable
         virtual
     {
         transferFrom(from, to, id);
-
         if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
     }
 
@@ -320,15 +329,14 @@ contract DN404Mirror {
 
     /// @dev Permissionless function to pull the owner from the base DN404 contract
     /// if it implements ownable, for marketplace signaling purposes.
-    function pullOwner() public virtual {
+    function pullOwner() public virtual returns (bool) {
         address newOwner;
         address base = baseERC20();
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, 0x8da5cb5b) // `owner()`.
-            if and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)) {
-                newOwner := shr(96, mload(0x0c))
-            }
+            let success := staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)
+            newOwner := mul(shr(96, mload(0x0c)), and(gt(returndatasize(), 0x1f), success))
         }
         DN404NFTStorage storage $ = _getDN404NFTStorage();
         address oldOwner = $.owner;
@@ -336,6 +344,7 @@ contract DN404Mirror {
             $.owner = newOwner;
             emit OwnershipTransferred(oldOwner, newOwner);
         }
+        return true;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -361,7 +370,6 @@ contract DN404Mirror {
             assembly {
                 let o := add(0x24, calldataload(0x04)) // Packed logs offset.
                 let end := add(o, shl(5, calldataload(sub(o, 0x20))))
-
                 for {} iszero(eq(o, end)) { o := add(0x20, o) } {
                     let d := calldataload(o) // Entry in the packed logs.
                     let a := shr(96, d) // The address.
@@ -388,7 +396,6 @@ contract DN404Mirror {
                 let to := calldataload(0x24)
                 let o := add(0x24, calldataload(0x44)) // Direct logs offset.
                 let end := add(o, shl(5, calldataload(sub(o, 0x20))))
-
                 for {} iszero(eq(o, end)) { o := add(0x20, o) } {
                     log4(codesize(), 0x00, _TRANSFER_EVENT_SIGNATURE, from, to, calldataload(o))
                 }
@@ -451,7 +458,9 @@ contract DN404Mirror {
             returndatacopy(0x00, 0x00, 0x20) // Copy the offset of the string in returndata.
             returndatacopy(result, mload(0x00), 0x20) // Copy the length of the string.
             returndatacopy(add(result, 0x20), add(mload(0x00), 0x20), mload(result)) // Copy the string.
-            mstore(0x40, add(add(result, 0x20), mload(result))) // Allocate memory.
+            let end := add(add(result, 0x20), mload(result))
+            mstore(end, 0) // Zeroize the word after the string.
+            mstore(0x40, add(end, 0x20)) // Allocate memory.
         }
     }
 
@@ -469,7 +478,10 @@ contract DN404Mirror {
             mstore(0x20, arg0)
             mstore(0x40, arg1)
             if iszero(
-                and(gt(returndatasize(), 0x1f), staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20))
+                and( // Arguments of `and` are evaluated last to first.
+                    gt(returndatasize(), 0x1f), // The call must return at least 32 bytes.
+                    staticcall(gas(), base, 0x1c, 0x44, 0x00, 0x20)
+                )
             ) {
                 returndatacopy(m, 0x00, returndatasize())
                 revert(m, returndatasize())
