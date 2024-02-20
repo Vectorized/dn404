@@ -132,7 +132,27 @@ contract DN404CustomUnitTest is SoladyTest {
         }
     }
 
-    function _totalSupplyOverflows(uint256 amount, uint256 unit) private pure returns (bool) {
+    function testTotalSupplyOverflowsTrick(uint256 amount, uint256 unit) public {
+        if (unit == 0) unit = 1;
+        assertEq(_totalSupplyOverflows(amount, unit), _totalSupplyOverflowsOriginal(amount, unit));
+    }
+
+    function _totalSupplyOverflows(uint256 amount, uint256 unit)
+        private
+        pure
+        returns (bool result)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(or(shr(96, amount), lt(0xfffffffe, div(amount, unit)))))
+        }
+    }
+
+    function _totalSupplyOverflowsOriginal(uint256 amount, uint256 unit)
+        private
+        pure
+        returns (bool)
+    {
         return (amount > type(uint96).max) || (amount / unit > type(uint32).max - 1);
     }
 }

@@ -1174,8 +1174,7 @@ abstract contract DN404 {
             let s := add(shl(96, map.slot), shr(3, index)) // Storage slot.
             let o := shl(5, and(index, 7)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
-            let m := 0xffffffff // Value mask.
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), value)))))
+            sstore(s, xor(v, shl(o, and(0xffffffff, xor(value, shr(o, v))))))
         }
     }
 
@@ -1190,11 +1189,10 @@ abstract contract DN404 {
         assembly {
             let i := sub(id, 1) // Index of the uint64 combined value.
             let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
-            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
             let v := sload(s) // Storage slot value.
-            let m := 0xffffffffffffffff // Value mask.
+            let o := shl(6, and(i, 3)) // Storage slot offset (bits).
             let combined := or(shl(32, ownedIndex), and(0xffffffff, ownership))
-            sstore(s, xor(v, shl(o, and(m, xor(shr(o, v), combined)))))
+            sstore(s, xor(v, shl(o, and(0xffffffffffffffff, xor(shr(o, v), combined)))))
         }
     }
 
