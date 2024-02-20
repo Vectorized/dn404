@@ -287,8 +287,8 @@ abstract contract DN404 {
         virtual
         returns (bool)
     {
-        totalSupplyAfterBurn = totalSupplyAfterBurn; // Silence compiler warning.
-        totalNFTSupplyAfterBurn = totalNFTSupplyAfterBurn; // Silence compiler warning.
+        // Silence unused variable compiler warning.
+        totalSupplyAfterBurn = totalNFTSupplyAfterBurn;
         return false;
     }
 
