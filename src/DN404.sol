@@ -221,14 +221,6 @@ abstract contract DN404 {
                 mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
                 revert(0x1c, 0x04)
             }
-
-            // Automatically call `pullOwner` on the mirror if the contract inherits
-            // Solady's Ownable and has the owner slot initialized. For quality of life.
-            let soladyOwnerSlot := not(0x8b78c6d8)
-            if sload(soladyOwnerSlot) {
-                mstore(0x00, 0x6cef16e6) // `pullOwner()`.
-                pop(call(gas(), mirror, 0, 0x1c, 0x04, 0x00, 0x00))
-            }
         }
 
         $.nextTokenId = 1;

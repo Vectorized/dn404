@@ -291,14 +291,12 @@ contract DN404MirrorTest is SoladyTest {
     function testPullOwnerWithOwnable() public {
         MockDN404Ownable dnOwnable = new MockDN404Ownable();
         dnOwnable.initializeDN404(1000, address(this), address(mirror));
-        assertEq(dnOwnable.owner(), address(this));
-        assertEq(mirror.owner(), address(this));
-
         address newOwner = address(123);
         dnOwnable.transferOwnership(newOwner);
 
+        assertEq(mirror.owner(), address(0));
         vm.expectEmit(true, true, true, true);
-        emit OwnershipTransferred(address(this), newOwner);
+        emit OwnershipTransferred(address(0), newOwner);
         mirror.pullOwner();
         assertEq(mirror.owner(), newOwner);
     }

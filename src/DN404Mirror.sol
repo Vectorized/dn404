@@ -340,8 +340,10 @@ contract DN404Mirror {
         }
         DN404NFTStorage storage $ = _getDN404NFTStorage();
         address oldOwner = $.owner;
-        if (oldOwner != newOwner) $.owner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
+        if (oldOwner != newOwner) {
+            $.owner = newOwner;
+            emit OwnershipTransferred(oldOwner, newOwner);
+        }
         return true;
     }
 
