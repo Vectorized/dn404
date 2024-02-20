@@ -445,20 +445,20 @@ abstract contract DN404 {
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
                     uint32 burnedPoolTail = $.burnedPoolTail;
-                    uint256 nextTokenId = $.nextTokenId;
+                    t.nextTokenId = $.nextTokenId;
                     // Mint loop.
                     do {
                         uint256 id;
                         if (burnedPoolHead != burnedPoolTail) {
                             id = _get($.burnedPool, burnedPoolHead++);
                         } else {
-                            id = nextTokenId;
+                            id = t.nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
                                 id = _useExistsLookup()
                                     ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
                                     : _wrapNFTId(id + 1, maxId);
                             }
-                            nextTokenId = _wrapNFTId(id + 1, maxId);
+                            t.nextTokenId = _wrapNFTId(id + 1, maxId);
                         }
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
@@ -466,7 +466,7 @@ abstract contract DN404 {
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != t.toEnd);
 
-                    $.nextTokenId = uint32(nextTokenId);
+                    $.nextTokenId = uint32(t.nextTokenId);
                     $.burnedPoolHead = burnedPoolHead;
                     _packedLogsSend(packedLogs, $.mirrorERC721);
                 }
@@ -1457,6 +1457,7 @@ abstract contract DN404 {
 
     /// @dev Struct of temporary variables for mints.
     struct _DNMintTemps {
+        uint256 nextTokenId;
         uint256 toEnd;
         uint32 toAlias;
     }
