@@ -110,23 +110,23 @@ contract DN404Mirror {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Returns the token collection name from the base DN404 contract.
-    function name() public view virtual returns (string memory result) {
+    function name() public view virtual returns (string memory) {
         return _readString(0x06fdde03, 0); // `name()`.
     }
 
     /// @dev Returns the token collection symbol from the base DN404 contract.
-    function symbol() public view virtual returns (string memory result) {
+    function symbol() public view virtual returns (string memory) {
         return _readString(0x95d89b41, 0); // `symbol()`.
     }
 
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from
     /// the base DN404 contract.
-    function tokenURI(uint256 id) public view virtual returns (string memory result) {
+    function tokenURI(uint256 id) public view virtual returns (string memory) {
         return _readString(0xc87b56dd, id); // `tokenURI()`.
     }
 
     /// @dev Returns the total NFT supply from the base DN404 contract.
-    function totalSupply() public view virtual returns (uint256 result) {
+    function totalSupply() public view virtual returns (uint256) {
         return _readWord(0xe2c79281, 0, 0); // `totalNFTSupply()`.
     }
 
@@ -134,7 +134,7 @@ contract DN404Mirror {
     ///
     /// Requirements:
     /// - `nftOwner` must not be the zero address.
-    function balanceOf(address nftOwner) public view virtual returns (uint256 result) {
+    function balanceOf(address nftOwner) public view virtual returns (uint256) {
         return _readWord(0xf5b100ea, uint160(nftOwner), 0); // `balanceOfNFT(address)`.
     }
 
@@ -142,13 +142,13 @@ contract DN404Mirror {
     ///
     /// Requirements:
     /// - Token `id` must exist.
-    function ownerOf(uint256 id) public view virtual returns (address result) {
+    function ownerOf(uint256 id) public view virtual returns (address) {
         return address(uint160(_readWord(0x6352211e, id, 0))); // `ownerOf(uint256)`.
     }
 
     /// @dev Returns the owner of token `id` from the base DN404 contract.
     /// Returns `address(0)` instead of reverting if the token does not exist.
-    function ownerAt(uint256 id) public view virtual returns (address result) {
+    function ownerAt(uint256 id) public view virtual returns (address) {
         return address(uint160(_readWord(0x24359879, id, 0))); // `ownerAt(uint256)`.
     }
 
@@ -230,7 +230,7 @@ contract DN404Mirror {
         public
         view
         virtual
-        returns (bool result)
+        returns (bool)
     {
         // `isApprovedForAll(address,address)`.
         return _readWord(0xe985e9c5, uint160(nftOwner), uint160(operator)) != 0;

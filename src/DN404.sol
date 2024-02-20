@@ -208,8 +208,8 @@ abstract contract DN404 {
     ) internal virtual {
         DN404Storage storage $ = _getDN404Storage();
 
-        if ($.nextTokenId != 0) revert DNAlreadyInitialized();
-
+        if (_unit() == 0) revert UnitIsZero();
+        if ($.mirrorERC721 != address(0)) revert DNAlreadyInitialized();
         if (mirror == address(0)) revert MirrorAddressIsZero();
 
         /// @solidity memory-safe-assembly
@@ -225,8 +225,6 @@ abstract contract DN404 {
 
         $.nextTokenId = 1;
         $.mirrorERC721 = mirror;
-
-        if (_unit() == 0) revert UnitIsZero();
 
         if (initialTokenSupply != 0) {
             if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
@@ -416,6 +414,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
+        if ($.mirrorERC721 == address(0)) revert();
 
         _DNMintTemps memory t;
         unchecked {
@@ -445,7 +444,7 @@ abstract contract DN404 {
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
                     t.burnedPoolTail = $.burnedPoolTail;
-                    t.nextTokenId = $.nextTokenId;
+                    t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                     // Mint loop.
                     do {
                         uint256 id;
@@ -493,6 +492,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
+        if ($.mirrorERC721 == address(0)) revert();
 
         _DNMintTemps memory t;
         unchecked {
@@ -563,6 +563,7 @@ abstract contract DN404 {
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
         DN404Storage storage $ = _getDN404Storage();
+        if ($.mirrorERC721 == address(0)) revert();
 
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
@@ -632,6 +633,7 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
+        if ($.mirrorERC721 == address(0)) revert();
 
         _DNTransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
@@ -715,10 +717,10 @@ abstract contract DN404 {
 
             if (t.numNFTMints != 0) {
                 _packedLogsSet(packedLogs, to, 0);
-                t.nextTokenId = $.nextTokenId;
                 Uint32Map storage toOwned = $.owned[to];
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 maxId = t.totalSupply / _unit();
+                t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                 uint256 toIndex = t.toOwnedLength;
                 toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
                 uint32 burnedPoolHead = $.burnedPoolHead;
@@ -772,9 +774,10 @@ abstract contract DN404 {
         internal
         virtual
     {
-        DN404Storage storage $ = _getDN404Storage();
-
         if (to == address(0)) revert TransferToZeroAddress();
+
+        DN404Storage storage $ = _getDN404Storage();
+        if ($.mirrorERC721 == address(0)) revert();
 
         Uint32Map storage oo = $.oo;
 
@@ -794,33 +797,30 @@ abstract contract DN404 {
         AddressData storage toAddressData = _addressData(to);
 
         uint256 unit = _unit();
+        mapping(address => Uint32Map) storage owned = $.owned;
+        Uint32Map storage fromOwned = owned[from];
 
         unchecked {
-            {
-                uint256 fromBalance = fromAddressData.balance;
-                if (unit > fromBalance) revert InsufficientBalance();
-                fromAddressData.balance = uint96(fromBalance - unit);
-                toAddressData.balance += uint96(unit);
-            }
-            mapping(address => Uint32Map) storage owned = $.owned;
-            Uint32Map storage fromOwned = owned[from];
-
-            if (_get($.mayHaveNFTApproval, id)) {
-                _set($.mayHaveNFTApproval, id, false);
-                delete $.nftApprovals[id];
-            }
-
-            {
-                uint32 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
-                uint32 i = _get(oo, _ownedIndex(id));
-                _set(fromOwned, i, updatedId);
-                _set(oo, _ownedIndex(updatedId), i);
-            }
+            uint256 fromBalance = fromAddressData.balance;
+            if (unit > fromBalance) revert InsufficientBalance();
+            fromAddressData.balance = uint96(fromBalance - unit);
+            toAddressData.balance += uint96(unit);
+        }
+        if (_get($.mayHaveNFTApproval, id)) {
+            _set($.mayHaveNFTApproval, id, false);
+            delete $.nftApprovals[id];
+        }
+        unchecked {
+            uint32 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
+            uint32 i = _get(oo, _ownedIndex(id));
+            _set(fromOwned, i, updatedId);
+            _set(oo, _ownedIndex(updatedId), i);
+        }
+        unchecked {
             uint32 n = toAddressData.ownedLength++;
             _set(owned[to], n, uint32(id));
             _setOwnerAliasAndOwnedIndex(oo, id, _registerAndResolveAlias(toAddressData, to), n);
         }
-
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Transfer} event.
@@ -913,7 +913,7 @@ abstract contract DN404 {
         d = _getDN404Storage().addressData[owner];
         unchecked {
             if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
-                uint256 skipNFT = (_toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG);
+                uint256 skipNFT = _toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG;
                 d.flags = uint8(skipNFT | _ADDRESS_DATA_INITIALIZED_FLAG);
             }
         }
