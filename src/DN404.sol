@@ -618,9 +618,6 @@ abstract contract DN404 {
                 t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedLength);
             }
 
-            t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
-            $.totalNFTSupply = uint32(t.totalNFTSupply);
-
             if (_useDirectTransfersIfPossible()) {
                 uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
                 if (n != 0) {
@@ -652,6 +649,9 @@ abstract contract DN404 {
                     }
                 }
             }
+
+            t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
+            $.totalNFTSupply = uint32(t.totalNFTSupply);
 
             Uint32Map storage oo = $.oo;
             _DNPackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
