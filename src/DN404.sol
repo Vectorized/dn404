@@ -444,7 +444,7 @@ abstract contract DN404 {
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
                     t.burnedPoolTail = $.burnedPoolTail;
-                    t.nextTokenId = $.nextTokenId;
+                    t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                     // Mint loop.
                     do {
                         uint256 id;
@@ -717,10 +717,10 @@ abstract contract DN404 {
 
             if (t.numNFTMints != 0) {
                 _packedLogsSet(packedLogs, to, 0);
-                t.nextTokenId = $.nextTokenId;
                 Uint32Map storage toOwned = $.owned[to];
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint256 maxId = t.totalSupply / _unit();
+                t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                 uint256 toIndex = t.toOwnedLength;
                 toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
                 uint32 burnedPoolHead = $.burnedPoolHead;
