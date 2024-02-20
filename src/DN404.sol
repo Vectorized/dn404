@@ -444,12 +444,12 @@ abstract contract DN404 {
                     toAddressData.ownedLength = uint32(t.toEnd);
                     t.toAlias = _registerAndResolveAlias(toAddressData, to);
                     uint32 burnedPoolHead = $.burnedPoolHead;
-                    uint32 burnedPoolTail = $.burnedPoolTail;
+                    t.burnedPoolTail = $.burnedPoolTail;
                     t.nextTokenId = $.nextTokenId;
                     // Mint loop.
                     do {
                         uint256 id;
-                        if (burnedPoolHead != burnedPoolTail) {
+                        if (burnedPoolHead != t.burnedPoolTail) {
                             id = _get($.burnedPool, burnedPoolHead++);
                         } else {
                             id = t.nextTokenId;
@@ -1458,6 +1458,7 @@ abstract contract DN404 {
     /// @dev Struct of temporary variables for mints.
     struct _DNMintTemps {
         uint256 nextTokenId;
+        uint32 burnedPoolTail;
         uint256 toEnd;
         uint32 toAlias;
     }
