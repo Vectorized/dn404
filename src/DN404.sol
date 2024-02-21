@@ -420,6 +420,7 @@ abstract contract DN404 {
         if ($.mirrorERC721 == address(0)) revert();
 
         _DNMintTemps memory t;
+        t.to = to;
         unchecked {
             uint256 toBalance = uint256(toAddressData.balance) + amount;
             toAddressData.balance = uint96(toBalance);
@@ -466,7 +467,7 @@ abstract contract DN404 {
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, id);
-                        _afterNFTTransfer(address(0), to, id);
+                        _afterNFTTransfer(address(0), t.to, id);
                     } while (toIndex != t.toEnd);
 
                     $.nextTokenId = uint32(t.nextTokenId);
@@ -499,6 +500,7 @@ abstract contract DN404 {
         if ($.mirrorERC721 == address(0)) revert();
 
         _DNMintTemps memory t;
+        t.to = to;
         unchecked {
             uint256 toBalance = uint256(toAddressData.balance) + amount;
             toAddressData.balance = uint96(toBalance);
@@ -540,7 +542,7 @@ abstract contract DN404 {
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                         _packedLogsAppend(packedLogs, id);
-                        _afterNFTTransfer(address(0), to, id);
+                        _afterNFTTransfer(address(0), t.to, id);
                     } while (toIndex != t.toEnd);
 
                     _packedLogsSend(packedLogs, $.mirrorERC721);
