@@ -465,8 +465,8 @@ abstract contract DN404 {
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                        _afterNFTTransfer(address(0), to, id);
                         _packedLogsAppend(packedLogs, id);
+                        _afterNFTTransfer(address(0), to, id);
                     } while (toIndex != t.toEnd);
 
                     $.nextTokenId = uint32(t.nextTokenId);
@@ -539,8 +539,8 @@ abstract contract DN404 {
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                        _afterNFTTransfer(address(0), to, id);
                         _packedLogsAppend(packedLogs, id);
+                        _afterNFTTransfer(address(0), to, id);
                     } while (toIndex != t.toEnd);
 
                     _packedLogsSend(packedLogs, $.mirrorERC721);
@@ -712,8 +712,8 @@ abstract contract DN404 {
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    _afterNFTTransfer(from, address(0), id);
                     _packedLogsAppend(packedLogs, id);
+                    _afterNFTTransfer(from, address(0), id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
@@ -751,8 +751,8 @@ abstract contract DN404 {
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                    _afterNFTTransfer(address(0), to, id);
                     _packedLogsAppend(packedLogs, id);
+                    _afterNFTTransfer(address(0), to, id);
                 } while (toIndex != t.toEnd);
 
                 $.burnedPoolHead = burnedPoolHead;
