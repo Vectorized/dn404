@@ -300,11 +300,8 @@ abstract contract DN404 {
         return true;
     }
 
-    /// @dev Hook that is called after any NFT mint.
-    function _afterNFTMint(uint256 id) internal virtual {}
-
-    /// @dev Hook that is called after any NFT burn.
-    function _afterNFTBurn(uint256 id) internal virtual {}
+    /// @dev Hook that is called after any NFT token transfers, including minting and burning.
+    function _afterNFTTransfer(address from, address to, uint256 id) internal virtual {}
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
@@ -468,7 +465,7 @@ abstract contract DN404 {
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                        _afterNFTMint(id);
+                        _afterNFTTransfer(address(0), to, id);
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != t.toEnd);
 
@@ -542,7 +539,7 @@ abstract contract DN404 {
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                        _afterNFTMint(id);
+                        _afterNFTTransfer(address(0), to, id);
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != t.toEnd);
 
@@ -588,9 +585,12 @@ abstract contract DN404 {
             if (numNFTBurns != 0) {
                 _DNPackedLogs memory packedLogs = _packedLogsMalloc(numNFTBurns);
                 _packedLogsSet(packedLogs, from, 1);
-                uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
-                $.totalNFTSupply = uint32(totalNFTSupply);
-                bool addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
+                bool addToBurnedPool;
+                {
+                    uint256 totalNFTSupply = uint256($.totalNFTSupply) - numNFTBurns;
+                    $.totalNFTSupply = uint32(totalNFTSupply);
+                    addToBurnedPool = _addToBurnedPool(totalNFTSupply, totalSupply_);
+                }
 
                 Uint32Map storage oo = $.oo;
                 uint256 fromEnd = fromIndex - numNFTBurns;
@@ -601,7 +601,7 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
-                    _afterNFTBurn(id);
+                    _afterNFTTransfer(from, address(0), id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
@@ -712,7 +712,7 @@ abstract contract DN404 {
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-                    _afterNFTBurn(id);
+                    _afterNFTTransfer(from, address(0), id);
                     _packedLogsAppend(packedLogs, id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
@@ -751,7 +751,7 @@ abstract contract DN404 {
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                    _afterNFTMint(id);
+                    _afterNFTTransfer(address(0), to, id);
                     _packedLogsAppend(packedLogs, id);
                 } while (toIndex != t.toEnd);
 
@@ -839,6 +839,7 @@ abstract contract DN404 {
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
+        _afterNFTTransfer(from, to, id);
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
