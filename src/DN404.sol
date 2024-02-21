@@ -648,6 +648,8 @@ abstract contract DN404 {
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
         t.totalSupply = $.totalSupply;
+        t.from = from;
+        t.to = to;
 
         if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
 
@@ -685,7 +687,7 @@ abstract contract DN404 {
                                 _set($.mayHaveNFTApproval, id, false);
                                 delete $.nftApprovals[id];
                             }
-                            _afterNFTTransfer(from, to, id);
+                            _afterNFTTransfer(t.from, t.to, id);
                         } while (--n != 0);
 
                         toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
@@ -720,7 +722,7 @@ abstract contract DN404 {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
-                    _afterNFTTransfer(from, address(0), id);
+                    _afterNFTTransfer(t.from, address(0), id);
                 } while (fromIndex != t.fromEnd);
 
                 if (addToBurnedPool) $.burnedPoolTail = (t.burnedPoolTail = burnedPoolTail);
@@ -753,7 +755,7 @@ abstract contract DN404 {
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
-                    _afterNFTTransfer(address(0), to, id);
+                    _afterNFTTransfer(address(0), t.to, id);
                 } while (toIndex != t.toEnd);
 
                 $.burnedPoolHead = burnedPoolHead;
@@ -1464,6 +1466,8 @@ abstract contract DN404 {
         uint32 toAlias;
         uint256 nextTokenId;
         uint32 burnedPoolTail;
+        address from;
+        address to;
     }
 
     /// @dev Struct of temporary variables for mints.
@@ -1472,6 +1476,7 @@ abstract contract DN404 {
         uint32 burnedPoolTail;
         uint256 toEnd;
         uint32 toAlias;
+        address to;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
