@@ -690,7 +690,7 @@ abstract contract DN404 {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
-                    _afterNFTTransfer(t.from, t.to, id);
+                    _afterNFTTransfer(from, to, id);
                 } while (--n != 0);
 
                 toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
@@ -724,7 +724,7 @@ abstract contract DN404 {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
-                    _afterNFTTransfer(t.from, address(0), id);
+                    _afterNFTTransfer(from, address(0), id);
                 } while (fromIndex != t.fromEnd);
 
                 if (addToBurnedPool) $.burnedPoolTail = (t.burnedPoolTail = burnedPoolTail);
@@ -757,7 +757,7 @@ abstract contract DN404 {
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                     _packedLogsAppend(packedLogs, id);
-                    _afterNFTTransfer(address(0), t.to, id);
+                    _afterNFTTransfer(address(0), to, id);
                 } while (toIndex != t.toEnd);
 
                 $.burnedPoolHead = burnedPoolHead;
