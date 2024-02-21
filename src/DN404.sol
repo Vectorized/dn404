@@ -601,13 +601,13 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
-                    _afterNFTTransfer(from, address(0), id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
+                    _afterNFTTransfer(from, address(0), id);
                 } while (fromIndex != fromEnd);
 
                 if (addToBurnedPool) $.burnedPoolTail = burnedPoolTail;
@@ -685,6 +685,7 @@ abstract contract DN404 {
                                 _set($.mayHaveNFTApproval, id, false);
                                 delete $.nftApprovals[id];
                             }
+                            _afterNFTTransfer(from, to, id);
                         } while (--n != 0);
 
                         toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
@@ -713,13 +714,13 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
-                    _afterNFTTransfer(from, address(0), id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
                         _set($.mayHaveNFTApproval, id, false);
                         delete $.nftApprovals[id];
                     }
+                    _afterNFTTransfer(from, address(0), id);
                 } while (fromIndex != t.fromEnd);
 
                 if (addToBurnedPool) $.burnedPoolTail = (t.burnedPoolTail = burnedPoolTail);

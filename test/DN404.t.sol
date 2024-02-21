@@ -268,6 +268,7 @@ contract DN404Test is SoladyTest {
         dn.setUseExistsLookup(_random() % 2 == 0);
 
         uint256 n = _bound(_random(), 0, 16);
+        while (_random() % 4 == 0) n = n * 3 + 1;
         dn.initializeDN404(n * _WAD, address(1111), address(mirror));
 
         address[] memory addresses = new address[](3);
