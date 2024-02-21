@@ -837,6 +837,7 @@ abstract contract DN404 {
             _set(owned[to], n, uint32(id));
             _setOwnerAliasAndOwnedIndex(oo, id, _registerAndResolveAlias(toAddressData, to), n);
         }
+        _afterNFTTransfer(from, to, id);
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Transfer} event.
@@ -844,7 +845,6 @@ abstract contract DN404 {
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
-        _afterNFTTransfer(from, to, id);
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
