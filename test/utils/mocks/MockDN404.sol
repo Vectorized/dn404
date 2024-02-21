@@ -152,7 +152,6 @@ contract MockDN404 is DN404 {
             mstore(0x00, from)
             mstore(0x20, to)
             mstore(0x10, id)
-            if iszero(keccak256(0x00, 0x40)) { revert(0x00, 0x00) }
         }
     }
 }
