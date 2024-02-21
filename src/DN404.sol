@@ -300,6 +300,12 @@ abstract contract DN404 {
         return true;
     }
 
+    /// @dev Hook that is called after any NFT mint.
+    function _afterNFTMint(uint256 id) internal virtual {}
+
+    /// @dev Hook that is called after any NFT burn.
+    function _afterNFTBurn(uint256 id) internal virtual {}
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -462,6 +468,7 @@ abstract contract DN404 {
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                        _afterNFTMint(id);
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != t.toEnd);
 
@@ -535,6 +542,7 @@ abstract contract DN404 {
                         if (_useExistsLookup()) _set($.exists, id, true);
                         _set(toOwned, toIndex, uint32(id));
                         _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                        _afterNFTMint(id);
                         _packedLogsAppend(packedLogs, id);
                     } while (toIndex != t.toEnd);
 
@@ -593,6 +601,7 @@ abstract contract DN404 {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
                     _packedLogsAppend(packedLogs, id);
+                    _afterNFTBurn(id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
                     if (_get($.mayHaveNFTApproval, id)) {
@@ -703,6 +712,7 @@ abstract contract DN404 {
                 do {
                     uint256 id = _get(fromOwned, --fromIndex);
                     _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
+                    _afterNFTBurn(id);
                     _packedLogsAppend(packedLogs, id);
                     if (_useExistsLookup()) _set($.exists, id, false);
                     if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
@@ -741,6 +751,7 @@ abstract contract DN404 {
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                    _afterNFTMint(id);
                     _packedLogsAppend(packedLogs, id);
                 } while (toIndex != t.toEnd);
 
