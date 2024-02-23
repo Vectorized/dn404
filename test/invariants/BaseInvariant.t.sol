@@ -16,6 +16,7 @@ import {DN404Handler} from "./handlers/DN404Handler.sol";
     * NFT balance of a user * WAD must be less than or equal to the ERC20 balance of that user
     * NFT balance of all users summed up must be equal to the NFT total supply
     * ERC20 balance of all users summed up must be equal to the ERC20 total supply
+    * Mirror contract known to the base and the base contract known to the mirror never change after initialization
 
 /**************************************************************************************************************************************/
 /*** Vault Invariants                                                                                                               ***/
