@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {Test, console2} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {MockDN404} from "../../utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../../../src/DN404Mirror.sol";
 
