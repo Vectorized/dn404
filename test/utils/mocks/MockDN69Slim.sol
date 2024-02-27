@@ -16,10 +16,7 @@ contract MockDN69Slim is DN69 {
         return "";
     }
 
-    function initializeDN69(
-        uint256 initialTokenSupply,
-        address initialSupplyOwner
-    ) public {
+    function initializeDN69(uint256 initialTokenSupply, address initialSupplyOwner) public {
         _initializeDN69(initialTokenSupply, initialSupplyOwner);
     }
 

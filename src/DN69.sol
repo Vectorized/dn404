@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 /// @title DN69
-/// @notice DN69 is a fully standard compliant, single-contract, 
+/// @notice DN69 is a fully standard compliant, single-contract,
 /// ERC20 and ERC1155 chimera implementation that mints
 /// and burns NFTs based on an account's ERC20 token balance.
 ///
@@ -105,13 +105,9 @@ abstract contract DN69 {
     /// @dev Thrown when attempting to transfer tokens to the zero address.
     error TransferToZeroAddress();
 
-    /// @dev Thrown when setting an NFT token approval
-    /// and the caller is not the owner or an approved operator.
-    error ApprovalCallerNotOwnerNorApproved();
-
     /// @dev Thrown when transferring an NFT
     /// and the caller is not the owner or an approved operator.
-    error TransferCallerNotOwnerNorApproved();
+    error NotOwnerNorApproved();
 
     /// @dev Thrown when transferring an NFT and the from address is not the current owner.
     error TransferFromIncorrectOwner();
@@ -208,14 +204,14 @@ abstract contract DN69 {
 
     /// @dev Initializes the DN69 contract with an
     /// `initialTokenSupply` and `initialTokenOwner`.
-    function _initializeDN69(
-        uint256 initialTokenSupply,
-        address initialSupplyOwner
-    ) internal virtual {
+    function _initializeDN69(uint256 initialTokenSupply, address initialSupplyOwner)
+        internal
+        virtual
+    {
         DN69Storage storage $ = _getDN69Storage();
 
         if (_unit() == 0) revert UnitIsZero();
-        
+
         $.nextTokenId = 1;
 
         if (initialTokenSupply != 0) {
@@ -328,7 +324,7 @@ abstract contract DN69 {
     ///
     /// Emits a {Transfer} event.
     function transfer(address to, uint256 amount) public virtual returns (bool) {
-        _transfer(msg.sender, to, amount);
+        _transfer(msg.sender, to, amount, "");
         return true;
     }
 
@@ -362,7 +358,7 @@ abstract contract DN69 {
                 a.value = allowed - amount;
             }
         }
-        _transfer(from, to, amount);
+        _transfer(from, to, amount, "");
         return true;
     }
 
@@ -387,7 +383,7 @@ abstract contract DN69 {
     /// additional NFTs ***AND*** the `to` address's skipNFT flag is set to false.
     ///
     /// Emits a {Transfer} event.
-    function _mint(address to, uint256 amount) internal virtual {
+    function _mint(address to, uint256 amount, bytes memory data) internal virtual {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage toAddressData = _addressData(to);
@@ -412,7 +408,7 @@ abstract contract DN69 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
-                    _DNBatchLogs memory p = _batchLogsMalloc(numNFTMints);
+                    _DNBatchIds memory p = _batchIdsMallloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
                     uint256 ownedUpTo = toAddressData.ownedUpTo;
                     uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
@@ -426,14 +422,15 @@ abstract contract DN69 {
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
                         ownedUpTo = _max(ownedUpTo, id);
-                        _batchLogsAppend(p, id);
+                        _batchIdsAppend(p, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
                     toAddressData.ownedUpTo = uint32(ownedUpTo);
                     toAddressData.ownedCount = uint32(toEnd);
                     $.nextTokenId = uint32(nextTokenId);
-                    _batchLogsEmit(p, address(0), to);
+                    _batchTransferEmit(address(0), to, p.ids);
+                    if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, p.ids, data);
                 }
             }
         }
@@ -453,7 +450,7 @@ abstract contract DN69 {
     /// additional NFTs ***AND*** the `to` address's skipNFT flag is set to false.
     ///
     /// Emits a {Transfer} event.
-    function _mintNext(address to, uint256 amount) internal virtual {
+    function _mintNext(address to, uint256 amount, bytes memory data) internal virtual {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage toAddressData = _addressData(to);
@@ -481,7 +478,7 @@ abstract contract DN69 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
-                    _DNBatchLogs memory p = _batchLogsMalloc(numNFTMints);
+                    _DNBatchIds memory p = _batchIdsMallloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
                     uint256 ownedUpTo = toAddressData.ownedUpTo;
                     // Mint loop.
@@ -494,13 +491,14 @@ abstract contract DN69 {
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
                         ownedUpTo = _max(ownedUpTo, id);
-                        _batchLogsAppend(p, id);
+                        _batchIdsAppend(p, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
                     toAddressData.ownedUpTo = uint32(ownedUpTo);
                     toAddressData.ownedCount = uint32(toEnd);
-                    _batchLogsEmit(p, address(0), to);
+                    _batchTransferEmit(address(0), to, p.ids);
+                    if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, p.ids, data);
                 }
             }
         }
@@ -540,7 +538,7 @@ abstract contract DN69 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                _DNBatchLogs memory p = _batchLogsMalloc(numNFTBurns);
+                _DNBatchIds memory p = _batchIdsMallloc(numNFTBurns);
                 fromAddressData.ownedCount = uint32(fromIndex - numNFTBurns);
                 uint256 id = fromAddressData.ownedUpTo;
                 // Burn loop.
@@ -549,11 +547,11 @@ abstract contract DN69 {
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
                     _afterNFTTransfer(from, address(0), id);
-                    _batchLogsAppend(p, id);
+                    _batchIdsAppend(p, id);
                 } while (--numNFTBurns != 0);
 
                 fromAddressData.ownedUpTo = uint32(id);
-                _batchLogsEmit(p, from, address(0));
+                _batchTransferEmit(from, address(0), p.ids);
             }
         }
         /// @solidity memory-safe-assembly
@@ -578,7 +576,10 @@ abstract contract DN69 {
     /// set to false.
     ///
     /// Emits a {Transfer} event.
-    function _transfer(address from, address to, uint256 amount) internal virtual {
+    function _transfer(address from, address to, uint256 amount, bytes memory data)
+        internal
+        virtual
+    {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage fromAddressData = _addressData(from);
@@ -612,10 +613,10 @@ abstract contract DN69 {
                     t.toOwnedCount += n;
                     break;
                 }
-                _DNBatchLogs memory p = _batchLogsMalloc(n);
+                t.directLogs = _batchIdsMallloc(n);
                 Bitmap storage fromOwned = $.owned[from];
                 Bitmap storage toOwned = $.owned[to];
-                
+
                 uint256 id = fromAddressData.ownedUpTo;
                 fromAddressData.ownedCount = uint32(t.fromOwnedCount -= n);
                 toAddressData.ownedUpTo = uint32(_max(toAddressData.ownedUpTo, id));
@@ -625,18 +626,18 @@ abstract contract DN69 {
                     id = _findLastSet(fromOwned, id);
                     _set(fromOwned, id, false);
                     _set(toOwned, id, true);
-                    _batchLogsAppend(p, id);
+                    _batchIdsAppend(t.directLogs, id);
                     _afterNFTTransfer(from, to, id);
                 } while (--n != 0);
 
                 fromAddressData.ownedUpTo = uint32(id);
-                _batchLogsEmit(p, from, to);
+                _batchTransferEmit(from, to, t.directLogs.ids);
                 break;
             }
 
             if (t.numNFTBurns != 0) {
                 uint256 n = t.numNFTBurns;
-                _DNBatchLogs memory p = _batchLogsMalloc(n);
+                t.burnLogs = _batchIdsMallloc(n);
                 Bitmap storage fromOwned = $.owned[from];
                 fromAddressData.ownedCount = uint32(t.fromOwnedCount -= n);
                 uint256 id = fromAddressData.ownedUpTo;
@@ -645,17 +646,17 @@ abstract contract DN69 {
                     id = _findLastSet(fromOwned, id);
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
-                    _batchLogsAppend(p, id);                    
+                    _batchIdsAppend(t.burnLogs, id);
                     _afterNFTTransfer(from, address(0), id);
                 } while (--n != 0);
 
                 fromAddressData.ownedUpTo = uint32(id);
-                _batchLogsEmit(p, from, address(0));
+                _batchTransferEmit(from, address(0), t.burnLogs.ids);
             }
 
             if (t.numNFTMints != 0) {
                 uint256 n = t.numNFTMints;
-                _DNBatchLogs memory p = _batchLogsMalloc(n);
+                t.mintLogs = _batchIdsMallloc(n);
                 Bitmap storage toOwned = $.owned[to];
                 toAddressData.ownedCount = uint32(t.toOwnedCount += n);
                 uint256 maxId = $.totalSupply / _unit();
@@ -671,14 +672,18 @@ abstract contract DN69 {
                     _set($.exists, id, true);
                     _set(toOwned, id, true);
                     ownedUpTo = _max(ownedUpTo, id);
-                    _batchLogsAppend(p, id);
+                    _batchIdsAppend(t.mintLogs, id);
                     _afterNFTTransfer(address(0), to, id);
                 } while (--n != 0);
 
                 toAddressData.ownedUpTo = uint32(ownedUpTo);
                 $.nextTokenId = uint32(nextTokenId);
-                _batchLogsEmit(p, address(0), to);
+                _batchTransferEmit(address(0), to, t.mintLogs.ids);
             }
+        }
+        if (_hasCode(to)) {
+            _checkOnERC1155BatchReceived(from, to, t.directLogs.ids, data);
+            _checkOnERC1155BatchReceived(address(0), to, t.mintLogs.ids, data);
         }
         /// @solidity memory-safe-assembly
         assembly {
@@ -700,7 +705,7 @@ abstract contract DN69 {
     ///   `msgSender` must be the owner of the token, or be approved to manage the token.
     ///
     /// Emits a {Transfer} event.
-    function _safeTransferFromNFT(address from, address to, uint256 id, bytes memory data)
+    function _safeTransferNFT(address by, address from, address to, uint256 id, bytes memory data)
         internal
         virtual
     {
@@ -709,16 +714,9 @@ abstract contract DN69 {
         DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
-        Bitmap storage fromOwned = $.owned[from];
-        Bitmap storage toOwned = $.owned[to];
-
-        if (!_get(fromOwned, id)) {
-            revert TransferFromIncorrectOwner();
-        }
-
-        if (msg.sender != from) {
-            if (_ref($.operatorApprovals, from, msg.sender).value == 0) {
-                revert TransferCallerNotOwnerNorApproved();
+        if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
+            if (_ref($.operatorApprovals, from, by).value == 0) {
+                revert NotOwnerNorApproved();
             }
         }
 
@@ -726,6 +724,13 @@ abstract contract DN69 {
         AddressData storage toAddressData = _addressData(to);
 
         uint256 unit = _unit();
+
+        Bitmap storage fromOwned = $.owned[from];
+        Bitmap storage toOwned = $.owned[to];
+
+        if (!_get(fromOwned, id)) {
+            revert TransferFromIncorrectOwner();
+        }
 
         unchecked {
             uint256 fromBalance = fromAddressData.balance;
@@ -753,7 +758,80 @@ abstract contract DN69 {
             mstore(0x00, unit)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, from, to)
         }
-        if (_hasCode(to)) _checkOnERC1155Received(address(0), to, id, data);
+        if (_hasCode(to)) _checkOnERC1155Received(from, to, id, data);
+    }
+
+    /// @dev Transfers token `id` from `from` to `to`.
+    ///
+    /// Requirements:
+    ///
+    /// - Call must originate from the mirror contract.
+    /// - Token `id` must exist.
+    /// - `from` must be the owner of the token.
+    /// - `to` cannot be the zero address.
+    ///   `msgSender` must be the owner of the token, or be approved to manage the token.
+    ///
+    /// Emits a {Transfer} event.
+    function _safeBatchTransferNFTs(
+        address by,
+        address from,
+        address to,
+        uint256[] memory ids,
+        bytes memory data
+    ) internal virtual {
+        if (to == address(0)) revert TransferToZeroAddress();
+
+        DN69Storage storage $ = _getDN69Storage();
+        if ($.nextTokenId == 0) revert DNNotInitialized();
+
+        if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
+            if (_ref($.operatorApprovals, from, by).value == 0) {
+                revert NotOwnerNorApproved();
+            }
+        }
+
+        AddressData storage fromAddressData = _addressData(from);
+        AddressData storage toAddressData = _addressData(to);
+
+        uint256 amount = ids.length * _unit();
+
+        unchecked {
+            uint256 fromBalance = fromAddressData.balance;
+            if (amount > fromBalance) revert InsufficientBalance();
+            fromAddressData.balance = uint96(fromBalance - amount);
+            toAddressData.balance += uint96(amount);
+        }
+
+        unchecked {
+            Bitmap storage fromOwned = $.owned[from];
+            Bitmap storage toOwned = $.owned[to];
+            uint256 upTo = toAddressData.ownedUpTo;
+            uint256 n = ids.length;
+            for (uint256 i; i != n; ++i) {
+                uint256 id = ids[i];
+                if (!_get(fromOwned, id)) {
+                    revert TransferFromIncorrectOwner();
+                }
+                _set(fromOwned, id, false);
+                _set(toOwned, id, true);
+                upTo = uint32(_max(upTo, id));
+                _afterNFTTransfer(from, to, id);
+            }
+            toAddressData.ownedUpTo = uint32(upTo);
+            fromAddressData.ownedCount -= uint32(n);
+            toAddressData.ownedCount += uint32(n);
+        }
+        _batchTransferEmit(from, to, ids);
+
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, amount)
+            log3(
+                0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to))
+            )
+        }
+        if (_hasCode(to)) _checkOnERC1155BatchReceived(from, to, ids, data);
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -890,12 +968,9 @@ abstract contract DN69 {
 
     /// @dev Perform a call to invoke {IERC1155Receiver-onERC1155Received} on `to`.
     /// Reverts if the target does not support the function correctly.
-    function _checkOnERC1155Received(
-        address from,
-        address to,
-        uint256 id,
-        bytes memory data
-    ) private {
+    function _checkOnERC1155Received(address from, address to, uint256 id, bytes memory data)
+        private
+    {
         /// @solidity memory-safe-assembly
         assembly {
             // Prepare the calldata.
@@ -978,101 +1053,6 @@ abstract contract DN69 {
         }
     }
 
-    // /// @dev Fallback modifier to dispatch calls from the mirror NFT contract
-    // /// to internal functions in this contract.
-    // modifier dn404Fallback() virtual {
-    //     DN404Storage storage $ = _getDN69Storage();
-
-    //     uint256 fnSelector = _calldataload(0x00) >> 224;
-    //     address mirror = $.mirrorERC721;
-
-    //     // `transferFromNFT(address,address,uint256,address)`.
-    //     if (fnSelector == 0xe5eb36c8) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _safeTransfer(
-    //             address(uint160(_calldataload(0x04))), // `from`.
-    //             address(uint160(_calldataload(0x24))), // `to`.
-    //             _calldataload(0x44), // `id`.
-    //             address(uint160(_calldataload(0x64))) // `msgSender`.
-    //         );
-    //         _return(1);
-    //     }
-    //     // `setApprovalForAll(address,bool,address)`.
-    //     if (fnSelector == 0x813500fc) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _setApprovalForAll(
-    //             address(uint160(_calldataload(0x04))), // `spender`.
-    //             _calldataload(0x24) != 0, // `status`.
-    //             address(uint160(_calldataload(0x44))) // `msgSender`.
-    //         );
-    //         _return(1);
-    //     }
-    //     // `isApprovedForAll(address,address)`.
-    //     if (fnSelector == 0xe985e9c5) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         Uint256Ref storage ref = _ref(
-    //             $.operatorApprovals,
-    //             address(uint160(_calldataload(0x04))), // `owner`.
-    //             address(uint160(_calldataload(0x24))) // `operator`.
-    //         );
-    //         _return(ref.value);
-    //     }
-    //     // `ownerOf(uint256)`.
-    //     if (fnSelector == 0x6352211e) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _return(uint160(_ownerOf(_calldataload(0x04))));
-    //     }
-    //     // `ownerAt(uint256)`.
-    //     if (fnSelector == 0x24359879) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _return(uint160(_ownerAt(_calldataload(0x04))));
-    //     }
-    //     // `approveNFT(address,uint256,address)`.
-    //     if (fnSelector == 0xd10b6e0c) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         address owner = _approveNFT(
-    //             address(uint160(_calldataload(0x04))), // `spender`.
-    //             _calldataload(0x24), // `id`.
-    //             address(uint160(_calldataload(0x44))) // `msgSender`.
-    //         );
-    //         _return(uint160(owner));
-    //     }
-    //     // `getApproved(uint256)`.
-    //     if (fnSelector == 0x081812fc) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _return(uint160(_getApproved(_calldataload(0x04))));
-    //     }
-    //     // `balanceOfNFT(address)`.
-    //     if (fnSelector == 0xf5b100ea) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _return(_balanceOfNFT(address(uint160(_calldataload(0x04)))));
-    //     }
-    //     // `totalNFTSupply()`.
-    //     if (fnSelector == 0xe2c79281) {
-    //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _return(_totalNFTSupply());
-    //     }
-    //     // `implementsDN404()`.
-    //     if (fnSelector == 0xb7a94eb8) {
-    //         _return(1);
-    //     }
-    //     _;
-    // }
-
-    // /// @dev Fallback function for calls from mirror NFT contract.
-    // /// Override this if you need to implement your custom
-    // /// fallback with utilities like Solady's `LibZip.cdFallback()`.
-    // /// And always remember to always wrap the fallback with `dn404Fallback`.
-    // fallback() external payable virtual dn404Fallback {
-    //     revert FnSelectorNotRecognized(); // Not mandatory. Just for quality of life.
-    // }
-
-    // /// @dev This is to silence the compiler warning.
-    // /// Override and remove the revert if you want your contract to receive ETH via receive.
-    // receive() external payable virtual {
-    //     if (msg.value != 0) revert();
-    // }
-
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                 INTERNAL / PRIVATE HELPERS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -1138,7 +1118,11 @@ abstract contract DN69 {
 
     /// @dev Returns the index of the most significant set bit in `[0..upTo]`.
     /// If no set bit is found, returns `type(uint256).max`.
-    function _findLastSet(Bitmap storage bitmap, uint256 upTo) internal view returns (uint256 setBitIndex) {
+    function _findLastSet(Bitmap storage bitmap, uint256 upTo)
+        internal
+        view
+        returns (uint256 setBitIndex)
+    {
         /// @solidity memory-safe-assembly
         assembly {
             setBitIndex := not(0) // Initialize to `type(uint256).max`.
@@ -1244,12 +1228,12 @@ abstract contract DN69 {
     }
 
     /// @dev Struct containing the data to be emitted in a {TransferBatch} event.
-    struct _DNBatchLogs {
+    struct _DNBatchIds {
         uint256 offset;
         uint256[] ids;
     }
 
-    function _batchLogsMalloc(uint256 n) private pure returns (_DNBatchLogs memory p) {
+    function _batchIdsMallloc(uint256 n) private pure returns (_DNBatchIds memory p) {
         /// @solidity memory-safe-assembly
         assembly {
             let ids := mload(0x40)
@@ -1261,7 +1245,7 @@ abstract contract DN69 {
         }
     }
 
-    function _batchLogsAppend(_DNBatchLogs memory p, uint256 id) private pure {
+    function _batchIdsAppend(_DNBatchIds memory p, uint256 id) private pure {
         /// @solidity memory-safe-assembly
         assembly {
             let offset := mload(p)
@@ -1270,10 +1254,9 @@ abstract contract DN69 {
         }
     }
 
-    function _batchLogsEmit(_DNBatchLogs memory p, address from, address to) private {
+    function _batchTransferEmit(address from, address to, uint256[] memory ids) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let ids := mload(add(0x20, p))
             let m := mload(0x40)
             mstore(m, 0x40)
             let n := add(0x20, shl(5, mload(ids)))
@@ -1285,10 +1268,17 @@ abstract contract DN69 {
             mstore(o, mload(ids))
             {
                 let end := add(o, returndatasize())
-                for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }    
+                for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
             }
             // Emit a {TransferBatch} event.
-            log4(m, sub(o, m), _TRANSFER_BATCH_EVENT_SIGNATURE, caller(), shr(96, shl(96, from)), shr(96, shl(96, to)))
+            log4(
+                m,
+                sub(o, m),
+                _TRANSFER_BATCH_EVENT_SIGNATURE,
+                caller(),
+                shr(96, shl(96, from)),
+                shr(96, shl(96, to))
+            )
         }
     }
 
@@ -1300,6 +1290,9 @@ abstract contract DN69 {
         uint256 toBalance;
         uint256 fromOwnedCount;
         uint256 toOwnedCount;
+        _DNBatchIds directLogs;
+        _DNBatchIds burnLogs;
+        _DNBatchIds mintLogs;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.

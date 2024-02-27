@@ -117,7 +117,7 @@ contract DN69Test is SoladyTest {
                     }
                     assertEq(balanceSum, dn.totalSupply());
                     assertLe(nftBalanceSum, balanceSum / _WAD);
-                }    
+                }
             }
         } while (_random() % 8 > 0);
 
@@ -173,5 +173,4 @@ contract DN69Test is SoladyTest {
             }
         }
     }
-
 }

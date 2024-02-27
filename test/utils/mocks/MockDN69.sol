@@ -34,17 +34,17 @@ contract MockDN69 is DN69 {
     }
 
     function mint(address to, uint256 amount) public {
-        _mint(to, amount);
+        _mint(to, amount, "");
     }
 
     function mintNext(address to, uint256 amount) public {
-        _mintNext(to, amount);
+        _mintNext(to, amount, "");
     }
 
     function burn(address from, uint256 amount) public {
         _burn(from, amount);
     }
-    
+
     function getAddressDataInitialized(address target) public view returns (bool) {
         return _getDN69Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
     }
@@ -61,7 +61,11 @@ contract MockDN69 is DN69 {
         return _getDN69Storage().nextTokenId;
     }
 
-    function findOwnedIds(address owner, uint256 begin, uint256 end) public view returns (uint256[] memory) {
+    function findOwnedIds(address owner, uint256 begin, uint256 end)
+        public
+        view
+        returns (uint256[] memory)
+    {
         return _findOwnedIds(owner, begin, end);
     }
 
@@ -78,7 +82,7 @@ contract MockDN69 is DN69 {
     }
 
     function safeTransferFromNFT(address from, address to, uint256 id) public {
-        _safeTransferFromNFT(from, to, id, "");
+        _safeTransferNFT(msg.sender, from, to, id, "");
     }
 
     function setGivePermit2DefaultInfiniteAllowance(bool value) public {
