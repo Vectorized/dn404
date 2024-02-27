@@ -87,6 +87,9 @@ abstract contract DN420 {
     /// @dev Thrown when attempting to double-initialize the contract.
     error DNAlreadyInitialized();
 
+    /// @dev The contract has not been initialized.
+    error DNNotInitialized();
+
     /// @dev Thrown when attempting to transfer or burn more tokens than sender's balance.
     error InsufficientBalance();
 
@@ -149,8 +152,8 @@ abstract contract DN420 {
         uint88 aux;
         // Flags for `initialized` and `skipNFT`.
         uint8 flags;
-        // The upper bound on the NFT IDs owned.
-        uint32 ownedEnd;
+        // The inclusive upper bound on the NFT IDs owned.
+        uint32 ownedUpTo;
         // The number of NFT tokens.
         uint32 ownedCount;
         // The token balance in wei.
@@ -389,6 +392,7 @@ abstract contract DN420 {
 
         AddressData storage toAddressData = _addressData(to);
         DN420Storage storage $ = _getDN420Storage();
+        if ($.nextTokenId == 0) revert DNNotInitialized();
 
         uint256 toEnd;
         unchecked {
@@ -410,7 +414,7 @@ abstract contract DN420 {
                 if (numNFTMints != 0) {
                     _DNBatchLogs memory p = _batchLogsMalloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
-                    uint256 ownedEnd = toAddressData.ownedEnd;
+                    uint256 ownedUpTo = toAddressData.ownedUpTo;
                     uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                     // Mint loop.
                     do {
@@ -421,12 +425,12 @@ abstract contract DN420 {
                         nextTokenId = _wrapNFTId(id + 1, maxId);
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
-                        ownedEnd = _max(ownedEnd, id);
+                        ownedUpTo = _max(ownedUpTo, id);
                         _batchLogsAppend(p, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
-                    toAddressData.ownedEnd = uint32(ownedEnd);
+                    toAddressData.ownedUpTo = uint32(ownedUpTo);
                     toAddressData.ownedCount = uint32(toEnd);
                     $.nextTokenId = uint32(nextTokenId);
                     _batchLogsEmit(p, address(0), to);
@@ -454,6 +458,7 @@ abstract contract DN420 {
 
         AddressData storage toAddressData = _addressData(to);
         DN420Storage storage $ = _getDN420Storage();
+        if ($.nextTokenId == 0) revert DNNotInitialized();
 
         uint256 toEnd;
         unchecked {
@@ -478,7 +483,7 @@ abstract contract DN420 {
                 if (numNFTMints != 0) {
                     _DNBatchLogs memory p = _batchLogsMalloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
-                    uint256 ownedEnd = toAddressData.ownedEnd;
+                    uint256 ownedUpTo = toAddressData.ownedUpTo;
                     // Mint loop.
                     do {
                         uint256 id = startId;
@@ -488,12 +493,12 @@ abstract contract DN420 {
                         startId = _wrapNFTId(id + 1, maxId);
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
-                        ownedEnd = _max(ownedEnd, id);
+                        ownedUpTo = _max(ownedUpTo, id);
                         _batchLogsAppend(p, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
-                    toAddressData.ownedEnd = uint32(ownedEnd);
+                    toAddressData.ownedUpTo = uint32(ownedUpTo);
                     toAddressData.ownedCount = uint32(toEnd);
                     _batchLogsEmit(p, address(0), to);
                 }
@@ -520,6 +525,7 @@ abstract contract DN420 {
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
         DN420Storage storage $ = _getDN420Storage();
+        if ($.nextTokenId == 0) revert DNNotInitialized();
 
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
@@ -536,7 +542,7 @@ abstract contract DN420 {
             if (numNFTBurns != 0) {
                 _DNBatchLogs memory p = _batchLogsMalloc(numNFTBurns);
                 fromAddressData.ownedCount = uint32(fromIndex - numNFTBurns);
-                uint256 id = fromAddressData.ownedEnd;
+                uint256 id = fromAddressData.ownedUpTo;
                 // Burn loop.
                 do {
                     id = _findLastSet(fromOwned, id);
@@ -546,7 +552,7 @@ abstract contract DN420 {
                     _batchLogsAppend(p, id);
                 } while (--numNFTBurns != 0);
 
-                fromAddressData.ownedEnd = uint32(id);
+                fromAddressData.ownedUpTo = uint32(id);
                 _batchLogsEmit(p, from, address(0));
             }
         }
@@ -578,11 +584,11 @@ abstract contract DN420 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
         DN420Storage storage $ = _getDN420Storage();
+        if ($.nextTokenId == 0) revert DNNotInitialized();
 
         _DNTransferTemps memory t;
         t.fromOwnedCount = fromAddressData.ownedCount;
         t.toOwnedCount = toAddressData.ownedCount;
-        t.totalSupply = $.totalSupply;
 
         if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
 
@@ -610,9 +616,9 @@ abstract contract DN420 {
                 Bitmap storage fromOwned = $.owned[from];
                 Bitmap storage toOwned = $.owned[to];
                 
-                uint256 id = fromAddressData.ownedEnd;
+                uint256 id = fromAddressData.ownedUpTo;
                 fromAddressData.ownedCount = uint32(t.fromOwnedCount -= n);
-                toAddressData.ownedEnd = uint32(_max(toAddressData.ownedEnd, id));
+                toAddressData.ownedUpTo = uint32(_max(toAddressData.ownedUpTo, id));
                 toAddressData.ownedCount = uint32(t.toOwnedCount += n);
                 // Direct transfer loop.
                 do {
@@ -623,7 +629,7 @@ abstract contract DN420 {
                     _afterNFTTransfer(from, to, id);
                 } while (--n != 0);
 
-                fromAddressData.ownedEnd = uint32(id);
+                fromAddressData.ownedUpTo = uint32(id);
                 _batchLogsEmit(p, from, to);
                 break;
             }
@@ -633,7 +639,7 @@ abstract contract DN420 {
                 _DNBatchLogs memory p = _batchLogsMalloc(n);
                 Bitmap storage fromOwned = $.owned[from];
                 fromAddressData.ownedCount = uint32(t.fromOwnedCount -= n);
-                uint256 id = fromAddressData.ownedEnd;
+                uint256 id = fromAddressData.ownedUpTo;
                 // Burn loop.
                 do {
                     id = _findLastSet(fromOwned, id);
@@ -643,7 +649,7 @@ abstract contract DN420 {
                     _afterNFTTransfer(from, address(0), id);
                 } while (--n != 0);
 
-                fromAddressData.ownedEnd = uint32(id);
+                fromAddressData.ownedUpTo = uint32(id);
                 _batchLogsEmit(p, from, address(0));
             }
 
@@ -652,9 +658,9 @@ abstract contract DN420 {
                 _DNBatchLogs memory p = _batchLogsMalloc(n);
                 Bitmap storage toOwned = $.owned[to];
                 toAddressData.ownedCount = uint32(t.toOwnedCount += n);
-                uint256 maxId = t.totalSupply / _unit();
+                uint256 maxId = $.totalSupply / _unit();
                 uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
-                uint256 ownedEnd = toAddressData.ownedEnd;
+                uint256 ownedUpTo = toAddressData.ownedUpTo;
                 // Mint loop.
                 do {
                     uint256 id = nextTokenId;
@@ -664,12 +670,12 @@ abstract contract DN420 {
                     nextTokenId = _wrapNFTId(id + 1, maxId);
                     _set($.exists, id, true);
                     _set(toOwned, id, true);
-                    ownedEnd = _max(ownedEnd, id);
+                    ownedUpTo = _max(ownedUpTo, id);
                     _batchLogsAppend(p, id);
                     _afterNFTTransfer(address(0), to, id);
                 } while (--n != 0);
 
-                toAddressData.ownedEnd = uint32(ownedEnd);
+                toAddressData.ownedUpTo = uint32(ownedUpTo);
                 $.nextTokenId = uint32(nextTokenId);
                 _batchLogsEmit(p, address(0), to);
             }
@@ -698,58 +704,50 @@ abstract contract DN420 {
         internal
         virtual
     {
-        // if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) revert TransferToZeroAddress();
 
-        // DN404Storage storage $ = _getDN420Storage();
-        // if ($.mirrorERC721 == address(0)) revert();
+        DN420Storage storage $ = _getDN420Storage();
+        if ($.nextTokenId == 0) revert DNNotInitialized();
 
-        // Uint32Map storage oo = $.oo;
+        Bitmap storage fromOwned = $.owned[from];
+        Bitmap storage toOwned = $.owned[to];
 
-        // if (!_get($.owned[from], id)) {
-        //     revert TransferFromIncorrectOwner();
-        // }
+        if (!_get(fromOwned, id)) {
+            revert TransferFromIncorrectOwner();
+        }
 
-        // if (msg.sender != from) {
-        //     if (_ref($.operatorApprovals, from, msg.sender).value == 0) {
-        //         revert TransferCallerNotOwnerNorApproved();
-        //     }
-        // }
+        if (msg.sender != from) {
+            if (_ref($.operatorApprovals, from, msg.sender).value == 0) {
+                revert TransferCallerNotOwnerNorApproved();
+            }
+        }
 
-        // AddressData storage fromAddressData = _addressData(from);
-        // AddressData storage toAddressData = _addressData(to);
+        AddressData storage fromAddressData = _addressData(from);
+        AddressData storage toAddressData = _addressData(to);
 
-        // uint256 unit = _unit();
-        // mapping(address => Uint32Map) storage owned = $.owned;
-        // Uint32Map storage fromOwned = owned[from];
+        uint256 unit = _unit();
 
-        // unchecked {
-        //     uint256 fromBalance = fromAddressData.balance;
-        //     if (unit > fromBalance) revert InsufficientBalance();
-        //     fromAddressData.balance = uint96(fromBalance - unit);
-        //     toAddressData.balance += uint96(unit);
-        // }
-        // if (_get($.mayHaveNFTApproval, id)) {
-        //     _set($.mayHaveNFTApproval, id, false);
-        //     delete $.nftApprovals[id];
-        // }
-        // unchecked {
-        //     uint32 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
-        //     uint32 i = _get(oo, _ownedIndex(id));
-        //     _set(fromOwned, i, updatedId);
-        //     _set(oo, _ownedIndex(updatedId), i);
-        // }
-        // unchecked {
-        //     uint32 n = toAddressData.ownedLength++;
-        //     _set(owned[to], n, uint32(id));
-        //     _setOwnerAliasAndOwnedIndex(oo, id, _registerAndResolveAlias(toAddressData, to), n);
-        // }
-        // /// @solidity memory-safe-assembly
-        // assembly {
-        //     // Emit the {Transfer} event.
-        //     mstore(0x00, unit)
-        //     // forgefmt: disable-next-item
-        //     log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
-        // }
+        unchecked {
+            uint256 fromBalance = fromAddressData.balance;
+            if (unit > fromBalance) revert InsufficientBalance();
+            fromAddressData.balance = uint96(fromBalance - unit);
+            toAddressData.balance += uint96(unit);
+
+            _set(fromOwned, id, false);
+            _set(toOwned, id, true);
+
+            --fromAddressData.ownedCount;
+            ++toAddressData.ownedCount;
+            toAddressData.ownedUpTo = uint32(_max(toAddressData.ownedUpTo, id));
+        }
+        _afterNFTTransfer(from, to, id);
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, unit)
+            // forgefmt: disable-next-item
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -841,111 +839,48 @@ abstract contract DN420 {
         }
     }
 
-    // /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
-    // /*                     MIRROR OPERATIONS                      */
-    // /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
+    /*                     ERC1155 OPERATIONS                     */
+    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    // /// @dev Returns the address of the mirror NFT contract.
-    // function mirrorERC721() public view virtual returns (address) {
-    //     return _getDN420Storage().mirrorERC721;
-    // }
+    /// @dev Returns `owner` NFT balance.
+    function _balanceOfNFT(address owner) internal view virtual returns (uint256) {
+        return _getDN420Storage().addressData[owner].ownedCount;
+    }
 
-    // /// @dev Returns the total NFT supply.
-    // function _totalNFTSupply() internal view virtual returns (uint256) {
-    //     return _getDN420Storage().totalNFTSupply;
-    // }
+    /// @dev Returns if token `id` exists.
+    function _exists(uint256 id) internal view virtual returns (bool) {
+        return _get(_getDN420Storage().exists, id);
+    }
 
-    // /// @dev Returns `owner` NFT balance.
-    // function _balanceOfNFT(address owner) internal view virtual returns (uint256) {
-    //     return _getDN420Storage().addressData[owner].ownedLength;
-    // }
-
-    // /// @dev Returns the owner of token `id`.
-    // /// Returns the zero address instead of reverting if the token does not exist.
-    // function _ownerAt(uint256 id) internal view virtual returns (address) {
-    //     DN404Storage storage $ = _getDN420Storage();
-    //     return $.aliasToAddress[_get($.oo, _ownershipIndex(_restrictNFTId(id)))];
-    // }
-
-    // /// @dev Returns the owner of token `id`.
-    // ///
-    // /// Requirements:
-    // /// - Token `id` must exist.
-    // function _ownerOf(uint256 id) internal view virtual returns (address) {
-    //     if (!_exists(id)) revert TokenDoesNotExist();
-    //     return _ownerAt(id);
-    // }
-
-    // /// @dev Returns if token `id` exists.
-    // function _exists(uint256 id) internal view virtual returns (bool) {
-    //     return _ownerAt(id) != address(0);
-    // }
-
-    // /// @dev Returns the account approved to manage token `id`.
-    // ///
-    // /// Requirements:
-    // /// - Token `id` must exist.
-    // function _getApproved(uint256 id) internal view virtual returns (address) {
-    //     if (!_exists(id)) revert TokenDoesNotExist();
-    //     return _getDN420Storage().nftApprovals[id];
-    // }
-
-    // /// @dev Sets `spender` as the approved account to manage token `id`, using `msgSender`.
-    // ///
-    // /// Requirements:
-    // /// - `msgSender` must be the owner or an approved operator for the token owner.
-    // function _approveNFT(address spender, uint256 id, address msgSender)
-    //     internal
-    //     virtual
-    //     returns (address owner)
-    // {
-    //     DN404Storage storage $ = _getDN420Storage();
-
-    //     owner = $.aliasToAddress[_get($.oo, _ownershipIndex(_restrictNFTId(id)))];
-
-    //     if (msgSender != owner) {
-    //         if (_ref($.operatorApprovals, owner, msgSender).value == 0) {
-    //             revert ApprovalCallerNotOwnerNorApproved();
-    //         }
-    //     }
-
-    //     $.nftApprovals[id] = spender;
-    //     _set($.mayHaveNFTApproval, id, spender != address(0));
-    // }
-
-    // /// @dev Approve or remove the `operator` as an operator for `msgSender`,
-    // /// without authorization checks.
-    // function _setApprovalForAll(address operator, bool approved, address msgSender)
-    //     internal
-    //     virtual
-    // {
-    //     _ref(_getDN420Storage().operatorApprovals, msgSender, operator).value = _toUint(approved);
-    // }
-
-    // /// @dev Returns the NFT IDs of `owner` in range `[begin, end)`.
-    // /// Optimized for smaller bytecode size, as this function is intended for off-chain calling.
-    // function _ownedIds(address owner, uint256 begin, uint256 end)
-    //     internal
-    //     view
-    //     virtual
-    //     returns (uint256[] memory ids)
-    // {
-    //     DN404Storage storage $ = _getDN420Storage();
-    //     Uint32Map storage owned = $.owned[owner];
-    //     uint256 n = _min($.addressData[owner].ownedLength, end);
-    //     /// @solidity memory-safe-assembly
-    //     assembly {
-    //         ids := mload(0x40)
-    //         let i := begin
-    //         for {} lt(i, n) { i := add(i, 1) } {
-    //             let s := add(shl(96, owned.slot), shr(3, i)) // Storage slot.
-    //             let id := and(0xffffffff, shr(shl(5, and(i, 7)), sload(s)))
-    //             mstore(add(add(ids, 0x20), shl(5, sub(i, begin))), id) // Append to.
-    //         }
-    //         mstore(ids, sub(i, begin)) // Store the length.
-    //         mstore(0x40, add(add(ids, 0x20), shl(5, sub(i, begin)))) // Allocate memory.
-    //     }
-    // }
+    /// @dev Returns the NFT IDs of `owner` in range `[begin, end)`.
+    /// Optimized for smaller bytecode size, as this function is intended for off-chain calling.
+    function _findOwnedIds(address owner, uint256 begin, uint256 end)
+        internal
+        view
+        virtual
+        returns (uint256[] memory ids)
+    {
+        unchecked {
+            DN420Storage storage $ = _getDN420Storage();
+            Bitmap storage owned = $.owned[owner];
+            end = _min(uint256($.addressData[owner].ownedUpTo) + 1, end);
+            /// @solidity memory-safe-assembly
+            assembly {
+                ids := mload(0x40)
+                let n := 0
+                let s := shl(96, owned.slot)
+                for { let id := begin } lt(id, end) { id := add(1, id) } {
+                    if and(1, shr(and(0xff, id), sload(add(s, shr(8, id))))) {
+                        mstore(add(add(ids, 0x20), shl(5, n)), id)
+                        n := add(1, n)
+                    }
+                }
+                mstore(ids, n)
+                mstore(0x40, add(shl(5, n), add(0x20, ids)))
+            }
+        }
+    }
 
     // /// @dev Fallback modifier to dispatch calls from the mirror NFT contract
     // /// to internal functions in this contract.
@@ -1265,17 +1200,8 @@ abstract contract DN420 {
         uint256 numNFTMints;
         uint256 fromBalance;
         uint256 toBalance;
-        uint256 fromOwnedEnd;
-        uint256 toOwnedEnd;
         uint256 fromOwnedCount;
         uint256 toOwnedCount;
-        uint256 totalSupply;
-        uint256 totalNFTSupply;
-        uint256 fromEnd;
-        uint256 toEnd;
-        uint32 toAlias;
-        uint256 nextTokenId;
-        uint32 burnedPoolTail;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
