@@ -166,6 +166,29 @@ contract MappingsTest is SoladyTest {
         }
     }
 
+    // /// @dev Returns the index of the most significant set bit in `[0, end)`.
+    // /// If no set bit is found, returns `type(uint256).max`.
+    // function _findLastSet(Bitmap storage bitmap, uint256 end) internal view returns (uint256 setBitIndex) {
+    //     /// @solidity memory-safe-assembly
+    //     assembly {
+    //         setBitIndex := not(0) // Initialize to `type(uint256).max`.
+    //         let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
+    //         let bucket := add(s, shr(8, end))
+    //         let bits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), sload(bucket)))
+    //         if iszero(or(bucketBits, eq(bucket, s))) {
+    //             for {} 1 {} {
+    //                 bucket := add(bucket, setBitIndex) // `sub(bucket, 1)`.
+    //                 mstore(0x00, bucket)
+    //                 bits := sload(bucket)
+    //                 if or(bucketBits, eq(bucket, s)) { break }
+    //             }
+    //         }
+    //         if bits {
+    //             setBitIndex := or(r, sub(0, or(igt(r, begin))))
+    //         }
+    //     }
+    // }
+
     function _fillBucket(Bitmap storage bitmap, uint256 i) internal {
         /// @solidity memory-safe-assembly
         assembly {
