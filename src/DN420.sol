@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 /// @title DN420
-/// @notice DN420 is a fully standard compliant, single-contract, 
+/// @notice DN420 is a fully standard compliant, single-contract,
 /// ERC20 and ERC1155 chimera implementation that mints
 /// and burns NFTs based on an account's ERC20 token balance.
 ///
@@ -205,14 +205,14 @@ abstract contract DN420 {
 
     /// @dev Initializes the DN420 contract with an
     /// `initialTokenSupply` and `initialTokenOwner`.
-    function _initializeDN420(
-        uint256 initialTokenSupply,
-        address initialSupplyOwner
-    ) internal virtual {
+    function _initializeDN420(uint256 initialTokenSupply, address initialSupplyOwner)
+        internal
+        virtual
+    {
         DN420Storage storage $ = _getDN420Storage();
 
         if (_unit() == 0) revert UnitIsZero();
-        
+
         $.nextTokenId = 1;
 
         if (initialTokenSupply != 0) {
@@ -415,7 +415,7 @@ abstract contract DN420 {
                     do {
                         uint256 id = nextTokenId;
                         while (_get($.exists, id)) {
-                            id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId);
+                            id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
                         }
                         nextTokenId = _wrapNFTId(id + 1, maxId);
                         _set($.exists, id, true);
@@ -474,13 +474,12 @@ abstract contract DN420 {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
                     Bitmap storage toOwned = $.owned[to];
-                    $.totalNFTSupply += uint32(numNFTMints);
                     uint256 ownedEnd = toAddressData.ownedEnd;
                     // Mint loop.
                     do {
                         uint256 id = startId;
                         while (_get($.exists, id)) {
-                            id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId);
+                            id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
                         }
                         startId = _wrapNFTId(id + 1, maxId);
                         _set($.exists, id, true);
@@ -525,12 +524,11 @@ abstract contract DN420 {
             $.totalSupply = uint96(totalSupply_);
 
             Bitmap storage fromOwned = $.owned[from];
-            uint256 fromIndex = fromAddressData.ownedLength;
+            uint256 fromIndex = fromAddressData.ownedCount;
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                $.totalNFTSupply -= uint32(numNFTBurns);
-                fromAddressData.ownedLength = uint32(fromIndex - numNFTBurns);
+                fromAddressData.ownedCount = uint32(fromIndex - numNFTBurns);
                 uint256 id = fromAddressData.ownedEnd;
                 // Burn loop.
                 do {
@@ -673,7 +671,7 @@ abstract contract DN420 {
         //                 id = t.nextTokenId;
         //                 while (_get(oo, _ownershipIndex(id)) != 0) {
         //                     id = _useExistsLookup()
-        //                         ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+        //                         ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
         //                         : _wrapNFTId(id + 1, maxId);
         //                 }
         //                 t.nextTokenId = _wrapNFTId(id + 1, maxId);
@@ -1085,19 +1083,9 @@ abstract contract DN420 {
         }
     }
 
-    /// @dev Returns the index of the most significant set bit in `[0, end)`.
+    /// @dev Returns the index of the least significant unset bit in `[begin..upTo]`.
     /// If no set bit is found, returns `type(uint256).max`.
-    function _findLastSet(Bitmap storage bitmap, uint256 end)
-        internal
-        view
-        returns (uint256 unsetBitIndex)
-    {
-
-    }
-
-    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
-    /// If no unset bit is found, returns `type(uint256).max`.
-    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 upTo)
         internal
         view
         returns (uint256 unsetBitIndex)
@@ -1107,16 +1095,16 @@ abstract contract DN420 {
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
             let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
             let bucket := add(s, shr(8, begin))
+            let lastBucket := add(s, shr(8, upTo))
             let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
-                let lastBucket := add(s, shr(8, end))
                 for {} 1 {} {
                     bucket := add(bucket, 1)
                     negBits := not(sload(bucket))
                     if or(negBits, gt(bucket, lastBucket)) { break }
                 }
                 if gt(bucket, lastBucket) {
-                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
+                    negBits := shr(and(0xff, not(upTo)), shl(and(0xff, not(upTo)), negBits))
                 }
             }
             if negBits {
@@ -1130,7 +1118,44 @@ abstract contract DN420 {
                 r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
                     0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
                 r := or(shl(8, sub(bucket, s)), r)
-                unsetBitIndex := or(r, sub(0, or(iszero(lt(r, end)), lt(r, begin))))
+                unsetBitIndex := or(r, sub(0, or(gt(r, upTo), lt(r, begin))))
+            }
+        }
+    }
+
+    /// @dev Returns the index of the most significant set bit in `[0..upTo]`.
+    /// If no set bit is found, returns `type(uint256).max`.
+    function _findLastSet(Bitmap storage bitmap, uint256 upTo)
+        internal
+        view
+        returns (uint256 setBitIndex)
+    {
+        /// @solidity memory-safe-assembly
+        assembly {
+            setBitIndex := not(0) // Initialize to `type(uint256).max`.
+            let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
+            let bucket := add(s, shr(8, upTo))
+            let bits := shr(and(0xff, not(upTo)), shl(and(0xff, not(upTo)), sload(bucket)))
+            if iszero(or(bits, eq(bucket, s))) {
+                for {} 1 {} {
+                    bucket := add(bucket, setBitIndex) // `sub(bucket, 1)`.
+                    mstore(0x00, bucket)
+                    bits := sload(bucket)
+                    if or(bits, eq(bucket, s)) { break }
+                }
+            }
+            if bits {
+                // Find-last-set routine.
+                let r := shl(7, lt(0xffffffffffffffffffffffffffffffff, bits))
+                r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, bits))))
+                r := or(r, shl(5, lt(0xffffffff, shr(r, bits))))
+                r := or(r, shl(4, lt(0xffff, shr(r, bits))))
+                r := or(r, shl(3, lt(0xff, shr(r, bits))))
+                // forgefmt: disable-next-item
+                r := or(r, byte(and(0x1f, shr(shr(r, bits), 0x8421084210842108cc6318c6db6d54be)),
+                    0x0706060506020504060203020504030106050205030304010505030400000000))
+                r := or(shl(8, sub(bucket, s)), r)
+                setBitIndex := or(r, sub(0, gt(r, upTo)))
             }
         }
     }
@@ -1209,6 +1234,60 @@ abstract contract DN420 {
         }
     }
 
+    /// @dev Struct containing the data to be emitted in a {TransferBatch} event.
+    struct _DNBatchLogs {
+        uint256 offset;
+        uint256[] ids;
+    }
+
+    function _batchLogsMalloc(uint256 n) private pure returns (_DNBatchLogs memory p) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let ids := mload(0x40)
+            let offset := add(ids, 0x20)
+            mstore(ids, n)
+            mstore(0x40, add(offset, shl(5, n)))
+            mstore(p, offset)
+            mstore(add(p, 0x20), ids)
+        }
+    }
+
+    function _batchLogsAppend(_DNBatchLogs memory p, uint256 id) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let offset := mload(p)
+            mstore(offset, id)
+            mstore(p, add(offset, 0x20))
+        }
+    }
+
+    function _batchLogsEmit(_DNBatchLogs memory p, address from, address to) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            let ids := mload(add(0x20, p))
+            let m := mload(0x40)
+            mstore(m, 0x40)
+            let n := add(0x20, shl(5, mload(ids)))
+            let o := add(m, 0x40)
+            pop(staticcall(gas(), 4, ids, n, o, n)) // Copy the `ids`.
+            mstore(add(m, 0x20), add(0x40, returndatasize()))
+            o := add(o, returndatasize())
+            // Store the length of `amounts`.
+            mstore(o, mload(ids))
+            let end := add(o, returndatasize())
+            for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
+            // Emit a {TransferBatch} event.
+            log4(
+                m,
+                sub(o, m),
+                _TRANSFER_BATCH_EVENT_SIGNATURE,
+                caller(),
+                shr(96, shl(96, from)),
+                shr(96, shl(96, to))
+            )
+        }
+    }
+
     /// @dev Struct of temporary variables for transfers.
     struct _DNTransferTemps {
         uint256 numNFTBurns;
@@ -1224,14 +1303,6 @@ abstract contract DN420 {
         uint32 toAlias;
         uint256 nextTokenId;
         uint32 burnedPoolTail;
-    }
-
-    /// @dev Struct of temporary variables for mints.
-    struct _DNMintTemps {
-        uint256 nextTokenId;
-        uint32 burnedPoolTail;
-        uint256 toEnd;
-        uint32 toAlias;
     }
 
     /// @dev Returns if `a` has bytecode of non-zero length.
