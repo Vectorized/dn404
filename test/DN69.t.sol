@@ -2,22 +2,22 @@
 pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
-import {DN420, MockDN420} from "./utils/mocks/MockDN420.sol";
+import {DN69, MockDN69} from "./utils/mocks/MockDN69.sol";
 // import {DN404Mirror} from "../src/DN404Mirror.sol";
 // import {LibClone} from "solady/utils/LibClone.sol";
 import {LibSort} from "solady/utils/LibSort.sol";
 
-contract DN420Test is SoladyTest {
+contract DN69Test is SoladyTest {
     uint256 internal constant _WAD = 10 ** 18;
 
-    MockDN420 dn;
+    MockDN69 dn;
 
     function setUp() public {
-        dn = new MockDN420();
+        dn = new MockDN69();
     }
 
     function testFindOwnedIds() public {
-        dn.initializeDN420(0, address(this));
+        dn.initializeDN69(0, address(this));
         address alice = address(111);
         address bob = address(2);
         assertEq(dn.findOwnedIds(alice, 0, 0), new uint256[](0));
@@ -52,7 +52,7 @@ contract DN420Test is SoladyTest {
 
     function testMixed(uint256) public {
         uint256 n = _bound(_random(), 0, 16);
-        dn.initializeDN420(n * _WAD, address(1111));
+        dn.initializeDN69(n * _WAD, address(1111));
 
         address[] memory addresses = new address[](3);
         addresses[0] = address(111);
@@ -99,7 +99,7 @@ contract DN420Test is SoladyTest {
                 if (fromIds.length != 0) {
                     uint256 id = fromIds[_random() % fromIds.length];
                     vm.prank(from);
-                    dn.transferFromNFT(from, to, id);
+                    dn.safeTransferFromNFT(from, to, id);
                 }
             }
 

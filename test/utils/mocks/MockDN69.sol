@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "../../../src/DN420.sol";
+import "../../../src/DN69.sol";
 
-contract MockDN420 is DN420 {
+contract MockDN69 is DN69 {
     string private _name;
 
     string private _symbol;
@@ -12,8 +12,8 @@ contract MockDN420 is DN420 {
 
     bool givePermit2DefaultInfiniteAllowance;
 
-    function initializeDN420(uint256 initialTokenSupply, address initialSupplyOwner) public {
-        _initializeDN420(initialTokenSupply, initialSupplyOwner);
+    function initializeDN69(uint256 initialTokenSupply, address initialSupplyOwner) public {
+        _initializeDN69(initialTokenSupply, initialSupplyOwner);
     }
 
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
@@ -46,7 +46,7 @@ contract MockDN420 is DN420 {
     }
     
     function getAddressDataInitialized(address target) public view returns (bool) {
-        return _getDN420Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
+        return _getDN69Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
     }
 
     function setAux(address target, uint88 value) public {
@@ -58,7 +58,7 @@ contract MockDN420 is DN420 {
     }
 
     function getNextTokenId() public view returns (uint32) {
-        return _getDN420Storage().nextTokenId;
+        return _getDN69Storage().nextTokenId;
     }
 
     function findOwnedIds(address owner, uint256 begin, uint256 end) public view returns (uint256[] memory) {
@@ -70,15 +70,15 @@ contract MockDN420 is DN420 {
     }
 
     function ownedCount(address owner) public view returns (uint256) {
-        return _getDN420Storage().addressData[owner].ownedCount;
+        return _getDN69Storage().addressData[owner].ownedCount;
     }
 
     function exists(uint256 id) public view returns (bool) {
         return _exists(id);
     }
 
-    function transferFromNFT(address from, address to, uint256 id) public {
-        _transferFromNFT(from, to, id);
+    function safeTransferFromNFT(address from, address to, uint256 id) public {
+        _safeTransferFromNFT(from, to, id, "");
     }
 
     function setGivePermit2DefaultInfiniteAllowance(bool value) public {

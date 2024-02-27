@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-/// @title DN420
-/// @notice DN420 is a fully standard compliant, single-contract, 
+/// @title DN69
+/// @notice DN69 is a fully standard compliant, single-contract, 
 /// ERC20 and ERC1155 chimera implementation that mints
 /// and burns NFTs based on an account's ERC20 token balance.
 ///
@@ -12,7 +12,7 @@ pragma solidity ^0.8.4;
 /// @author cygaar (@0xCygaar)
 /// @author Thomas (@0xjustadev)
 /// @author Harrison (@PopPunkOnChain)
-abstract contract DN420 {
+abstract contract DN69 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -66,7 +66,7 @@ abstract contract DN420 {
 
     /// @dev `keccak256(bytes("SkipNFTSet(address,bool)"))`.
     uint256 private constant _SKIP_NFT_SET_EVENT_SIGNATURE =
-        0xb5a1de456fff688115a4f75380060c23c8532d14ff85f687cc871456d6420393;
+        0xb5a1de456fff688115a4f75380060c23c8532d14ff85f687cc871456d669393;
 
     /// @dev `keccak256(bytes("TransferSingle(address,address,address,uint256,uint256)"))`.
     uint256 private constant _TRANSFER_SINGLE_EVENT_SIGNATURE =
@@ -176,7 +176,7 @@ abstract contract DN420 {
     }
 
     /// @dev Struct containing the base token contract storage.
-    struct DN420Storage {
+    struct DN69Storage {
         // Next NFT ID to assign for a mint.
         uint32 nextTokenId;
         // Total supply of tokens.
@@ -193,11 +193,11 @@ abstract contract DN420 {
         mapping(address => AddressData) addressData;
     }
 
-    /// @dev Returns a storage pointer for DN420Storage.
-    function _getDN420Storage() internal pure virtual returns (DN420Storage storage $) {
+    /// @dev Returns a storage pointer for DN69Storage.
+    function _getDN69Storage() internal pure virtual returns (DN69Storage storage $) {
         /// @solidity memory-safe-assembly
         assembly {
-            // `uint72(bytes9(keccak256("DN420_STORAGE")))`.
+            // `uint72(bytes9(keccak256("DN69_STORAGE")))`.
             $.slot := 0xb6dffd38a260769cb2 // Truncate to 9 bytes to reduce bytecode size.
         }
     }
@@ -206,13 +206,13 @@ abstract contract DN420 {
     /*                         INITIALIZER                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Initializes the DN420 contract with an
+    /// @dev Initializes the DN69 contract with an
     /// `initialTokenSupply` and `initialTokenOwner`.
-    function _initializeDN420(
+    function _initializeDN69(
         uint256 initialTokenSupply,
         address initialSupplyOwner
     ) internal virtual {
-        DN420Storage storage $ = _getDN420Storage();
+        DN69Storage storage $ = _getDN69Storage();
 
         if (_unit() == 0) revert UnitIsZero();
         
@@ -289,21 +289,21 @@ abstract contract DN420 {
 
     /// @dev Returns the amount of tokens in existence.
     function totalSupply() public view virtual returns (uint256) {
-        return uint256(_getDN420Storage().totalSupply);
+        return uint256(_getDN69Storage().totalSupply);
     }
 
     /// @dev Returns the amount of tokens owned by `owner`.
     function balanceOf(address owner) public view virtual returns (uint256) {
-        return _getDN420Storage().addressData[owner].balance;
+        return _getDN69Storage().addressData[owner].balance;
     }
 
     /// @dev Returns the amount of tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
         if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
-            uint8 flags = _getDN420Storage().addressData[owner].flags;
+            uint8 flags = _getDN69Storage().addressData[owner].flags;
             if (flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG == 0) return type(uint256).max;
         }
-        return _ref(_getDN420Storage().allowance, owner, spender).value;
+        return _ref(_getDN69Storage().allowance, owner, spender).value;
     }
 
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -349,10 +349,10 @@ abstract contract DN420 {
     ///
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
-        Uint256Ref storage a = _ref(_getDN420Storage().allowance, from, msg.sender);
+        Uint256Ref storage a = _ref(_getDN69Storage().allowance, from, msg.sender);
 
         uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
-            && (_getDN420Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == 0
+            && (_getDN69Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == 0
             ? type(uint256).max
             : a.value;
 
@@ -391,7 +391,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage toAddressData = _addressData(to);
-        DN420Storage storage $ = _getDN420Storage();
+        DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
         uint256 toEnd;
@@ -457,7 +457,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage toAddressData = _addressData(to);
-        DN420Storage storage $ = _getDN420Storage();
+        DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
         uint256 toEnd;
@@ -524,7 +524,7 @@ abstract contract DN420 {
     /// Emits a {Transfer} event.
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
-        DN420Storage storage $ = _getDN420Storage();
+        DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
         uint256 fromBalance = fromAddressData.balance;
@@ -583,7 +583,7 @@ abstract contract DN420 {
 
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
-        DN420Storage storage $ = _getDN420Storage();
+        DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
         _DNTransferTemps memory t;
@@ -700,13 +700,13 @@ abstract contract DN420 {
     ///   `msgSender` must be the owner of the token, or be approved to manage the token.
     ///
     /// Emits a {Transfer} event.
-    function _transferFromNFT(address from, address to, uint256 id)
+    function _safeTransferFromNFT(address from, address to, uint256 id, bytes memory data)
         internal
         virtual
     {
         if (to == address(0)) revert TransferToZeroAddress();
 
-        DN420Storage storage $ = _getDN420Storage();
+        DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
         Bitmap storage fromOwned = $.owned[from];
@@ -743,11 +743,17 @@ abstract contract DN420 {
         _afterNFTTransfer(from, to, id);
         /// @solidity memory-safe-assembly
         assembly {
+            from := shr(96, shl(96, from))
+            to := shr(96, shl(96, to))
+            // Emit a {TransferSingle} event.
+            mstore(0x00, id)
+            mstore(0x20, 1)
+            log4(0x00, 0x40, _TRANSFER_SINGLE_EVENT_SIGNATURE, caller(), from, to)
             // Emit the {Transfer} event.
             mstore(0x00, unit)
-            // forgefmt: disable-next-item
-            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, from, to)
         }
+        if (_hasCode(to)) _checkOnERC1155Received(address(0), to, id, data);
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -759,9 +765,9 @@ abstract contract DN420 {
     /// Emits a {Approval} event.
     function _approve(address owner, address spender, uint256 amount) internal virtual {
         if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
-            _getDN420Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
+            _getDN69Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
         }
-        _ref(_getDN420Storage().allowance, owner, spender).value = amount;
+        _ref(_getDN69Storage().allowance, owner, spender).value = amount;
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Approval} event.
@@ -779,14 +785,14 @@ abstract contract DN420 {
     /// Minting, transferring, burning the tokens of `owner` will not change the auxiliary data.
     /// Auxiliary data can be set for any address, even if it does not have any tokens.
     function _getAux(address owner) internal view virtual returns (uint88) {
-        return _getDN420Storage().addressData[owner].aux;
+        return _getDN69Storage().addressData[owner].aux;
     }
 
     /// @dev Set the auxiliary data for `owner` to `value`.
     /// Minting, transferring, burning the tokens of `owner` will not change the auxiliary data.
     /// Auxiliary data can be set for any address, even if it does not have any tokens.
     function _setAux(address owner, uint88 value) internal virtual {
-        _getDN420Storage().addressData[owner].aux = value;
+        _getDN69Storage().addressData[owner].aux = value;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -796,7 +802,7 @@ abstract contract DN420 {
     /// @dev Returns true if minting and transferring ERC20s to `owner` will skip minting NFTs.
     /// Returns false otherwise.
     function getSkipNFT(address owner) public view virtual returns (bool) {
-        AddressData storage d = _getDN420Storage().addressData[owner];
+        AddressData storage d = _getDN69Storage().addressData[owner];
         if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) return _hasCode(owner);
         return d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0;
     }
@@ -830,7 +836,7 @@ abstract contract DN420 {
     ///
     /// Initializes account `owner` AddressData if it is not currently initialized.
     function _addressData(address owner) internal virtual returns (AddressData storage d) {
-        d = _getDN420Storage().addressData[owner];
+        d = _getDN69Storage().addressData[owner];
         unchecked {
             if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
                 uint256 skipNFT = _toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG;
@@ -845,12 +851,12 @@ abstract contract DN420 {
 
     /// @dev Returns `owner` NFT balance.
     function _balanceOfNFT(address owner) internal view virtual returns (uint256) {
-        return _getDN420Storage().addressData[owner].ownedCount;
+        return _getDN69Storage().addressData[owner].ownedCount;
     }
 
     /// @dev Returns if token `id` exists.
     function _exists(uint256 id) internal view virtual returns (bool) {
-        return _get(_getDN420Storage().exists, id);
+        return _get(_getDN69Storage().exists, id);
     }
 
     /// @dev Returns the NFT IDs of `owner` in range `[begin, end)`.
@@ -862,7 +868,7 @@ abstract contract DN420 {
         returns (uint256[] memory ids)
     {
         unchecked {
-            DN420Storage storage $ = _getDN420Storage();
+            DN69Storage storage $ = _getDN69Storage();
             Bitmap storage owned = $.owned[owner];
             end = _min(uint256($.addressData[owner].ownedUpTo) + 1, end);
             /// @solidity memory-safe-assembly
@@ -882,10 +888,100 @@ abstract contract DN420 {
         }
     }
 
+    /// @dev Perform a call to invoke {IERC1155Receiver-onERC1155Received} on `to`.
+    /// Reverts if the target does not support the function correctly.
+    function _checkOnERC1155Received(
+        address from,
+        address to,
+        uint256 id,
+        bytes memory data
+    ) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Prepare the calldata.
+            let m := mload(0x40)
+            // `onERC1155Received(address,address,uint256,uint256,bytes)`.
+            mstore(m, 0xf23a6e61)
+            mstore(add(m, 0x20), caller())
+            mstore(add(m, 0x40), shr(96, shl(96, from)))
+            mstore(add(m, 0x60), id)
+            mstore(add(m, 0x80), 1)
+            mstore(add(m, 0xa0), 0xa0)
+            let n := mload(data)
+            mstore(add(m, 0xc0), n)
+            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xe0), n)) }
+            // Revert if the call reverts.
+            if iszero(call(gas(), to, 0, add(m, 0x1c), add(0xc4, n), m, 0x20)) {
+                if returndatasize() {
+                    // Bubble up the revert if the call reverts.
+                    returndatacopy(m, 0x00, returndatasize())
+                    revert(m, returndatasize())
+                }
+            }
+            // Load the returndata and compare it with the function selector.
+            if iszero(eq(mload(m), shl(224, 0xf23a6e61))) {
+                mstore(0x00, 0x9c05499b) // `TransferToNonERC1155ReceiverImplementer()`.
+                revert(0x1c, 0x04)
+            }
+        }
+    }
+
+    /// @dev Perform a call to invoke {IERC1155Receiver-onERC1155BatchReceived} on `to`.
+    /// Reverts if the target does not support the function correctly.
+    function _checkOnERC1155BatchReceived(
+        address from,
+        address to,
+        uint256[] memory ids,
+        bytes memory data
+    ) private {
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Prepare the calldata.
+            let m := mload(0x40)
+            // `onERC1155BatchReceived(address,address,uint256[],uint256[],bytes)`.
+            mstore(m, 0xbc197c81)
+            mstore(add(m, 0x20), caller())
+            mstore(add(m, 0x40), shr(96, shl(96, from)))
+            // Copy the `ids`.
+            mstore(add(m, 0x60), 0xa0)
+            let n := add(0x20, shl(5, mload(ids)))
+            let o := add(m, 0xc0)
+            pop(staticcall(gas(), 4, ids, n, o, n))
+            // Copy the `amounts`.
+            let s := add(0xa0, returndatasize())
+            mstore(add(m, 0x80), s)
+            o := add(o, returndatasize())
+            mstore(o, mload(ids))
+            {
+                let end := add(o, returndatasize())
+                for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
+            }
+            // Copy the `data`.
+            mstore(add(m, 0xa0), add(s, returndatasize()))
+            o := add(o, returndatasize())
+            n := add(0x20, mload(data))
+            pop(staticcall(gas(), 4, data, n, o, n))
+            n := sub(add(o, returndatasize()), add(m, 0x1c))
+            // Revert if the call reverts.
+            if iszero(call(gas(), to, 0, add(m, 0x1c), n, m, 0x20)) {
+                if returndatasize() {
+                    // Bubble up the revert if the call reverts.
+                    returndatacopy(m, 0x00, returndatasize())
+                    revert(m, returndatasize())
+                }
+            }
+            // Load the returndata and compare it with the function selector.
+            if iszero(eq(mload(m), shl(224, 0xbc197c81))) {
+                mstore(0x00, 0x9c05499b) // `TransferToNonERC1155ReceiverImplementer()`.
+                revert(0x1c, 0x04)
+            }
+        }
+    }
+
     // /// @dev Fallback modifier to dispatch calls from the mirror NFT contract
     // /// to internal functions in this contract.
     // modifier dn404Fallback() virtual {
-    //     DN404Storage storage $ = _getDN420Storage();
+    //     DN404Storage storage $ = _getDN69Storage();
 
     //     uint256 fnSelector = _calldataload(0x00) >> 224;
     //     address mirror = $.mirrorERC721;
@@ -893,7 +989,7 @@ abstract contract DN420 {
     //     // `transferFromNFT(address,address,uint256,address)`.
     //     if (fnSelector == 0xe5eb36c8) {
     //         if (msg.sender != mirror) revert SenderNotMirror();
-    //         _transferFromNFT(
+    //         _safeTransfer(
     //             address(uint160(_calldataload(0x04))), // `from`.
     //             address(uint160(_calldataload(0x24))), // `to`.
     //             _calldataload(0x44), // `id`.
@@ -1187,8 +1283,10 @@ abstract contract DN420 {
             o := add(o, returndatasize())
             // Store the length of `amounts`.
             mstore(o, mload(ids))
-            let end := add(o, returndatasize())
-            for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
+            {
+                let end := add(o, returndatasize())
+                for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }    
+            }
             // Emit a {TransferBatch} event.
             log4(m, sub(o, m), _TRANSFER_BATCH_EVENT_SIGNATURE, caller(), shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
