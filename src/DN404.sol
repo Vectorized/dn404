@@ -457,7 +457,7 @@ abstract contract DN404 {
                             id = t.nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
                                 id = _useExistsLookup()
-                                    ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                    ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
                                     : _wrapNFTId(id + 1, maxId);
                             }
                             t.nextTokenId = _wrapNFTId(id + 1, maxId);
@@ -532,7 +532,7 @@ abstract contract DN404 {
                         uint256 id = startId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
                             id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
                                 : _wrapNFTId(id + 1, maxId);
                         }
                         startId = _wrapNFTId(id + 1, maxId);
@@ -744,7 +744,7 @@ abstract contract DN404 {
                         id = t.nextTokenId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
                             id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
                                 : _wrapNFTId(id + 1, maxId);
                         }
                         t.nextTokenId = _wrapNFTId(id + 1, maxId);
@@ -1228,9 +1228,9 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
-    /// If no unset bit is found, returns `type(uint256).max`.
-    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+    /// @dev Returns the index of the least significant unset bit in `[begin..upTo]`.
+    /// If no set bit is found, returns `type(uint256).max`.
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 upTo)
         internal
         view
         returns (uint256 unsetBitIndex)
@@ -1242,14 +1242,14 @@ abstract contract DN404 {
             let bucket := add(s, shr(8, begin))
             let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
-                let lastBucket := add(s, shr(8, end))
+                let lastBucket := add(s, shr(8, upTo))
                 for {} 1 {} {
                     bucket := add(bucket, 1)
                     negBits := not(sload(bucket))
                     if or(negBits, gt(bucket, lastBucket)) { break }
                 }
                 if gt(bucket, lastBucket) {
-                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
+                    negBits := shr(and(0xff, not(upTo)), shl(and(0xff, not(upTo)), negBits))
                 }
             }
             if negBits {
@@ -1263,7 +1263,7 @@ abstract contract DN404 {
                 r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
                     0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
                 r := or(shl(8, sub(bucket, s)), r)
-                unsetBitIndex := or(r, sub(0, or(iszero(lt(r, end)), lt(r, begin))))
+                unsetBitIndex := or(r, sub(0, or(gt(r, upTo), lt(r, begin))))
             }
         }
     }
