@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 /// @title DN420
-/// @notice DN420 is a fully standard compliant, single-contract,
+/// @notice DN420 is a fully standard compliant, single-contract, 
 /// ERC20 and ERC1155 chimera implementation that mints
 /// and burns NFTs based on an account's ERC20 token balance.
 ///
@@ -205,14 +205,14 @@ abstract contract DN420 {
 
     /// @dev Initializes the DN420 contract with an
     /// `initialTokenSupply` and `initialTokenOwner`.
-    function _initializeDN420(uint256 initialTokenSupply, address initialSupplyOwner)
-        internal
-        virtual
-    {
+    function _initializeDN420(
+        uint256 initialTokenSupply,
+        address initialSupplyOwner
+    ) internal virtual {
         DN420Storage storage $ = _getDN420Storage();
 
         if (_unit() == 0) revert UnitIsZero();
-
+        
         $.nextTokenId = 1;
 
         if (initialTokenSupply != 0) {
@@ -408,6 +408,7 @@ abstract contract DN420 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
+                    _DNBatchLogs memory p = _batchLogsMalloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
                     uint256 ownedEnd = toAddressData.ownedEnd;
                     uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
@@ -421,12 +422,14 @@ abstract contract DN420 {
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
                         ownedEnd = _max(ownedEnd, id);
+                        _batchLogsAppend(p, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
                     toAddressData.ownedEnd = uint32(ownedEnd);
                     toAddressData.ownedCount = uint32(toEnd);
                     $.nextTokenId = uint32(nextTokenId);
+                    _batchLogsEmit(p, address(0), to);
                 }
             }
         }
@@ -473,6 +476,7 @@ abstract contract DN420 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
+                    _DNBatchLogs memory p = _batchLogsMalloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
                     uint256 ownedEnd = toAddressData.ownedEnd;
                     // Mint loop.
@@ -485,11 +489,13 @@ abstract contract DN420 {
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
                         ownedEnd = _max(ownedEnd, id);
+                        _batchLogsAppend(p, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
                     toAddressData.ownedEnd = uint32(ownedEnd);
                     toAddressData.ownedCount = uint32(toEnd);
+                    _batchLogsEmit(p, address(0), to);
                 }
             }
         }
@@ -528,17 +534,20 @@ abstract contract DN420 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
+                _DNBatchLogs memory p = _batchLogsMalloc(numNFTBurns);
                 fromAddressData.ownedCount = uint32(fromIndex - numNFTBurns);
                 uint256 id = fromAddressData.ownedEnd;
                 // Burn loop.
                 do {
-                    id = _findLastSet(fromOwned, id + 1);
+                    id = _findLastSet(fromOwned, id);
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
                     _afterNFTTransfer(from, address(0), id);
+                    _batchLogsAppend(p, id);
                 } while (--numNFTBurns != 0);
 
                 fromAddressData.ownedEnd = uint32(id);
+                _batchLogsEmit(p, from, address(0));
             }
         }
         /// @solidity memory-safe-assembly
@@ -564,211 +573,184 @@ abstract contract DN420 {
     ///
     /// Emits a {Transfer} event.
     function _transfer(address from, address to, uint256 amount) internal virtual {
+        if (to == address(0)) revert TransferToZeroAddress();
+
+        AddressData storage fromAddressData = _addressData(from);
+        AddressData storage toAddressData = _addressData(to);
+        DN420Storage storage $ = _getDN420Storage();
+
+        _DNTransferTemps memory t;
+        t.fromOwnedCount = fromAddressData.ownedCount;
+        t.toOwnedCount = toAddressData.ownedCount;
+        t.totalSupply = $.totalSupply;
+
+        if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
+
+        unchecked {
+            fromAddressData.balance = uint96(t.fromBalance -= amount);
+            toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
+
+            t.numNFTBurns = _zeroFloorSub(t.fromOwnedCount, t.fromBalance / _unit());
+
+            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                if (from == to) t.toOwnedCount = t.fromOwnedCount - t.numNFTBurns;
+                t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedCount);
+            }
+
+            while (_useDirectTransfersIfPossible()) {
+                uint256 n = _min(t.fromOwnedCount, _min(t.numNFTBurns, t.numNFTMints));
+                if (n == 0) break;
+                t.numNFTBurns -= n;
+                t.numNFTMints -= n;
+                if (from == to) {
+                    t.toOwnedCount += n;
+                    break;
+                }
+                _DNBatchLogs memory p = _batchLogsMalloc(n);
+                Bitmap storage fromOwned = $.owned[from];
+                Bitmap storage toOwned = $.owned[to];
+                
+                uint256 id = fromAddressData.ownedEnd;
+                fromAddressData.ownedCount = uint32(t.fromOwnedCount -= n);
+                toAddressData.ownedEnd = uint32(_max(toAddressData.ownedEnd, id));
+                toAddressData.ownedCount = uint32(t.toOwnedCount += n);
+                // Direct transfer loop.
+                do {
+                    id = _findLastSet(fromOwned, id);
+                    _set(fromOwned, id, false);
+                    _set(toOwned, id, true);
+                    _batchLogsAppend(p, id);
+                    _afterNFTTransfer(from, to, id);
+                } while (--n != 0);
+
+                fromAddressData.ownedEnd = uint32(id);
+                _batchLogsEmit(p, from, to);
+                break;
+            }
+
+            if (t.numNFTBurns != 0) {
+                uint256 n = t.numNFTBurns;
+                _DNBatchLogs memory p = _batchLogsMalloc(n);
+                Bitmap storage fromOwned = $.owned[from];
+                fromAddressData.ownedCount = uint32(t.fromOwnedCount -= n);
+                uint256 id = fromAddressData.ownedEnd;
+                // Burn loop.
+                do {
+                    id = _findLastSet(fromOwned, id);
+                    _set(fromOwned, id, false);
+                    _set($.exists, id, false);
+                    _batchLogsAppend(p, id);                    
+                    _afterNFTTransfer(from, address(0), id);
+                } while (--n != 0);
+
+                fromAddressData.ownedEnd = uint32(id);
+                _batchLogsEmit(p, from, address(0));
+            }
+
+            if (t.numNFTMints != 0) {
+                uint256 n = t.numNFTMints;
+                _DNBatchLogs memory p = _batchLogsMalloc(n);
+                Bitmap storage toOwned = $.owned[to];
+                toAddressData.ownedCount = uint32(t.toOwnedCount += n);
+                uint256 maxId = t.totalSupply / _unit();
+                uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
+                uint256 ownedEnd = toAddressData.ownedEnd;
+                // Mint loop.
+                do {
+                    uint256 id = nextTokenId;
+                    while (_get($.exists, id)) {
+                        id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
+                    }
+                    nextTokenId = _wrapNFTId(id + 1, maxId);
+                    _set($.exists, id, true);
+                    _set(toOwned, id, true);
+                    ownedEnd = _max(ownedEnd, id);
+                    _batchLogsAppend(p, id);
+                    _afterNFTTransfer(address(0), to, id);
+                } while (--n != 0);
+
+                toAddressData.ownedEnd = uint32(ownedEnd);
+                $.nextTokenId = uint32(nextTokenId);
+                _batchLogsEmit(p, address(0), to);
+            }
+        }
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Emit the {Transfer} event.
+            mstore(0x00, amount)
+            // forgefmt: disable-next-item
+            log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
+    }
+
+    /// @dev Transfers token `id` from `from` to `to`.
+    ///
+    /// Requirements:
+    ///
+    /// - Call must originate from the mirror contract.
+    /// - Token `id` must exist.
+    /// - `from` must be the owner of the token.
+    /// - `to` cannot be the zero address.
+    ///   `msgSender` must be the owner of the token, or be approved to manage the token.
+    ///
+    /// Emits a {Transfer} event.
+    function _transferFromNFT(address from, address to, uint256 id)
+        internal
+        virtual
+    {
         // if (to == address(0)) revert TransferToZeroAddress();
+
+        // DN404Storage storage $ = _getDN420Storage();
+        // if ($.mirrorERC721 == address(0)) revert();
+
+        // Uint32Map storage oo = $.oo;
+
+        // if (!_get($.owned[from], id)) {
+        //     revert TransferFromIncorrectOwner();
+        // }
+
+        // if (msg.sender != from) {
+        //     if (_ref($.operatorApprovals, from, msg.sender).value == 0) {
+        //         revert TransferCallerNotOwnerNorApproved();
+        //     }
+        // }
 
         // AddressData storage fromAddressData = _addressData(from);
         // AddressData storage toAddressData = _addressData(to);
-        // DN420Storage storage $ = _getDN420Storage();
-        // if ($.mirrorERC721 == address(0)) revert();
 
-        // _DNTransferTemps memory t;
-        // t.fromOwnedLength = fromAddressData.ownedLength;
-        // t.toOwnedLength = toAddressData.ownedLength;
-        // t.totalSupply = $.totalSupply;
-
-        // if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
+        // uint256 unit = _unit();
+        // mapping(address => Uint32Map) storage owned = $.owned;
+        // Uint32Map storage fromOwned = owned[from];
 
         // unchecked {
-        //     fromAddressData.balance = uint96(t.fromBalance -= amount);
-        //     toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
-
-        //     t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _unit());
-
-        //     if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-        //         if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
-        //         t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedLength);
-        //     }
-
-        //     while (_useDirectTransfersIfPossible()) {
-        //         uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
-        //         if (n == 0) break;
-        //         t.numNFTBurns -= n;
-        //         t.numNFTMints -= n;
-        //         if (from == to) {
-        //             t.toOwnedLength += n;
-        //             break;
-        //         }
-        //         // _DNDirectLogs memory directLogs = _directLogsMalloc(n, from, to);
-        //         Uint32Map storage fromOwned = $.owned[from];
-        //         Uint32Map storage toOwned = $.owned[to];
-        //         t.toAlias = _registerAndResolveAlias(toAddressData, to);
-        //         uint256 toIndex = t.toOwnedLength;
-        //         // Direct transfer loop.
-        //         do {
-        //             uint256 id = _get(fromOwned, --t.fromOwnedLength);
-        //             _set(toOwned, toIndex, uint32(id));
-        //             _setOwnerAliasAndOwnedIndex($.oo, id, t.toAlias, uint32(toIndex++));
-        //             _directLogsAppend(directLogs, id);
-        //             if (_get($.mayHaveNFTApproval, id)) {
-        //                 _set($.mayHaveNFTApproval, id, false);
-        //                 delete $.nftApprovals[id];
-        //             }
-        //             _afterNFTTransfer(from, to, id);
-        //         } while (--n != 0);
-
-        //         toAddressData.ownedLength = uint32(t.toOwnedLength = toIndex);
-        //         fromAddressData.ownedLength = uint32(t.fromOwnedLength);
-        //         _directLogsSend(directLogs, $.mirrorERC721);
-        //         break;
-        //     }
-
-        //     t.totalNFTSupply = uint256($.totalNFTSupply) + t.numNFTMints - t.numNFTBurns;
-        //     $.totalNFTSupply = uint32(t.totalNFTSupply);
-
-        //     Uint32Map storage oo = $.oo;
-        //     _DNPackedLogs memory packedLogs = _packedLogsMalloc(t.numNFTBurns + t.numNFTMints);
-
-        //     t.burnedPoolTail = $.burnedPoolTail;
-        //     if (t.numNFTBurns != 0) {
-        //         _packedLogsSet(packedLogs, from, 1);
-        //         bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
-        //         Uint32Map storage fromOwned = $.owned[from];
-        //         uint256 fromIndex = t.fromOwnedLength;
-        //         fromAddressData.ownedLength = uint32(t.fromEnd = fromIndex - t.numNFTBurns);
-        //         uint32 burnedPoolTail = t.burnedPoolTail;
-        //         // Burn loop.
-        //         do {
-        //             uint256 id = _get(fromOwned, --fromIndex);
-        //             _setOwnerAliasAndOwnedIndex(oo, id, 0, 0);
-        //             _packedLogsAppend(packedLogs, id);
-        //             if (_useExistsLookup()) _set($.exists, id, false);
-        //             if (addToBurnedPool) _set($.burnedPool, burnedPoolTail++, uint32(id));
-        //             if (_get($.mayHaveNFTApproval, id)) {
-        //                 _set($.mayHaveNFTApproval, id, false);
-        //                 delete $.nftApprovals[id];
-        //             }
-        //             _afterNFTTransfer(from, address(0), id);
-        //         } while (fromIndex != t.fromEnd);
-
-        //         if (addToBurnedPool) $.burnedPoolTail = (t.burnedPoolTail = burnedPoolTail);
-        //     }
-
-        //     if (t.numNFTMints != 0) {
-        //         _packedLogsSet(packedLogs, to, 0);
-        //         Uint32Map storage toOwned = $.owned[to];
-        //         t.toAlias = _registerAndResolveAlias(toAddressData, to);
-        //         uint256 maxId = t.totalSupply / _unit();
-        //         t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
-        //         uint256 toIndex = t.toOwnedLength;
-        //         toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
-        //         uint32 burnedPoolHead = $.burnedPoolHead;
-        //         // Mint loop.
-        //         do {
-        //             uint256 id;
-        //             if (burnedPoolHead != t.burnedPoolTail) {
-        //                 id = _get($.burnedPool, burnedPoolHead++);
-        //             } else {
-        //                 id = t.nextTokenId;
-        //                 while (_get(oo, _ownershipIndex(id)) != 0) {
-        //                     id = _useExistsLookup()
-        //                         ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
-        //                         : _wrapNFTId(id + 1, maxId);
-        //                 }
-        //                 t.nextTokenId = _wrapNFTId(id + 1, maxId);
-        //             }
-        //             if (_useExistsLookup()) _set($.exists, id, true);
-        //             _set(toOwned, toIndex, uint32(id));
-        //             _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-        //             _packedLogsAppend(packedLogs, id);
-        //             _afterNFTTransfer(address(0), to, id);
-        //         } while (toIndex != t.toEnd);
-
-        //         $.burnedPoolHead = burnedPoolHead;
-        //         $.nextTokenId = uint32(t.nextTokenId);
-        //     }
-
-        //     if (packedLogs.logs.length != 0) _packedLogsSend(packedLogs, $.mirrorERC721);
+        //     uint256 fromBalance = fromAddressData.balance;
+        //     if (unit > fromBalance) revert InsufficientBalance();
+        //     fromAddressData.balance = uint96(fromBalance - unit);
+        //     toAddressData.balance += uint96(unit);
+        // }
+        // if (_get($.mayHaveNFTApproval, id)) {
+        //     _set($.mayHaveNFTApproval, id, false);
+        //     delete $.nftApprovals[id];
+        // }
+        // unchecked {
+        //     uint32 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
+        //     uint32 i = _get(oo, _ownedIndex(id));
+        //     _set(fromOwned, i, updatedId);
+        //     _set(oo, _ownedIndex(updatedId), i);
+        // }
+        // unchecked {
+        //     uint32 n = toAddressData.ownedLength++;
+        //     _set(owned[to], n, uint32(id));
+        //     _setOwnerAliasAndOwnedIndex(oo, id, _registerAndResolveAlias(toAddressData, to), n);
         // }
         // /// @solidity memory-safe-assembly
         // assembly {
         //     // Emit the {Transfer} event.
-        //     mstore(0x00, amount)
+        //     mstore(0x00, unit)
         //     // forgefmt: disable-next-item
         //     log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
         // }
     }
-
-    // /// @dev Transfers token `id` from `from` to `to`.
-    // ///
-    // /// Requirements:
-    // ///
-    // /// - Call must originate from the mirror contract.
-    // /// - Token `id` must exist.
-    // /// - `from` must be the owner of the token.
-    // /// - `to` cannot be the zero address.
-    // ///   `msgSender` must be the owner of the token, or be approved to manage the token.
-    // ///
-    // /// Emits a {Transfer} event.
-    // function _transferFromNFT(address from, address to, uint256 id, address msgSender)
-    //     internal
-    //     virtual
-    // {
-    //     if (to == address(0)) revert TransferToZeroAddress();
-
-    //     DN404Storage storage $ = _getDN420Storage();
-    //     if ($.mirrorERC721 == address(0)) revert();
-
-    //     Uint32Map storage oo = $.oo;
-
-    //     if (from != $.aliasToAddress[_get(oo, _ownershipIndex(_restrictNFTId(id)))]) {
-    //         revert TransferFromIncorrectOwner();
-    //     }
-
-    //     if (msgSender != from) {
-    //         if (_ref($.operatorApprovals, from, msgSender).value == 0) {
-    //             if (msgSender != $.nftApprovals[id]) {
-    //                 revert TransferCallerNotOwnerNorApproved();
-    //             }
-    //         }
-    //     }
-
-    //     AddressData storage fromAddressData = _addressData(from);
-    //     AddressData storage toAddressData = _addressData(to);
-
-    //     uint256 unit = _unit();
-    //     mapping(address => Uint32Map) storage owned = $.owned;
-    //     Uint32Map storage fromOwned = owned[from];
-
-    //     unchecked {
-    //         uint256 fromBalance = fromAddressData.balance;
-    //         if (unit > fromBalance) revert InsufficientBalance();
-    //         fromAddressData.balance = uint96(fromBalance - unit);
-    //         toAddressData.balance += uint96(unit);
-    //     }
-    //     if (_get($.mayHaveNFTApproval, id)) {
-    //         _set($.mayHaveNFTApproval, id, false);
-    //         delete $.nftApprovals[id];
-    //     }
-    //     unchecked {
-    //         uint32 updatedId = _get(fromOwned, --fromAddressData.ownedLength);
-    //         uint32 i = _get(oo, _ownedIndex(id));
-    //         _set(fromOwned, i, updatedId);
-    //         _set(oo, _ownedIndex(updatedId), i);
-    //     }
-    //     unchecked {
-    //         uint32 n = toAddressData.ownedLength++;
-    //         _set(owned[to], n, uint32(id));
-    //         _setOwnerAliasAndOwnedIndex(oo, id, _registerAndResolveAlias(toAddressData, to), n);
-    //     }
-    //     _afterNFTTransfer(from, to, id);
-    //     /// @solidity memory-safe-assembly
-    //     assembly {
-    //         // Emit the {Transfer} event.
-    //         mstore(0x00, unit)
-    //         // forgefmt: disable-next-item
-    //         log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
-    //     }
-    // }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                 INTERNAL APPROVE FUNCTIONS                 */
@@ -1125,11 +1107,7 @@ abstract contract DN420 {
 
     /// @dev Returns the index of the most significant set bit in `[0..upTo]`.
     /// If no set bit is found, returns `type(uint256).max`.
-    function _findLastSet(Bitmap storage bitmap, uint256 upTo)
-        internal
-        view
-        returns (uint256 setBitIndex)
-    {
+    function _findLastSet(Bitmap storage bitmap, uint256 upTo) internal view returns (uint256 setBitIndex) {
         /// @solidity memory-safe-assembly
         assembly {
             setBitIndex := not(0) // Initialize to `type(uint256).max`.
@@ -1277,14 +1255,7 @@ abstract contract DN420 {
             let end := add(o, returndatasize())
             for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
             // Emit a {TransferBatch} event.
-            log4(
-                m,
-                sub(o, m),
-                _TRANSFER_BATCH_EVENT_SIGNATURE,
-                caller(),
-                shr(96, shl(96, from)),
-                shr(96, shl(96, to))
-            )
+            log4(m, sub(o, m), _TRANSFER_BATCH_EVENT_SIGNATURE, caller(), shr(96, shl(96, from)), shr(96, shl(96, to)))
         }
     }
 
@@ -1294,8 +1265,10 @@ abstract contract DN420 {
         uint256 numNFTMints;
         uint256 fromBalance;
         uint256 toBalance;
-        uint256 fromOwnedLength;
-        uint256 toOwnedLength;
+        uint256 fromOwnedEnd;
+        uint256 toOwnedEnd;
+        uint256 fromOwnedCount;
+        uint256 toOwnedCount;
         uint256 totalSupply;
         uint256 totalNFTSupply;
         uint256 fromEnd;
