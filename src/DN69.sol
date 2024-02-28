@@ -601,7 +601,7 @@ abstract contract DN69 {
             uint256 toBalance;
             uint256 fromBalance = fromAddressData.balance;
             if (amount > fromBalance) revert InsufficientBalance();
-            
+
             fromAddressData.balance = uint96(fromBalance -= amount);
             toAddressData.balance = uint96(toBalance = uint256(toAddressData.balance) + amount);
 
@@ -610,7 +610,7 @@ abstract contract DN69 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 if (from == to) t.toOwnedCount = t.fromOwnedCount - t.numNFTBurns;
                 t.numNFTMints = _zeroFloorSub(toBalance / _unit(), t.toOwnedCount);
-            }    
+            }
         }
 
         unchecked {
@@ -704,7 +704,6 @@ abstract contract DN69 {
         }
     }
 
-    
     function _safeTransferNFT(address by, address from, address to, uint256 id, bytes memory data)
         internal
         virtual
@@ -915,12 +914,7 @@ abstract contract DN69 {
     }
 
     /// @dev Returns whether `operator` is approved to manage the tokens of `owner`.
-    function isApprovedForAll(address owner, address operator)
-        public
-        view
-        virtual
-        returns (bool)
-    {
+    function isApprovedForAll(address owner, address operator) public view virtual returns (bool) {
         return _ref(_getDN69Storage().operatorApprovals, owner, operator).value != 0;
     }
 
@@ -934,7 +928,10 @@ abstract contract DN69 {
     /// @dev Sets whether `operator` is approved to manage the tokens of the caller.
     ///
     /// Emits a {ApprovalForAll} event.
-    function _setApprovalForAll(address owner, address operator, bool isApproved) internal virtual {
+    function _setApprovalForAll(address owner, address operator, bool isApproved)
+        internal
+        virtual
+    {
         _ref(_getDN69Storage().operatorApprovals, owner, operator).value = _toUint(isApproved);
         /// @solidity memory-safe-assembly
         assembly {
@@ -946,12 +943,10 @@ abstract contract DN69 {
         }
     }
 
-    function safeTransferNFT(
-        address from,
-        address to,
-        uint256 id,
-        bytes memory data
-    ) public virtual {
+    function safeTransferNFT(address from, address to, uint256 id, bytes memory data)
+        public
+        virtual
+    {
         _safeTransferNFT(msg.sender, from, to, id, data);
     }
 
@@ -975,7 +970,7 @@ abstract contract DN69 {
             result := or(or(eq(s, 0x01ffc9a7), eq(s, 0xd9b67a26)), eq(s, 0x0e89341c))
         }
     }
- 
+
     /// @dev Returns `owner` NFT balance.
     function _balanceOfNFT(address owner) internal view virtual returns (uint256) {
         return _getDN69Storage().addressData[owner].ownedCount;
