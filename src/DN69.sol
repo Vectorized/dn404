@@ -463,12 +463,6 @@ abstract contract DN69 {
         DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
-        uint256 toEnd;
-        unchecked {
-            uint256 toBalance = uint256(toAddressData.balance) + amount;
-            toAddressData.balance = uint96(toBalance);
-            toEnd = toBalance / _unit();
-        }
         uint256 startId;
         uint256 maxId;
         unchecked {
@@ -479,6 +473,12 @@ abstract contract DN69 {
             uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
             if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
             maxId = totalSupply_ / _unit();
+        }
+        uint256 toEnd;
+        unchecked {
+            uint256 toBalance = uint256(toAddressData.balance) + amount;
+            toAddressData.balance = uint96(toBalance);
+            toEnd = toBalance / _unit();
         }
         unchecked {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
@@ -774,10 +774,10 @@ abstract contract DN69 {
             }
         }
 
+        uint256 amount = ids.length * _unit();
+
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
-
-        uint256 amount = ids.length * _unit();
 
         unchecked {
             uint256 fromBalance = fromAddressData.balance;
@@ -1019,27 +1019,31 @@ abstract contract DN69 {
 
         // `safeTransferFrom(address,address,uint256,uint256,bytes)`.
         if (fnSelector == 0xf242432a) {
-            address to = address(uint160(_calldataload(0x04)));
-            address from = address(uint160(_calldataload(0x24)));
-            uint256 id = _calldataload(0x44);
-            uint256 amount = _calldataload(0x64);
-            bytes memory data = _calldataBytes(0x84);
-            if (amount != 1) revert InvalidNFTAmount();
-            _safeTransferNFT(msg.sender, from, to, id, data);
+            if (_calldataload(0x64) != 1) revert InvalidNFTAmount();
+            _safeTransferNFT(
+                msg.sender, // `by`.
+                address(uint160(_calldataload(0x04))), // `from`.
+                address(uint160(_calldataload(0x24))), // `to`.
+                _calldataload(0x44), // `id`.
+                _calldataBytes(0x84) // `data`.
+            );
         }
         // `safeBatchTransferFrom(address,address,uint256[],uint256[],bytes)`.
         if (fnSelector == 0x2eb2c2d6) {
-            address to = address(uint160(_calldataload(0x04)));
-            address from = address(uint160(_calldataload(0x24)));
             uint256[] memory ids = _calldataUint256Array(0x44);
-            uint256[] memory amounts = _calldataUint256Array(0x64);
-            bytes memory data = _calldataBytes(0x84);
             unchecked {
+                uint256[] memory amounts = _calldataUint256Array(0x64);
                 uint256 n = ids.length;
                 if (n != amounts.length) revert ArrayLengthsMismatch();
                 while (n-- != 0) if (_get(amounts, n) != 1) revert InvalidNFTAmount();
             }
-            _safeBatchTransferNFTs(msg.sender, from, to, ids, data);
+            _safeBatchTransferNFTs(
+                msg.sender,
+                address(uint160(_calldataload(0x04))), // `from`.
+                address(uint160(_calldataload(0x24))), // `to`.
+                ids,
+                _calldataBytes(0x84) // `data.
+            );
         }
         // `balanceOfBatch(address[],uint256[])`.
         if (fnSelector == 0x4e1273f4) {
@@ -1063,7 +1067,7 @@ abstract contract DN69 {
         if (fnSelector == 0x00fdd58e) {
             address owner = address(uint160(_calldataload(0x04)));
             uint256 id = _calldataload(0x24);
-            _return(_toUint(owns(owner, id)));
+            _return(_toUint(_get($.owned[owner], id)));
         }
         // `implementsDN69()`.
         if (fnSelector == 0x0e0b0984) {
