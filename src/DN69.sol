@@ -414,7 +414,7 @@ abstract contract DN69 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
-                    uint256[] memory ids = _batchIdsMallloc(numNFTMints);
+                    uint256[] memory ids = _uint256ArrayMalloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
                     uint256 ownedUpTo = toAddressData.ownedUpTo;
                     uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
@@ -428,7 +428,7 @@ abstract contract DN69 {
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
                         ownedUpTo = _max(ownedUpTo, id);
-                        _batchIdsAppend(ids, id);
+                        _append(ids, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
@@ -484,7 +484,7 @@ abstract contract DN69 {
             if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
                 uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
                 if (numNFTMints != 0) {
-                    uint256[] memory ids = _batchIdsMallloc(numNFTMints);
+                    uint256[] memory ids = _uint256ArrayMalloc(numNFTMints);
                     Bitmap storage toOwned = $.owned[to];
                     uint256 ownedUpTo = toAddressData.ownedUpTo;
                     // Mint loop.
@@ -497,7 +497,7 @@ abstract contract DN69 {
                         _set($.exists, id, true);
                         _set(toOwned, id, true);
                         ownedUpTo = _max(ownedUpTo, id);
-                        _batchIdsAppend(ids, id);
+                        _append(ids, id);
                         _afterNFTTransfer(address(0), to, id);
                     } while (--numNFTMints != 0);
 
@@ -544,7 +544,7 @@ abstract contract DN69 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                uint256[] memory ids = _batchIdsMallloc(numNFTBurns);
+                uint256[] memory ids = _uint256ArrayMalloc(numNFTBurns);
                 fromAddressData.ownedCount = uint32(fromIndex - numNFTBurns);
                 uint256 id = fromAddressData.ownedUpTo;
                 // Burn loop.
@@ -553,7 +553,7 @@ abstract contract DN69 {
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
                     _afterNFTTransfer(from, address(0), id);
-                    _batchIdsAppend(ids, id);
+                    _append(ids, id);
                 } while (--numNFTBurns != 0);
 
                 fromAddressData.ownedUpTo = uint32(id);
@@ -623,7 +623,7 @@ abstract contract DN69 {
                     t.toOwnedCount += n;
                     break;
                 }
-                t.directIds = _batchIdsMallloc(n);
+                t.directIds = _uint256ArrayMalloc(n);
                 Bitmap storage fromOwned = $.owned[from];
                 Bitmap storage toOwned = $.owned[to];
 
@@ -636,7 +636,7 @@ abstract contract DN69 {
                     id = _findLastSet(fromOwned, id);
                     _set(fromOwned, id, false);
                     _set(toOwned, id, true);
-                    _batchIdsAppend(t.directIds, id);
+                    _append(t.directIds, id);
                     _afterNFTTransfer(from, to, id);
                 } while (--n != 0);
 
@@ -647,7 +647,7 @@ abstract contract DN69 {
 
             if (t.numNFTBurns != 0) {
                 uint256 n = t.numNFTBurns;
-                uint256[] memory burnIds = _batchIdsMallloc(n);
+                uint256[] memory burnIds = _uint256ArrayMalloc(n);
                 Bitmap storage fromOwned = $.owned[from];
                 fromAddressData.ownedCount = uint32(t.fromOwnedCount - n);
                 uint256 id = fromAddressData.ownedUpTo;
@@ -656,7 +656,7 @@ abstract contract DN69 {
                     id = _findLastSet(fromOwned, id);
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
-                    _batchIdsAppend(burnIds, id);
+                    _append(burnIds, id);
                     _afterNFTTransfer(from, address(0), id);
                 } while (--n != 0);
 
@@ -666,7 +666,7 @@ abstract contract DN69 {
 
             if (t.numNFTMints != 0) {
                 uint256 n = t.numNFTMints;
-                t.mintIds = _batchIdsMallloc(n);
+                t.mintIds = _uint256ArrayMalloc(n);
                 Bitmap storage toOwned = $.owned[to];
                 toAddressData.ownedCount = uint32(t.toOwnedCount + n);
                 uint256 maxId = $.totalSupply / _unit();
@@ -682,7 +682,7 @@ abstract contract DN69 {
                     _set($.exists, id, true);
                     _set(toOwned, id, true);
                     ownedUpTo = _max(ownedUpTo, id);
-                    _batchIdsAppend(t.mintIds, id);
+                    _append(t.mintIds, id);
                     _afterNFTTransfer(address(0), to, id);
                 } while (--n != 0);
 
@@ -715,9 +715,7 @@ abstract contract DN69 {
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
         if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
-            if (_ref($.operatorApprovals, from, by).value == 0) {
-                revert NotOwnerNorApproved();
-            }
+            if (_ref($.operatorApprovals, from, by).value == 0) revert NotOwnerNorApproved();
         }
 
         AddressData storage fromAddressData = _addressData(from);
@@ -728,9 +726,7 @@ abstract contract DN69 {
         Bitmap storage fromOwned = $.owned[from];
         Bitmap storage toOwned = $.owned[to];
 
-        if (!_get(fromOwned, id)) {
-            revert TransferFromIncorrectOwner();
-        }
+        if (!_get(fromOwned, id)) revert TransferFromIncorrectOwner();
 
         unchecked {
             uint256 fromBalance = fromAddressData.balance;
@@ -797,10 +793,8 @@ abstract contract DN69 {
             uint256 upTo = toAddressData.ownedUpTo;
             uint256 n = ids.length;
             for (uint256 i; i != n; ++i) {
-                uint256 id = ids[i];
-                if (!_get(fromOwned, id)) {
-                    revert TransferFromIncorrectOwner();
-                }
+                uint256 id = _get(ids, i);
+                if (!_get(fromOwned, id)) revert TransferFromIncorrectOwner();
                 _set(fromOwned, id, false);
                 _set(toOwned, id, true);
                 upTo = uint32(_max(upTo, id));
@@ -960,7 +954,7 @@ abstract contract DN69 {
     ) public virtual {
         _safeTransferNFT(msg.sender, from, to, id, data);
     }
-    
+
     function safeBatchTransferNFTs(
         address from,
         address to,
@@ -1048,7 +1042,7 @@ abstract contract DN69 {
             unchecked {
                 uint256 n = ids.length;
                 if (n != amounts.length) revert ArrayLengthsMismatch();
-                for (uint256 i; i != n; ++i) if (amounts[i] != 1) revert InvalidNFTAmount();
+                while (n-- != 0) if (_get(amounts, n) != 1) revert InvalidNFTAmount();
             }
             _safeBatchTransferNFTs(msg.sender, from, to, ids, data);
         }
@@ -1059,9 +1053,9 @@ abstract contract DN69 {
             unchecked {
                 uint256 n = ids.length;
                 if (owners.length != n) revert ArrayLengthsMismatch();
-                uint256[] memory result = new uint256[](n);
-                for (uint256 i; i != n; ++i) {
-                    result[i] = _toUint(_get($.owned[owners[i]], ids[i]));
+                uint256[] memory result = _uint256ArrayMalloc(n);
+                while (n-- != 0) {
+                    _set(result, n, _toUint(_get($.owned[_get(owners, n)], _get(ids, n))));
                 }
                 /// @solidity memory-safe-assembly
                 assembly {
@@ -1158,10 +1152,8 @@ abstract contract DN69 {
             mstore(add(m, 0x80), s)
             o := add(o, returndatasize())
             mstore(o, mload(ids))
-            {
-                let end := add(o, returndatasize())
-                for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
-            }
+            let end := add(o, returndatasize())
+            for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
             // Copy the `data`.
             mstore(add(m, 0xa0), add(s, returndatasize()))
             o := add(o, returndatasize())
@@ -1358,24 +1350,23 @@ abstract contract DN69 {
         }
     }
 
-    function _batchIdsMallloc(uint256 n) private pure returns (uint256[] memory ids) {
+    function _uint256ArrayMalloc(uint256 n) private pure returns (uint256[] memory result) {
         /// @solidity memory-safe-assembly
         assembly {
-            ids := add(0x20, mload(0x40))
-            let offset := add(ids, 0x20)
-            mstore(sub(ids, 0x20), offset)
-            mstore(ids, n)
+            result := add(0x20, mload(0x40))
+            let offset := add(result, 0x20)
+            mstore(sub(result, 0x20), offset)
+            mstore(result, n)
             mstore(0x40, add(offset, shl(5, n)))
         }
     }
 
-    function _batchIdsAppend(uint256[] memory ids, uint256 id) private pure {
+    function _append(uint256[] memory a, uint256 id) private pure {
         /// @solidity memory-safe-assembly
         assembly {
-            let offsetPointer := sub(ids, 0x20)
-            let offset := mload(offsetPointer)
+            let offset := mload(sub(a, 0x20))
             mstore(offset, id)
-            mstore(offsetPointer, add(offset, 0x20))
+            mstore(sub(a, 0x20), add(offset, 0x20))
         }
     }
 
@@ -1391,10 +1382,8 @@ abstract contract DN69 {
             o := add(o, returndatasize())
             // Store the length of `amounts`.
             mstore(o, mload(ids))
-            {
-                let end := add(o, returndatasize())
-                for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
-            }
+            let end := add(o, returndatasize())
+            for { o := add(o, 0x20) } iszero(eq(o, end)) { o := add(0x20, o) } { mstore(o, 1) }
             // Emit a {TransferBatch} event.
             // forgefmt: disable-next-item
             log4(m, sub(o, m), _TRANSFER_BATCH_EVENT_SIGNATURE, caller(),
@@ -1448,6 +1437,27 @@ abstract contract DN69 {
             mstore(result, n)
             calldatacopy(add(0x20, result), add(o, 0x20), n)
             mstore(0x40, add(add(result, 0x20), n))
+        }
+    }
+
+    function _get(address[] memory a, uint256 i) private pure returns (address result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(add(add(0x20, a), shl(5, i)))
+        }
+    }
+
+    function _get(uint256[] memory a, uint256 i) private pure returns (uint256 result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(add(add(0x20, a), shl(5, i)))
+        }
+    }
+
+    function _set(uint256[] memory a, uint256 i, uint256 value) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(add(add(0x20, a), shl(5, i)), value)
         }
     }
 
