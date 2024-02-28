@@ -396,11 +396,11 @@ abstract contract DN69 {
         DN69Storage storage $ = _getDN69Storage();
         if ($.nextTokenId == 0) revert DNNotInitialized();
 
-        uint256 toEnd;
+        _DNMintTemps memory t;
         unchecked {
             uint256 toBalance = uint256(toAddressData.balance) + amount;
             toAddressData.balance = uint96(toBalance);
-            toEnd = toBalance / _unit();
+            t.toEnd = toBalance / _unit();
         }
         uint256 maxId;
         unchecked {
@@ -411,33 +411,33 @@ abstract contract DN69 {
             maxId = totalSupply_ / _unit();
         }
         unchecked {
-            while (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
-                if (numNFTMints == 0) break;
-                uint256[] memory ids = _uint256ArrayMalloc(numNFTMints);
-                Bitmap storage toOwned = $.owned[to];
-                uint256 ownedUpTo = toAddressData.ownedUpTo;
-                uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
-                // Mint loop.
-                do {
-                    uint256 id = nextTokenId;
-                    while (_get($.exists, id)) {
-                        id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
-                    }
-                    nextTokenId = _wrapNFTId(id + 1, maxId);
-                    _set($.exists, id, true);
-                    _set(toOwned, id, true);
-                    ownedUpTo = _max(ownedUpTo, id);
-                    _append(ids, id);
-                    _afterNFTTransfer(address(0), to, id);
-                } while (--numNFTMints != 0);
+            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                t.numNFTMints = _zeroFloorSub(t.toEnd, toAddressData.ownedCount);
+                if (t.numNFTMints != 0) {
+                    uint256[] memory ids = _uint256ArrayMalloc(t.numNFTMints);
+                    Bitmap storage toOwned = $.owned[to];
+                    t.ownedUpTo = toAddressData.ownedUpTo;
+                    t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
+                    // Mint loop.
+                    do {
+                        uint256 id = t.nextTokenId;
+                        while (_get($.exists, id)) {
+                            id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
+                        }
+                        t.nextTokenId = _wrapNFTId(id + 1, maxId);
+                        _set($.exists, id, true);
+                        _set(toOwned, id, true);
+                        t.ownedUpTo = _max(t.ownedUpTo, id);
+                        _append(ids, id);
+                        _afterNFTTransfer(address(0), to, id);
+                    } while (--t.numNFTMints != 0);
 
-                toAddressData.ownedUpTo = uint32(ownedUpTo);
-                toAddressData.ownedCount = uint32(toEnd);
-                $.nextTokenId = uint32(nextTokenId);
-                _batchTransferEmit(address(0), to, ids);
-                if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, ids, data);
-                break;
+                    toAddressData.ownedUpTo = uint32(t.ownedUpTo);
+                    toAddressData.ownedCount = uint32(t.toEnd);
+                    $.nextTokenId = uint32(t.nextTokenId);
+                    _batchTransferEmit(address(0), to, ids);
+                    if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, ids, data);
+                }
             }
         }
         /// @solidity memory-safe-assembly
@@ -474,38 +474,38 @@ abstract contract DN69 {
             if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
             maxId = totalSupply_ / _unit();
         }
-        uint256 toEnd;
+        _DNMintTemps memory t;
         unchecked {
             uint256 toBalance = uint256(toAddressData.balance) + amount;
             toAddressData.balance = uint96(toBalance);
-            toEnd = toBalance / _unit();
+            t.toEnd = toBalance / _unit();
         }
         unchecked {
-            while (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                uint256 numNFTMints = _zeroFloorSub(toEnd, toAddressData.ownedCount);
-                if (numNFTMints == 0) break;
-                uint256[] memory ids = _uint256ArrayMalloc(numNFTMints);
-                Bitmap storage toOwned = $.owned[to];
-                uint256 ownedUpTo = toAddressData.ownedUpTo;
-                // Mint loop.
-                do {
-                    uint256 id = startId;
-                    while (_get($.exists, id)) {
-                        id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
-                    }
-                    startId = _wrapNFTId(id + 1, maxId);
-                    _set($.exists, id, true);
-                    _set(toOwned, id, true);
-                    ownedUpTo = _max(ownedUpTo, id);
-                    _append(ids, id);
-                    _afterNFTTransfer(address(0), to, id);
-                } while (--numNFTMints != 0);
+            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                t.numNFTMints = _zeroFloorSub(t.toEnd, toAddressData.ownedCount);
+                if (t.numNFTMints != 0) {
+                    uint256[] memory ids = _uint256ArrayMalloc(t.numNFTMints);
+                    Bitmap storage toOwned = $.owned[to];
+                    t.ownedUpTo = toAddressData.ownedUpTo;
+                    // Mint loop.
+                    do {
+                        uint256 id = startId;
+                        while (_get($.exists, id)) {
+                            id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
+                        }
+                        startId = _wrapNFTId(id + 1, maxId);
+                        _set($.exists, id, true);
+                        _set(toOwned, id, true);
+                        t.ownedUpTo = _max(t.ownedUpTo, id);
+                        _append(ids, id);
+                        _afterNFTTransfer(address(0), to, id);
+                    } while (--t.numNFTMints != 0);
 
-                toAddressData.ownedUpTo = uint32(ownedUpTo);
-                toAddressData.ownedCount = uint32(toEnd);
-                _batchTransferEmit(address(0), to, ids);
-                if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, ids, data);
-                break;
+                    toAddressData.ownedUpTo = uint32(t.ownedUpTo);
+                    toAddressData.ownedCount = uint32(t.toEnd);
+                    _batchTransferEmit(address(0), to, ids);
+                    if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, ids, data);
+                }
             }
         }
         /// @solidity memory-safe-assembly
@@ -670,24 +670,24 @@ abstract contract DN69 {
                 Bitmap storage toOwned = $.owned[to];
                 toAddressData.ownedCount = uint32(t.toOwnedCount + n);
                 uint256 maxId = $.totalSupply / _unit();
-                uint256 nextTokenId = _wrapNFTId($.nextTokenId, maxId);
-                uint256 ownedUpTo = toAddressData.ownedUpTo;
+                t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
+                t.ownedUpTo = toAddressData.ownedUpTo;
                 // Mint loop.
                 do {
-                    uint256 id = nextTokenId;
+                    uint256 id = t.nextTokenId;
                     while (_get($.exists, id)) {
                         id = _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId);
                     }
-                    nextTokenId = _wrapNFTId(id + 1, maxId);
+                    t.nextTokenId = _wrapNFTId(id + 1, maxId);
                     _set($.exists, id, true);
                     _set(toOwned, id, true);
-                    ownedUpTo = _max(ownedUpTo, id);
+                    t.ownedUpTo = _max(t.ownedUpTo, id);
                     _append(t.mintIds, id);
                     _afterNFTTransfer(address(0), to, id);
                 } while (--n != 0);
 
-                toAddressData.ownedUpTo = uint32(ownedUpTo);
-                $.nextTokenId = uint32(nextTokenId);
+                toAddressData.ownedUpTo = uint32(t.ownedUpTo);
+                $.nextTokenId = uint32(t.nextTokenId);
                 _batchTransferEmit(address(0), to, t.mintIds);
             }
         }
@@ -1390,12 +1390,22 @@ abstract contract DN69 {
         }
     }
 
+    /// @dev Struct of temporary variables for mints.
+    struct _DNMintTemps {
+        uint256 toEnd;
+        uint256 numNFTMints;
+        uint256 nextTokenId;
+        uint256 ownedUpTo;
+    }
+
     /// @dev Struct of temporary variables for transfers.
     struct _DNTransferTemps {
         uint256 numNFTBurns;
         uint256 numNFTMints;
         uint256 fromOwnedCount;
         uint256 toOwnedCount;
+        uint256 nextTokenId;
+        uint256 ownedUpTo;
         uint256[] directIds;
         uint256[] mintIds;
     }
