@@ -49,6 +49,9 @@ abstract contract DN404 {
     /// @dev Thrown when attempting to double-initialize the contract.
     error DNAlreadyInitialized();
 
+    /// @dev The function can only be called after the contract has been initialized.
+    error DNNotInitialized();
+
     /// @dev Thrown when attempting to transfer or burn more tokens than sender's balance.
     error InsufficientBalance();
 
@@ -417,7 +420,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         _DNMintTemps memory t;
         unchecked {
@@ -496,7 +499,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         _DNMintTemps memory t;
         unchecked {
@@ -568,7 +571,7 @@ abstract contract DN404 {
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
@@ -642,24 +645,26 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         _DNTransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
-        t.totalSupply = $.totalSupply;
-
-        if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
 
         unchecked {
-            fromAddressData.balance = uint96(t.fromBalance -= amount);
-            toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
+            {
+                uint256 fromBalance = fromAddressData.balance;
+                if (amount > fromBalance) revert InsufficientBalance();
+                fromAddressData.balance = uint96(fromBalance -= amount);
 
-            t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _unit());
+                uint256 toBalance = uint256(toAddressData.balance) + amount;
+                toAddressData.balance = uint96(toBalance);
+                t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, fromBalance / _unit());
 
-            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
-                t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedLength);
+                if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                    if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
+                    t.numNFTMints = _zeroFloorSub(toBalance / _unit(), t.toOwnedLength);
+                }
             }
 
             while (_useDirectTransfersIfPossible()) {
@@ -704,7 +709,7 @@ abstract contract DN404 {
             t.burnedPoolTail = $.burnedPoolTail;
             if (t.numNFTBurns != 0) {
                 _packedLogsSet(packedLogs, from, 1);
-                bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
+                bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, $.totalSupply);
                 Uint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
                 fromAddressData.ownedLength = uint32(t.fromEnd = fromIndex - t.numNFTBurns);
@@ -730,7 +735,7 @@ abstract contract DN404 {
                 _packedLogsSet(packedLogs, to, 0);
                 Uint32Map storage toOwned = $.owned[to];
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxId = t.totalSupply / _unit();
+                uint256 maxId = $.totalSupply / _unit();
                 t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                 uint256 toIndex = t.toOwnedLength;
                 toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
@@ -789,7 +794,7 @@ abstract contract DN404 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         Uint32Map storage oo = $.oo;
 
@@ -1033,7 +1038,8 @@ abstract contract DN404 {
         _ref(_getDN404Storage().operatorApprovals, msgSender, operator).value = _toUint(approved);
     }
 
-    /// @dev Returns the NFT IDs of `owner` in range `[begin, end)`.
+    /// @dev Returns the NFT IDs of `owner` in the range `[begin..end)` (exclusive of `end`).
+    /// `begin` and `end` are indices in the owner's token ID array, not the entire token range.
     /// Optimized for smaller bytecode size, as this function is intended for off-chain calling.
     function _ownedIds(address owner, uint256 begin, uint256 end)
         internal
@@ -1043,12 +1049,12 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
         Uint32Map storage owned = $.owned[owner];
-        uint256 n = _min($.addressData[owner].ownedLength, end);
+        end = _min($.addressData[owner].ownedLength, end);
         /// @solidity memory-safe-assembly
         assembly {
             ids := mload(0x40)
             let i := begin
-            for {} lt(i, n) { i := add(i, 1) } {
+            for {} lt(i, end) { i := add(i, 1) } {
                 let s := add(shl(96, owned.slot), shr(3, i)) // Storage slot.
                 let id := and(0xffffffff, shr(shl(5, and(i, 7)), sload(s)))
                 mstore(add(add(ids, 0x20), shl(5, sub(i, begin))), id) // Append to.
@@ -1453,11 +1459,8 @@ abstract contract DN404 {
     struct _DNTransferTemps {
         uint256 numNFTBurns;
         uint256 numNFTMints;
-        uint256 fromBalance;
-        uint256 toBalance;
         uint256 fromOwnedLength;
         uint256 toOwnedLength;
-        uint256 totalSupply;
         uint256 totalNFTSupply;
         uint256 fromEnd;
         uint256 toEnd;
