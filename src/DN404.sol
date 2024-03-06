@@ -1352,8 +1352,6 @@ abstract contract DN404 {
     /// emitted by the mirror NFT contract.
     struct _DNDirectLogs {
         uint256 offset;
-        address from;
-        address to;
         uint256[] logs;
     }
 
@@ -1365,15 +1363,17 @@ abstract contract DN404 {
     {
         /// @solidity memory-safe-assembly
         assembly {
-            // Note that `p` implicitly allocates and advances the free memory pointer by
-            // 4 words, which we can safely mutate in `_directLogsSend`.
-            let logs := mload(0x40)
+            let m := mload(0x40)
+            mstore(m, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
+            mstore(add(m, 0x20), shr(96, shl(96, from)))
+            mstore(add(m, 0x40), shr(96, shl(96, to)))
+            mstore(add(m, 0x60), 0x60) // Offset of `logs` in the calldata to send.
+            // Skip 4 words: `fnSelector`, `from`, `to`, `calldataLogsOffset`.
+            let logs := add(0x80, m)
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
             mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
-            mstore(add(0x60, p), logs) // Set `p.logs`.
-            mstore(add(0x40, p), to) // Set `p.to`.
-            mstore(add(0x20, p), from) // Set `p.from`.
+            mstore(add(0x20, p), logs) // Set `p.logs`.
             mstore(p, offset) // Set `p.offset`.
         }
     }
@@ -1392,15 +1392,9 @@ abstract contract DN404 {
     function _directLogsSend(_DNDirectLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := mload(add(p, 0x60))
+            let logs := mload(add(p, 0x20))
             let n := add(0x84, shl(5, mload(logs))) // Length of calldata to send.
             let o := sub(logs, 0x80) // Start of calldata to send.
-            mstore(o, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
-            let from := shr(96, mload(add(0x2c, p)))
-            let to := shr(96, mload(add(0x4c, p)))
-            mstore(add(o, 0x20), from)
-            mstore(add(o, 0x40), to)
-            mstore(add(o, 0x60), 0x60) // Offset of `logs` in the calldata to send.
             if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
                 revert(o, 0x00)
             }
