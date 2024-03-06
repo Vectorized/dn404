@@ -1396,8 +1396,8 @@ abstract contract DN404 {
             let n := add(0x84, shl(5, mload(logs))) // Length of calldata to send.
             let o := sub(logs, 0x80) // Start of calldata to send.
             mstore(o, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
-            let from := mload(add(0x20, p))
-            let to := mload(add(0x40, p))
+            let from := shr(96, mload(add(0x2c, p)))
+            let to := shr(96, mload(add(0x4c, p)))
             mstore(add(o, 0x20), from)
             mstore(add(o, 0x40), to)
             mstore(add(o, 0x60), 0x60) // Offset of `logs` in the calldata to send.
