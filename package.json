@@ -1,7 +1,7 @@
 {
   "name": "dn404",
   "license": "MIT",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Implementation of a co-joined ERC20 and ERC721 pair.",
   "files": [
     "src/**/*.sol"
