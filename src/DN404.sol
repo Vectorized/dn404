@@ -1095,7 +1095,6 @@ abstract contract DN404 {
         }
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             Uint256Ref storage ref = _ref(
                 $.operatorApprovals,
                 address(uint160(_calldataload(0x04))), // `owner`.
@@ -1105,12 +1104,10 @@ abstract contract DN404 {
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_ownerOf(_calldataload(0x04))));
         }
         // `ownerAt(uint256)`.
         if (fnSelector == 0x24359879) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_ownerAt(_calldataload(0x04))));
         }
         // `approveNFT(address,uint256,address)`.
@@ -1125,17 +1122,14 @@ abstract contract DN404 {
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_getApproved(_calldataload(0x04))));
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_balanceOfNFT(address(uint160(_calldataload(0x04)))));
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_totalNFTSupply());
         }
         // `tokenURI(uint256)`.
