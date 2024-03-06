@@ -49,6 +49,9 @@ abstract contract DN404 {
     /// @dev Thrown when attempting to double-initialize the contract.
     error DNAlreadyInitialized();
 
+    /// @dev The function can only be called after the contract has been initialized.
+    error DNNotInitialized();
+
     /// @dev Thrown when attempting to transfer or burn more tokens than sender's balance.
     error InsufficientBalance();
 
@@ -265,7 +268,7 @@ abstract contract DN404 {
     function symbol() public view virtual returns (string memory);
 
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id`.
-    function tokenURI(uint256 id) public view virtual returns (string memory);
+    function _tokenURI(uint256 id) internal view virtual returns (string memory);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                       CONFIGURABLES                        */
@@ -417,7 +420,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         _DNMintTemps memory t;
         unchecked {
@@ -457,7 +460,7 @@ abstract contract DN404 {
                             id = t.nextTokenId;
                             while (_get(oo, _ownershipIndex(id)) != 0) {
                                 id = _useExistsLookup()
-                                    ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                    ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
                                     : _wrapNFTId(id + 1, maxId);
                             }
                             t.nextTokenId = _wrapNFTId(id + 1, maxId);
@@ -496,7 +499,7 @@ abstract contract DN404 {
 
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         _DNMintTemps memory t;
         unchecked {
@@ -532,7 +535,7 @@ abstract contract DN404 {
                         uint256 id = startId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
                             id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
                                 : _wrapNFTId(id + 1, maxId);
                         }
                         startId = _wrapNFTId(id + 1, maxId);
@@ -568,7 +571,7 @@ abstract contract DN404 {
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         uint256 fromBalance = fromAddressData.balance;
         if (amount > fromBalance) revert InsufficientBalance();
@@ -642,24 +645,26 @@ abstract contract DN404 {
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         _DNTransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
         t.toOwnedLength = toAddressData.ownedLength;
-        t.totalSupply = $.totalSupply;
-
-        if (amount > (t.fromBalance = fromAddressData.balance)) revert InsufficientBalance();
 
         unchecked {
-            fromAddressData.balance = uint96(t.fromBalance -= amount);
-            toAddressData.balance = uint96(t.toBalance = uint256(toAddressData.balance) + amount);
+            {
+                uint256 fromBalance = fromAddressData.balance;
+                if (amount > fromBalance) revert InsufficientBalance();
+                fromAddressData.balance = uint96(fromBalance -= amount);
 
-            t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, t.fromBalance / _unit());
+                uint256 toBalance = uint256(toAddressData.balance) + amount;
+                toAddressData.balance = uint96(toBalance);
+                t.numNFTBurns = _zeroFloorSub(t.fromOwnedLength, fromBalance / _unit());
 
-            if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
-                if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
-                t.numNFTMints = _zeroFloorSub(t.toBalance / _unit(), t.toOwnedLength);
+                if (toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG == 0) {
+                    if (from == to) t.toOwnedLength = t.fromOwnedLength - t.numNFTBurns;
+                    t.numNFTMints = _zeroFloorSub(toBalance / _unit(), t.toOwnedLength);
+                }
             }
 
             while (_useDirectTransfersIfPossible()) {
@@ -704,7 +709,7 @@ abstract contract DN404 {
             t.burnedPoolTail = $.burnedPoolTail;
             if (t.numNFTBurns != 0) {
                 _packedLogsSet(packedLogs, from, 1);
-                bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, t.totalSupply);
+                bool addToBurnedPool = _addToBurnedPool(t.totalNFTSupply, $.totalSupply);
                 Uint32Map storage fromOwned = $.owned[from];
                 uint256 fromIndex = t.fromOwnedLength;
                 fromAddressData.ownedLength = uint32(t.fromEnd = fromIndex - t.numNFTBurns);
@@ -730,7 +735,7 @@ abstract contract DN404 {
                 _packedLogsSet(packedLogs, to, 0);
                 Uint32Map storage toOwned = $.owned[to];
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxId = t.totalSupply / _unit();
+                uint256 maxId = $.totalSupply / _unit();
                 t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
                 uint256 toIndex = t.toOwnedLength;
                 toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
@@ -744,7 +749,7 @@ abstract contract DN404 {
                         id = t.nextTokenId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
                             id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId + 1), maxId)
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
                                 : _wrapNFTId(id + 1, maxId);
                         }
                         t.nextTokenId = _wrapNFTId(id + 1, maxId);
@@ -789,7 +794,7 @@ abstract contract DN404 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert();
+        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
 
         Uint32Map storage oo = $.oo;
 
@@ -1033,7 +1038,8 @@ abstract contract DN404 {
         _ref(_getDN404Storage().operatorApprovals, msgSender, operator).value = _toUint(approved);
     }
 
-    /// @dev Returns the NFT IDs of `owner` in range `[begin, end)`.
+    /// @dev Returns the NFT IDs of `owner` in the range `[begin..end)` (exclusive of `end`).
+    /// `begin` and `end` are indices in the owner's token ID array, not the entire token range.
     /// Optimized for smaller bytecode size, as this function is intended for off-chain calling.
     function _ownedIds(address owner, uint256 begin, uint256 end)
         internal
@@ -1043,12 +1049,12 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
         Uint32Map storage owned = $.owned[owner];
-        uint256 n = _min($.addressData[owner].ownedLength, end);
+        end = _min($.addressData[owner].ownedLength, end);
         /// @solidity memory-safe-assembly
         assembly {
             ids := mload(0x40)
             let i := begin
-            for {} lt(i, n) { i := add(i, 1) } {
+            for {} lt(i, end) { i := add(i, 1) } {
                 let s := add(shl(96, owned.slot), shr(3, i)) // Storage slot.
                 let id := and(0xffffffff, shr(shl(5, and(i, 7)), sload(s)))
                 mstore(add(add(ids, 0x20), shl(5, sub(i, begin))), id) // Append to.
@@ -1064,11 +1070,10 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
-        address mirror = $.mirrorERC721;
 
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _transferFromNFT(
                 address(uint160(_calldataload(0x04))), // `from`.
                 address(uint160(_calldataload(0x24))), // `to`.
@@ -1079,7 +1084,7 @@ abstract contract DN404 {
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _setApprovalForAll(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24) != 0, // `status`.
@@ -1089,7 +1094,6 @@ abstract contract DN404 {
         }
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             Uint256Ref storage ref = _ref(
                 $.operatorApprovals,
                 address(uint160(_calldataload(0x04))), // `owner`.
@@ -1099,17 +1103,15 @@ abstract contract DN404 {
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_ownerOf(_calldataload(0x04))));
         }
         // `ownerAt(uint256)`.
         if (fnSelector == 0x24359879) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_ownerAt(_calldataload(0x04))));
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             address owner = _approveNFT(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24), // `id`.
@@ -1119,18 +1121,30 @@ abstract contract DN404 {
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_getApproved(_calldataload(0x04))));
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_balanceOfNFT(address(uint160(_calldataload(0x04)))));
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_totalNFTSupply());
+        }
+        // `tokenURI(uint256)`.
+        if (fnSelector == 0xc87b56dd) {
+            /// @solidity memory-safe-assembly
+            assembly {
+                mstore(0x40, add(mload(0x40), 0x20))
+            }
+            string memory uri = _tokenURI(_calldataload(0x04));
+            /// @solidity memory-safe-assembly
+            assembly {
+                // Memory safe, as we've advanced the free memory pointer by a word.
+                let o := sub(uri, 0x20)
+                mstore(o, 0x20) // Store the offset of `uri`.
+                return(o, add(0x60, mload(uri)))
+            }
         }
         // `implementsDN404()`.
         if (fnSelector == 0xb7a94eb8) {
@@ -1228,9 +1242,9 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
-    /// If no unset bit is found, returns `type(uint256).max`.
-    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+    /// @dev Returns the index of the least significant unset bit in `[begin..upTo]`.
+    /// If no set bit is found, returns `type(uint256).max`.
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 upTo)
         internal
         view
         returns (uint256 unsetBitIndex)
@@ -1242,14 +1256,14 @@ abstract contract DN404 {
             let bucket := add(s, shr(8, begin))
             let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
-                let lastBucket := add(s, shr(8, end))
+                let lastBucket := add(s, shr(8, upTo))
                 for {} 1 {} {
                     bucket := add(bucket, 1)
                     negBits := not(sload(bucket))
                     if or(negBits, gt(bucket, lastBucket)) { break }
                 }
                 if gt(bucket, lastBucket) {
-                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
+                    negBits := shr(and(0xff, not(upTo)), shl(and(0xff, not(upTo)), negBits))
                 }
             }
             if negBits {
@@ -1263,7 +1277,7 @@ abstract contract DN404 {
                 r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
                     0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
                 r := or(shl(8, sub(bucket, s)), r)
-                unsetBitIndex := or(r, sub(0, or(iszero(lt(r, end)), lt(r, begin))))
+                unsetBitIndex := or(r, sub(0, or(gt(r, upTo), lt(r, begin))))
             }
         }
     }
@@ -1338,8 +1352,6 @@ abstract contract DN404 {
     /// emitted by the mirror NFT contract.
     struct _DNDirectLogs {
         uint256 offset;
-        address from;
-        address to;
         uint256[] logs;
     }
 
@@ -1351,15 +1363,17 @@ abstract contract DN404 {
     {
         /// @solidity memory-safe-assembly
         assembly {
-            // Note that `p` implicitly allocates and advances the free memory pointer by
-            // 4 words, which we can safely mutate in `_directLogsSend`.
-            let logs := mload(0x40)
+            let m := mload(0x40)
+            mstore(m, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
+            mstore(add(m, 0x20), shr(96, shl(96, from)))
+            mstore(add(m, 0x40), shr(96, shl(96, to)))
+            mstore(add(m, 0x60), 0x60) // Offset of `logs` in the calldata to send.
+            // Skip 4 words: `fnSelector`, `from`, `to`, `calldataLogsOffset`.
+            let logs := add(0x80, m)
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
             mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
-            mstore(add(0x60, p), logs) // Set `p.logs`.
-            mstore(add(0x40, p), to) // Set `p.to`.
-            mstore(add(0x20, p), from) // Set `p.from`.
+            mstore(add(0x20, p), logs) // Set `p.logs`.
             mstore(p, offset) // Set `p.offset`.
         }
     }
@@ -1378,15 +1392,9 @@ abstract contract DN404 {
     function _directLogsSend(_DNDirectLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := mload(add(p, 0x60))
+            let logs := mload(add(p, 0x20))
             let n := add(0x84, shl(5, mload(logs))) // Length of calldata to send.
             let o := sub(logs, 0x80) // Start of calldata to send.
-            mstore(o, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
-            let from := mload(add(0x20, p))
-            let to := mload(add(0x40, p))
-            mstore(add(o, 0x20), from)
-            mstore(add(o, 0x40), to)
-            mstore(add(o, 0x60), 0x60) // Offset of `logs` in the calldata to send.
             if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
                 revert(o, 0x00)
             }
@@ -1453,11 +1461,8 @@ abstract contract DN404 {
     struct _DNTransferTemps {
         uint256 numNFTBurns;
         uint256 numNFTMints;
-        uint256 fromBalance;
-        uint256 toBalance;
         uint256 fromOwnedLength;
         uint256 toOwnedLength;
-        uint256 totalSupply;
         uint256 totalNFTSupply;
         uint256 fromEnd;
         uint256 toEnd;

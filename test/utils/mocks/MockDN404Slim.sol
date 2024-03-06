@@ -12,7 +12,7 @@ contract MockDN404Slim is DN404 {
         return "symbol";
     }
 
-    function tokenURI(uint256) public view virtual override returns (string memory) {
+    function _tokenURI(uint256) internal view virtual override returns (string memory) {
         return "";
     }
 

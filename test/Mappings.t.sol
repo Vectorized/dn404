@@ -126,9 +126,9 @@ contract MappingsTest is SoladyTest {
         }
     }
 
-    /// @dev Returns the index of the least significant unset bit in `[begin, end)`.
+    /// @dev Returns the index of the least significant unset bit in `[begin..upTo]`.
     /// If no set bit is found, returns `type(uint256).max`.
-    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 end)
+    function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 upTo)
         internal
         view
         returns (uint256 unsetBitIndex)
@@ -138,7 +138,7 @@ contract MappingsTest is SoladyTest {
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
             let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
             let bucket := add(s, shr(8, begin))
-            let lastBucket := add(s, shr(8, end))
+            let lastBucket := add(s, shr(8, upTo))
             let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
                 for {} 1 {} {
@@ -147,7 +147,7 @@ contract MappingsTest is SoladyTest {
                     if or(negBits, gt(bucket, lastBucket)) { break }
                 }
                 if gt(bucket, lastBucket) {
-                    negBits := shr(and(0xff, not(end)), shl(and(0xff, not(end)), negBits))
+                    negBits := shr(and(0xff, not(upTo)), shl(and(0xff, not(upTo)), negBits))
                 }
             }
             if negBits {
@@ -161,7 +161,7 @@ contract MappingsTest is SoladyTest {
                 r := or(r, byte(and(div(0xd76453e0, shr(r, b)), 0x1f),
                     0x001f0d1e100c1d070f090b19131c1706010e11080a1a141802121b1503160405))
                 r := or(shl(8, sub(bucket, s)), r)
-                unsetBitIndex := or(r, sub(0, or(iszero(lt(r, end)), lt(r, begin))))
+                unsetBitIndex := or(r, sub(0, or(gt(r, upTo), lt(r, begin))))
             }
         }
     }
@@ -186,13 +186,15 @@ contract MappingsTest is SoladyTest {
         assertEq(_findFirstUnset(bitmapA, 0, 1000), 257);
 
         assertEq(_findFirstUnset(bitmapB, 500, 1000), 500);
-        _fillBucket(bitmapB, 1); // Set bits `[256, 512)`.
+        _fillBucket(bitmapB, 1); // Set bits `[256..511]`.
         assertEq(_findFirstUnset(bitmapB, 500, 1000), 512);
         assertEq(_findFirstUnset(bitmapB, 500, 513), 512);
-        assertEq(_findFirstUnset(bitmapB, 500, 512), type(uint256).max);
-        assertEq(_findFirstUnset(bitmapB, 256, 512), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 500, 512), 512);
+        assertEq(_findFirstUnset(bitmapB, 500, 511), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 256, 512), 512);
+        assertEq(_findFirstUnset(bitmapB, 256, 511), type(uint256).max);
         assertEq(_findFirstUnset(bitmapB, 255, 512), 255);
-        assertEq(_findFirstUnset(bitmapB, 255, 255), type(uint256).max);
+        assertEq(_findFirstUnset(bitmapB, 255, 255), 255);
         assertEq(_findFirstUnset(bitmapB, 255, 254), type(uint256).max);
     }
 
@@ -229,20 +231,20 @@ contract MappingsTest is SoladyTest {
             }
             do {
                 uint256 begin = _random() % (1024 + 10);
-                uint256 end = _random() % (1024 + 10);
-                uint256 actual = _findFirstUnset(bitmapA, begin, end);
-                uint256 expected = _findFirstUnset(m, begin, end);
+                uint256 upTo = _random() % (1024 + 10);
+                uint256 actual = _findFirstUnset(bitmapA, begin, upTo);
+                uint256 expected = _findFirstUnset(m, begin, upTo);
                 assertEq(actual, expected);
             } while (_random() % 16 > 0);
         } while (_random() % 2 == 0);
     }
 
-    function _findFirstUnset(uint256[] memory m, uint256 begin, uint256 end)
+    function _findFirstUnset(uint256[] memory m, uint256 begin, uint256 upTo)
         internal
         pure
         returns (uint256)
     {
-        for (uint256 i = begin; i < end; ++i) {
+        for (uint256 i = begin; i <= upTo; ++i) {
             if ((m[i >> 8] >> (i & 0xff)) & 1 == 0) return i;
         }
         return type(uint256).max;
@@ -423,6 +425,48 @@ contract MappingsTest is SoladyTest {
         /// @solidity memory-safe-assembly
         assembly {
             result := or(0xf348aeebbad597df99cf9f4f0000000000000000000000000000000000000000, a)
+        }
+    }
+
+    function testStorageSlotsNoCollision(uint256 slot0, uint256 slot1, uint256 i0, uint256 i1)
+        public
+    {
+        while (true) {
+            slot0 = _bound(slot0, 1, type(uint96).max);
+            slot1 = _bound(slot1, 1, type(uint96).max);
+            if (slot0 != slot1) break;
+            slot0 = _random();
+            slot1 = _random();
+        }
+
+        i0 = _getRandomIndex(i0);
+        i1 = _getRandomIndex(i1);
+
+        uint256 shift0 = _bound(_random(), 1, 10);
+        uint256 shift1 = _bound(_random(), 1, 10);
+
+        /// @solidity memory-safe-assembly
+        assembly {
+            let finalSlot0 := add(shl(96, slot0), shr(shift0, i0))
+            let finalSlot1 := add(shl(96, slot1), shr(shift1, i1))
+            if eq(finalSlot1, finalSlot0) { revert(0x00, 0x00) }
+        }
+    }
+
+    function _getRandomIndex(uint256 i) internal returns (uint256) {
+        unchecked {
+            uint256 r = _random();
+            if ((r & 0xf) == 0) {
+                return type(uint256).max - _random() % 8;
+            }
+            if (((r >> 16) & 0xf) == 0) {
+                uint256 modulus = 1 << (_random() % 32 + 1);
+                return type(uint256).max - _random() % modulus;
+            }
+            if (((r >> 24) & 0xf) == 0) {
+                return _bound(i, 0, type(uint32).max);
+            }
+            return _bound(i, 0, type(uint40).max);
         }
     }
 }

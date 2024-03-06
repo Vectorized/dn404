@@ -35,7 +35,7 @@ contract MockDN404 is DN404 {
         return _symbol;
     }
 
-    function tokenURI(uint256 id) public view virtual override returns (string memory) {
+    function _tokenURI(uint256 id) internal view virtual override returns (string memory) {
         return string(abi.encodePacked(_baseURI, id));
     }
 
@@ -144,6 +144,25 @@ contract MockDN404 is DN404 {
         returns (uint256[] memory)
     {
         return _ownedIds(owner, start, end);
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal virtual override {
+        DN404._transfer(_brutalized(from), _brutalized(to), amount);
+    }
+
+    function _transferFromNFT(address from, address to, uint256 id, address msgSender)
+        internal
+        virtual
+        override
+    {
+        DN404._transferFromNFT(_brutalized(from), _brutalized(to), id, _brutalized(msgSender));
+    }
+
+    function _brutalized(address a) internal pure returns (address result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := or(0xf348aeebbad597df99cf9f4f0000000000000000000000000000000000000000, a)
+        }
     }
 
     function _afterNFTTransfer(address from, address to, uint256 id) internal virtual override {
