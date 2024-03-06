@@ -18,7 +18,7 @@ contract MockDN404OnlyERC20 is DN404 {
         return "SYMBOL";
     }
 
-    function tokenURI(uint256) public view virtual override returns (string memory) {
+    function _tokenURI(uint256) internal view virtual override returns (string memory) {
         return "";
     }
 

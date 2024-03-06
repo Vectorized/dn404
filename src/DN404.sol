@@ -268,7 +268,7 @@ abstract contract DN404 {
     function symbol() public view virtual returns (string memory);
 
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id`.
-    function tokenURI(uint256 id) public view virtual returns (string memory);
+    function _tokenURI(uint256 id) internal view virtual returns (string memory);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                       CONFIGURABLES                        */
@@ -1137,6 +1137,20 @@ abstract contract DN404 {
         if (fnSelector == 0xe2c79281) {
             if (msg.sender != mirror) revert SenderNotMirror();
             _return(_totalNFTSupply());
+        }
+        // `tokenURI(uint256)`.
+        if (fnSelector == 0xc87b56dd) {
+            /// @solidity memory-safe-assembly
+            assembly {
+                mstore(0x40, add(mload(0x40), 0x20))
+            }
+            string memory uri = _tokenURI(_calldataload(0x04));
+            /// @solidity memory-safe-assembly
+            assembly {
+                let o := sub(uri, 0x20)
+                mstore(o, 0x20)
+                return(o, add(0x60, mload(uri)))
+            }
         }
         // `implementsDN404()`.
         if (fnSelector == 0xb7a94eb8) {

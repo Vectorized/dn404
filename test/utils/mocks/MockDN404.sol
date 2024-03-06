@@ -35,7 +35,7 @@ contract MockDN404 is DN404 {
         return _symbol;
     }
 
-    function tokenURI(uint256 id) public view virtual override returns (string memory) {
+    function _tokenURI(uint256 id) internal view virtual override returns (string memory) {
         return string(abi.encodePacked(_baseURI, id));
     }
 
