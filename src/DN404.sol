@@ -268,7 +268,7 @@ abstract contract DN404 {
     function symbol() public view virtual returns (string memory);
 
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id`.
-    function tokenURI(uint256 id) public view virtual returns (string memory);
+    function _tokenURI(uint256 id) internal view virtual returns (string memory);
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                       CONFIGURABLES                        */
@@ -1070,11 +1070,10 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
-        address mirror = $.mirrorERC721;
 
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _transferFromNFT(
                 address(uint160(_calldataload(0x04))), // `from`.
                 address(uint160(_calldataload(0x24))), // `to`.
@@ -1085,7 +1084,7 @@ abstract contract DN404 {
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _setApprovalForAll(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24) != 0, // `status`.
@@ -1095,7 +1094,6 @@ abstract contract DN404 {
         }
         // `isApprovedForAll(address,address)`.
         if (fnSelector == 0xe985e9c5) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             Uint256Ref storage ref = _ref(
                 $.operatorApprovals,
                 address(uint160(_calldataload(0x04))), // `owner`.
@@ -1105,17 +1103,15 @@ abstract contract DN404 {
         }
         // `ownerOf(uint256)`.
         if (fnSelector == 0x6352211e) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_ownerOf(_calldataload(0x04))));
         }
         // `ownerAt(uint256)`.
         if (fnSelector == 0x24359879) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_ownerAt(_calldataload(0x04))));
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             address owner = _approveNFT(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24), // `id`.
@@ -1125,18 +1121,30 @@ abstract contract DN404 {
         }
         // `getApproved(uint256)`.
         if (fnSelector == 0x081812fc) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(uint160(_getApproved(_calldataload(0x04))));
         }
         // `balanceOfNFT(address)`.
         if (fnSelector == 0xf5b100ea) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_balanceOfNFT(address(uint160(_calldataload(0x04)))));
         }
         // `totalNFTSupply()`.
         if (fnSelector == 0xe2c79281) {
-            if (msg.sender != mirror) revert SenderNotMirror();
             _return(_totalNFTSupply());
+        }
+        // `tokenURI(uint256)`.
+        if (fnSelector == 0xc87b56dd) {
+            /// @solidity memory-safe-assembly
+            assembly {
+                mstore(0x40, add(mload(0x40), 0x20))
+            }
+            string memory uri = _tokenURI(_calldataload(0x04));
+            /// @solidity memory-safe-assembly
+            assembly {
+                // Memory safe, as we've advanced the free memory pointer by a word.
+                let o := sub(uri, 0x20)
+                mstore(o, 0x20) // Store the offset of `uri`.
+                return(o, add(0x60, mload(uri)))
+            }
         }
         // `implementsDN404()`.
         if (fnSelector == 0xb7a94eb8) {
@@ -1344,8 +1352,6 @@ abstract contract DN404 {
     /// emitted by the mirror NFT contract.
     struct _DNDirectLogs {
         uint256 offset;
-        address from;
-        address to;
         uint256[] logs;
     }
 
@@ -1357,15 +1363,17 @@ abstract contract DN404 {
     {
         /// @solidity memory-safe-assembly
         assembly {
-            // Note that `p` implicitly allocates and advances the free memory pointer by
-            // 4 words, which we can safely mutate in `_directLogsSend`.
-            let logs := mload(0x40)
+            let m := mload(0x40)
+            mstore(m, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
+            mstore(add(m, 0x20), shr(96, shl(96, from)))
+            mstore(add(m, 0x40), shr(96, shl(96, to)))
+            mstore(add(m, 0x60), 0x60) // Offset of `logs` in the calldata to send.
+            // Skip 4 words: `fnSelector`, `from`, `to`, `calldataLogsOffset`.
+            let logs := add(0x80, m)
             mstore(logs, n) // Store the length.
             let offset := add(0x20, logs) // Skip the word for `p.logs.length`.
             mstore(0x40, add(offset, shl(5, n))) // Allocate memory.
-            mstore(add(0x60, p), logs) // Set `p.logs`.
-            mstore(add(0x40, p), to) // Set `p.to`.
-            mstore(add(0x20, p), from) // Set `p.from`.
+            mstore(add(0x20, p), logs) // Set `p.logs`.
             mstore(p, offset) // Set `p.offset`.
         }
     }
@@ -1384,15 +1392,9 @@ abstract contract DN404 {
     function _directLogsSend(_DNDirectLogs memory p, address mirror) private {
         /// @solidity memory-safe-assembly
         assembly {
-            let logs := mload(add(p, 0x60))
+            let logs := mload(add(p, 0x20))
             let n := add(0x84, shl(5, mload(logs))) // Length of calldata to send.
             let o := sub(logs, 0x80) // Start of calldata to send.
-            mstore(o, 0x144027d3) // `logDirectTransfer(address,address,uint256[])`.
-            let from := mload(add(0x20, p))
-            let to := mload(add(0x40, p))
-            mstore(add(o, 0x20), from)
-            mstore(add(o, 0x40), to)
-            mstore(add(o, 0x60), 0x60) // Offset of `logs` in the calldata to send.
             if iszero(and(eq(mload(o), 1), call(gas(), mirror, 0, add(o, 0x1c), n, o, 0x20))) {
                 revert(o, 0x00)
             }
