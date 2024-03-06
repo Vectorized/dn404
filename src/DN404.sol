@@ -1140,8 +1140,9 @@ abstract contract DN404 {
             string memory uri = _tokenURI(_calldataload(0x04));
             /// @solidity memory-safe-assembly
             assembly {
+                // Memory safe, as we've advanced the free memory pointer by a word.
                 let o := sub(uri, 0x20)
-                mstore(o, 0x20)
+                mstore(o, 0x20) // Store the offset of `uri`.
                 return(o, add(0x60, mload(uri)))
             }
         }
