@@ -1070,11 +1070,10 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
 
         uint256 fnSelector = _calldataload(0x00) >> 224;
-        address mirror = $.mirrorERC721;
 
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _transferFromNFT(
                 address(uint160(_calldataload(0x04))), // `from`.
                 address(uint160(_calldataload(0x24))), // `to`.
@@ -1085,7 +1084,7 @@ abstract contract DN404 {
         }
         // `setApprovalForAll(address,bool,address)`.
         if (fnSelector == 0x813500fc) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _setApprovalForAll(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24) != 0, // `status`.
@@ -1112,7 +1111,7 @@ abstract contract DN404 {
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != mirror) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             address owner = _approveNFT(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24), // `id`.
