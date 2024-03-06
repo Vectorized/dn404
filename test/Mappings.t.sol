@@ -427,4 +427,46 @@ contract MappingsTest is SoladyTest {
             result := or(0xf348aeebbad597df99cf9f4f0000000000000000000000000000000000000000, a)
         }
     }
+
+    function testStorageSlotsNoCollision(uint256 slot0, uint256 slot1, uint256 i0, uint256 i1)
+        public
+    {
+        while (true) {
+            slot0 = _bound(slot0, 1, type(uint96).max);
+            slot1 = _bound(slot1, 1, type(uint96).max);
+            if (slot0 != slot1) break;
+            slot0 = _random();
+            slot1 = _random();
+        }
+
+        i0 = _getRandomIndex(i0);
+        i1 = _getRandomIndex(i1);
+
+        uint256 shift0 = _bound(_random(), 1, 10);
+        uint256 shift1 = _bound(_random(), 1, 10);
+
+        /// @solidity memory-safe-assembly
+        assembly {
+            let finalSlot0 := add(shl(96, slot0), shr(shift0, i0))
+            let finalSlot1 := add(shl(96, slot1), shr(shift1, i1))
+            if eq(finalSlot1, finalSlot0) { revert(0x00, 0x00) }
+        }
+    }
+
+    function _getRandomIndex(uint256 i) internal returns (uint256) {
+        unchecked {
+            uint256 r = _random();
+            if ((r & 0xf) == 0) {
+                return type(uint256).max - _random() % 8;
+            }
+            if (((r >> 16) & 0xf) == 0) {
+                uint256 modulus = 1 << (_random() % 32 + 1);
+                return type(uint256).max - _random() % modulus;
+            }
+            if (((r >> 24) & 0xf) == 0) {
+                return _bound(i, 0, type(uint32).max);
+            }
+            return _bound(i, 0, type(uint40).max);
+        }
+    }
 }
