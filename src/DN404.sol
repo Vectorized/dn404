@@ -61,8 +61,8 @@ abstract contract DN404 {
     /// @dev Thrown when minting an amount of tokens that would overflow the max tokens.
     error TotalSupplyOverflow();
 
-    /// @dev The unit cannot be zero.
-    error UnitIsZero();
+    /// @dev The unit must be greater than zero and less than `2**96`.
+    error InvalidUnit();
 
     /// @dev Thrown when the caller for a fallback NFT function is not the mirror contract.
     error SenderNotMirror();
@@ -211,7 +211,9 @@ abstract contract DN404 {
     ) internal virtual {
         DN404Storage storage $ = _getDN404Storage();
 
-        if (_unit() == 0) revert UnitIsZero();
+        unchecked {
+            if (_unit() - 1 >= 2 ** 96 - 1) revert InvalidUnit();
+        }
         if ($.mirrorERC721 != address(0)) revert DNAlreadyInitialized();
         if (mirror == address(0)) revert MirrorAddressIsZero();
 
