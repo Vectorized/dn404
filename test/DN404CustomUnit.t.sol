@@ -37,6 +37,8 @@ contract DN404CustomUnitTest is SoladyTest {
             bool expected = unit == 0 || unit > type(uint96).max;
             bool computed = unit - 1 >= 2 ** 96 - 1;
             assertEq(computed, expected);
+            bool isValid = 0 < unit && unit < 2 ** 96;
+            assertEq(computed, !isValid);
         }
     }
 
