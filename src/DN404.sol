@@ -27,8 +27,8 @@ abstract contract DN404 {
     /// @dev Emitted when `amount` tokens is approved by `owner` to be used by `spender`.
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-    /// @dev Emitted when `target` sets their skipNFT flag to `status`.
-    event SkipNFTSet(address indexed target, bool status);
+    /// @dev Emitted when `owner` sets their skipNFT flag to `status`.
+    event SkipNFTSet(address indexed owner, bool status);
 
     /// @dev `keccak256(bytes("Transfer(address,address,uint256)"))`.
     uint256 private constant _TRANSFER_EVENT_SIGNATURE =
