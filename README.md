@@ -1,31 +1,42 @@
-# DN404 🥜
+# DN404: ERC20/ERC721 Co-Joined Implementation
 
 [![NPM][npm-shield]][npm-url]
 [![CI][ci-shield]][ci-url]
 
-DN404 is an implementation of a co-joined ERC20 and ERC721 pair.
+Welcome to DN404, an experimental implementation of co-joined ERC20 and ERC721 contracts. 
+DN404 aims to provide seamless interoperability between ERC20 and ERC721 tokens, ensuring full compliance with their respective specifications while offering optimized functionality. 
 
-- Full compliance with the ERC20 and ERC721 specifications.
-- Transfers on one side will be reflected on the other side.
-- Pretty optimized.
+## Overview 
+DN404 enables transfers between ERC20 and ERC721 tokens, ensuring that actions performed on one side are reflected on the other side. 
+This project is designed to facilitate easy integration of ERC20 and ERC721 tokens within a single ecosystem, providing developers with a robust foundation for building decentralized applications. 
 
 ## Installation
 
-To install with [**Foundry**](https://github.com/gakonst/foundry):
-
+With [**Foundry**](https://github.com/gakonst/foundry):
 ```sh
-forge install vectorized/dn404
+To install DN404 using Foundry, execute the following command: forge install vectorized/dn404 
 ```
 
-To install with [**Hardhat**](https://github.com/nomiclabs/hardhat):
+With [**Hardhat**](https://github.com/nomiclabs/hardhat):
 
 ```sh
-npm install dn404
+To install DN404 using Hardhat, execute the following command: npm install dn404
 ```
 
 ## Contracts
 
-The Solidity smart contracts are located in the `src` directory.
+The DN404 repository contains the following Solidity smart contracts:
+
+#### DN404: This contract represents the ERC20 functionality within DN404.
+
+#### DN404Mirror: This contract represents the ERC721 functionality within DN404.
+
+#### SimpleDN404: A simple example demonstrating DN404 as an ERC20 token.
+
+#### NFTMintDN404: A simple example demonstrating DN404 as an ERC721 token.
+
+These contracts are located in the src directory of the repository. Navigation of the branch to access the contracts is shown below.
+
 
 ```ml
 src
@@ -38,33 +49,34 @@ src
 
 ## Contributing
 
-Feel free to make a pull request.
+Contributions to DN404 are highly encouraged! 
+To contribute, please adhere to the guidelines outlined [here](https://github.com/Vectorized/solady/issues/19). 
+You can contribute by submitting pull requests for new features, enhancements, or bug fixes, or any other areas of improvement that you may find.
 
-Guidelines same as [Solady's](https://github.com/Vectorized/solady/issues/19).
 
 ## Safety
 
-This is **experimental software** and is provided on an "as is" and "as available" basis.
+It's essential to note that DN404 is experimental software provided on an **as is** and **as available** basis. 
+While the contracts have undergone thorough testing, there may still be unforeseen issues/emergent behavior, especially when used in conjunction with other code or future Solidity versions. 
+
+**Always** conduct comprehensive testing to ensure compatibility with your codebase.
 
 We **do not give any warranties** and **will not be liable for any loss** incurred through any use of this codebase.
 
-While DN404 has been heavily tested, there may be parts that exhibit unexpected emergent behavior when used with other code, or break in future Solidity versions.
-
-Please always include your own thorough tests when using DN404 to make sure it works correctly with your code.
-
 ## Upgradability
 
-Most contracts in DN404 are compatible with both upgradeable and non-upgradeable (i.e. regular) contracts.
-
-Please call any required internal initialization methods accordingly.
+Most contracts within DN404 support both upgradeable and non-upgradeable (regular) implementations. 
+If utilizing upgradeable contracts, ensure to call any required internal initialization methods accordingly..
 
 ## Acknowledgements
 
-This repository is inspired by various sources:
-
+DN404 draws inspiration from various sources, including:
 - [Serec](https://twitter.com/SerecThunderson)
 - [Solady](https://github.com/vectorized/solady)
 - [ERC721A](https://github.com/chiru-labs/ERC721A)
+  
+These sources have played a significant role in shaping the design and functionality of DN404.
+
 
 [npm-shield]: https://img.shields.io/npm/v/dn404.svg
 [npm-url]: https://www.npmjs.com/package/dn404
