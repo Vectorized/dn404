@@ -58,11 +58,13 @@ Most contracts in DN404 are compatible with both upgradeable and non-upgradeable
 
 Please call any required internal initialization methods accordingly.
 
-## Acknowledgements
+## Acknowledgments
 
 This repository is inspired by various sources:
 
-- [Serec](https://twitter.com/SerecThunderson)
+- [SJ741](https://github.com/SerecThunderson/SJ741)
+- [ERC7651 (a.k.a. "ERC"404)](https://github.com/Pandora-Labs-Org/erc404)
+- ["ERC"425](https://github.com/paradox425/ERC425)
 - [Solady](https://github.com/vectorized/solady)
 - [ERC721A](https://github.com/chiru-labs/ERC721A)
 
