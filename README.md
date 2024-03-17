@@ -58,7 +58,7 @@ Most contracts in DN404 are compatible with both upgradeable and non-upgradeable
 
 Please call any required internal initialization methods accordingly.
 
-## Acknowledgements
+## Acknowledgments
 
 This repository is inspired by various sources:
 
