@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
-import {DN69, MockDN69} from "./utils/mocks/MockDN69.sol";
+import {DN420, MockDN420} from "./utils/mocks/MockDN420.sol";
 import {LibSort} from "solady/utils/LibSort.sol";
 import {LibPRNG} from "solady/utils/LibPRNG.sol";
 
@@ -150,7 +150,7 @@ contract WrongReturnDataERC1155Recipient is ERC1155TokenReceiver {
 
 contract NonERC1155Recipient {}
 
-contract DN69Test is SoladyTest {
+contract DN420Test is SoladyTest {
     using LibPRNG for *;
 
     event Transfer(address indexed from, address indexed to, uint256 amount);
@@ -177,17 +177,17 @@ contract DN69Test is SoladyTest {
 
     uint256 internal constant _WAD = 10 ** 18;
 
-    MockDN69 dn;
+    MockDN420 dn;
 
     address internal constant _ALICE = address(111);
     address internal constant _BOB = address(222);
 
     function setUp() public {
-        dn = new MockDN69();
+        dn = new MockDN420();
     }
 
     function testFindOwnedIds() public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
         assertEq(dn.findOwnedIds(_ALICE, 0, 0), new uint256[](0));
         assertEq(dn.findOwnedIds(_ALICE, 0, 1), new uint256[](0));
         assertEq(dn.findOwnedIds(_ALICE, 0, 10), new uint256[](0));
@@ -228,7 +228,7 @@ contract DN69Test is SoladyTest {
     }
 
     function testERC1155Methods(uint256) public {
-        dn.initializeDN69(10 * _WAD, address(this));
+        dn.initializeDN420(10 * _WAD, address(this));
         unchecked {
             for (uint256 i; i < 3; ++i) {
                 dn.transfer(_ALICE, 1 * _WAD);
@@ -289,7 +289,7 @@ contract DN69Test is SoladyTest {
             assertEq(dn.balanceOf(_ALICE), t.aliceIds.length * _WAD);
             assertEq(dn.balanceOf(_BOB), t.bobIds.length * _WAD);
             if (_random() % 16 == 0) {
-                vm.expectRevert(DN69.InvalidNFTAmount.selector);
+                vm.expectRevert(DN420.InvalidNFTAmount.selector);
                 IERC1155(address(dn)).safeTransferFrom(_ALICE, _BOB, t.id, _invalidAmount(), "");
             }
             vm.expectEmit(true, true, true, true);
@@ -330,11 +330,11 @@ contract DN69Test is SoladyTest {
                 }
             }
             if (_random() % 16 == 0 && t.ids.length != 0) {
-                vm.expectRevert(DN69.InvalidNFTAmount.selector);
+                vm.expectRevert(DN420.InvalidNFTAmount.selector);
                 IERC1155(address(dn)).safeBatchTransferFrom(
                     _ALICE, _BOB, t.ids, _filled(t.ids.length, _invalidAmount()), ""
                 );
-                vm.expectRevert(DN69.ArrayLengthsMismatch.selector);
+                vm.expectRevert(DN420.ArrayLengthsMismatch.selector);
                 IERC1155(address(dn)).safeBatchTransferFrom(
                     _ALICE, _BOB, t.ids, _filled(_invalidLength(t.ids.length), 1), ""
                 );
@@ -366,7 +366,7 @@ contract DN69Test is SoladyTest {
                 _filled(t.ids.length, 1)
             );
             if (_random() % 32 == 0) {
-                vm.expectRevert(DN69.ArrayLengthsMismatch.selector);
+                vm.expectRevert(DN420.ArrayLengthsMismatch.selector);
                 IERC1155(address(dn)).balanceOfBatch(
                     _filled(t.ids.length, _BOB), _filled(_invalidLength(t.ids.length), 0)
                 );
@@ -375,7 +375,7 @@ contract DN69Test is SoladyTest {
     }
 
     function testERC1155MethodsSelfTransfers(uint256) public {
-        dn.initializeDN69(10 * _WAD, address(this));
+        dn.initializeDN420(10 * _WAD, address(this));
         for (uint256 i; i < 3; ++i) {
             dn.transfer(_ALICE, 1 * _WAD);
         }
@@ -393,7 +393,7 @@ contract DN69Test is SoladyTest {
         if (_random() % 2 == 0) {
             t.id = t.aliceIds[_random() % t.aliceIds.length];
             if (_random() % 16 == 0) {
-                vm.expectRevert(DN69.InvalidNFTAmount.selector);
+                vm.expectRevert(DN420.InvalidNFTAmount.selector);
                 IERC1155(address(dn)).safeTransferFrom(_ALICE, _ALICE, t.id, _invalidAmount(), "");
             }
             vm.expectEmit(true, true, true, true);
@@ -418,7 +418,7 @@ contract DN69Test is SoladyTest {
         if (_random() % 2 == 0) {
             t.ids = _randomSampleWithoutReplacements(t.aliceIds);
             if (_random() % 16 == 0 && t.ids.length != 0) {
-                vm.expectRevert(DN69.InvalidNFTAmount.selector);
+                vm.expectRevert(DN420.InvalidNFTAmount.selector);
                 IERC1155(address(dn)).safeBatchTransferFrom(
                     _ALICE, _ALICE, t.ids, _filled(t.ids.length, _invalidAmount()), ""
                 );
@@ -521,7 +521,7 @@ contract DN69Test is SoladyTest {
 
     function testMixed(uint256) public {
         uint256 n = _random() % 8 == 0 ? _bound(_random(), 0, 512) : _bound(_random(), 0, 16);
-        dn.initializeDN69(n * _WAD, address(1111));
+        dn.initializeDN420(n * _WAD, address(1111));
 
         address[] memory addresses = new address[](3);
         addresses[0] = address(111);
@@ -619,7 +619,7 @@ contract DN69Test is SoladyTest {
                     LibSort.uniquifySorted(t.idsCopy);
                     if (t.idsCopy.length < t.ids.length) {
                         vm.prank(t.from);
-                        vm.expectRevert(DN69.TransferFromIncorrectOwner.selector);
+                        vm.expectRevert(DN420.TransferFromIncorrectOwner.selector);
                         dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
                     } else {
                         vm.prank(t.from);
@@ -700,13 +700,13 @@ contract DN69Test is SoladyTest {
     }
 
     function testMintToZeroReverts(uint256) public {
-        dn.initializeDN69(0, address(this));
-        vm.expectRevert(DN69.TransferToZeroAddress.selector);
+        dn.initializeDN420(0, address(this));
+        vm.expectRevert(DN420.TransferToZeroAddress.selector);
         dn.mint(address(0), _bound(_random(), _WAD, 10 * _WAD), _randomBytes());
     }
 
     function testMintNext() public {
-        dn.initializeDN69(10 * _WAD, address(this));
+        dn.initializeDN420(10 * _WAD, address(this));
         dn.mintNext(_ALICE, 10 * _WAD);
         for (uint256 i = 11; i <= 20; ++i) {
             assertEq(dn.owns(_ALICE, i), true);
@@ -722,7 +722,7 @@ contract DN69Test is SoladyTest {
     }
 
     function testMintToRevertingERC155RecipientReverts(uint256) public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
         address to = address(new RevertingERC1155Recipient());
         vm.prank(to);
         dn.setSkipNFT(false);
@@ -747,14 +747,14 @@ contract DN69Test is SoladyTest {
     }
 
     function testMintToNonERC155RecipientReverts(uint256) public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
         address to = address(new NonERC1155Recipient());
         vm.prank(to);
         dn.setSkipNFT(false);
         if (_random() % 32 == 0) {
             dn.mint(to, _bound(_random(), 0, _WAD - 1), _randomBytes());
         } else if (_random() % 2 == 0) {
-            vm.expectRevert(DN69.TransferToNonERC1155ReceiverImplementer.selector);
+            vm.expectRevert(DN420.TransferToNonERC1155ReceiverImplementer.selector);
             if (_random() % 2 == 0) {
                 dn.mint(to, _bound(_random(), _WAD, 10 * _WAD), _randomBytes());
             } else {
@@ -765,14 +765,14 @@ contract DN69Test is SoladyTest {
             vm.prank(_ALICE);
             dn.setApprovalForAll(address(this), true);
             assertEq(dn.owns(_ALICE, 1), true);
-            vm.expectRevert(DN69.TransferToNonERC1155ReceiverImplementer.selector);
+            vm.expectRevert(DN420.TransferToNonERC1155ReceiverImplementer.selector);
             vm.prank(_ALICE);
             dn.safeTransferFromNFT(_ALICE, to, 1, _randomBytes());
         }
     }
 
     function testSafeTransferFromToERC1155Recipient(uint256) public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
         ERC1155Recipient to = new ERC1155Recipient();
         bytes memory transferData = _randomBytes();
 
@@ -805,7 +805,7 @@ contract DN69Test is SoladyTest {
     }
 
     function testSafeBatchTransferFromToERC1155Recipient(uint256) public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
         ERC1155Recipient to = new ERC1155Recipient();
         bytes memory transferData = _randomBytes();
 
@@ -842,7 +842,7 @@ contract DN69Test is SoladyTest {
     }
 
     function testTransferFromToERC1155Recipient(uint256) public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
         ERC1155Recipient from = new ERC1155Recipient();
         ERC1155Recipient to = new ERC1155Recipient();
 
@@ -890,22 +890,22 @@ contract DN69Test is SoladyTest {
     }
 
     function testTransferMixedReverts(uint256) public {
-        dn.initializeDN69(0, address(this));
+        dn.initializeDN420(0, address(this));
 
         address from = _randomNonZeroAddress();
         uint256 amount = _bound(_random(), 1, 10) * _WAD;
         dn.mint(from, amount, "");
 
         if (_random() % 4 == 0) {
-            vm.expectRevert(DN69.TransferToZeroAddress.selector);
+            vm.expectRevert(DN420.TransferToZeroAddress.selector);
             dn.mint(address(0), _random(), "");
-            vm.expectRevert(DN69.TransferToZeroAddress.selector);
+            vm.expectRevert(DN420.TransferToZeroAddress.selector);
             dn.mintNext(address(0), _random(), "");
-            vm.expectRevert(DN69.TransferToZeroAddress.selector);
+            vm.expectRevert(DN420.TransferToZeroAddress.selector);
             dn.transfer(address(0), amount);
             vm.prank(from);
             dn.approve(address(this), type(uint256).max);
-            vm.expectRevert(DN69.TransferToZeroAddress.selector);
+            vm.expectRevert(DN420.TransferToZeroAddress.selector);
             dn.transferFrom(from, address(0), amount);
             address to = _randomNonZeroAddress();
             dn.transferFrom(from, to, amount);
@@ -926,7 +926,7 @@ contract DN69Test is SoladyTest {
                 vm.prank(from);
                 dn.setApprovalForAll(by, false);
             } else {
-                vm.expectRevert(DN69.NotOwnerNorApproved.selector);
+                vm.expectRevert(DN420.NotOwnerNorApproved.selector);
                 _safeTransferFromNFT(by, from, to, 1);
             }
             if (dn.owns(to, 1)) {
@@ -938,7 +938,7 @@ contract DN69Test is SoladyTest {
         if (_random() % 4 == 0) {
             uint256 id = _bound(_random(), 0, 256);
             while (dn.owns(from, id)) id = _bound(_random(), 0, 256);
-            vm.expectRevert(DN69.TransferFromIncorrectOwner.selector);
+            vm.expectRevert(DN420.TransferFromIncorrectOwner.selector);
             _safeTransferFromNFT(from, from, _randomNonZeroAddress(), id);
         }
 
@@ -948,7 +948,7 @@ contract DN69Test is SoladyTest {
             uint256[] memory ids = dn.findOwnedIds(from);
             if (ids.length < 2) break;
             ids[0] = ids[_bound(_random(), 1, ids.length - 1)];
-            vm.expectRevert(DN69.TransferFromIncorrectOwner.selector);
+            vm.expectRevert(DN420.TransferFromIncorrectOwner.selector);
             dn.safeBatchTransferFromNFTs(from, from, to, ids);
         }
 
@@ -957,7 +957,7 @@ contract DN69Test is SoladyTest {
             uint256[] memory ids = dn.findOwnedIds(from);
             ids[0] = _bound(_random(), 0, 256);
             while (dn.owns(from, ids[0])) ids[0] = _bound(_random(), 0, 256);
-            vm.expectRevert(DN69.TransferFromIncorrectOwner.selector);
+            vm.expectRevert(DN420.TransferFromIncorrectOwner.selector);
             dn.safeBatchTransferFromNFTs(from, from, to, ids);
             dn.safeBatchTransferFromNFTs(from, from, to, dn.findOwnedIds(from));
             dn.safeBatchTransferFromNFTs(to, to, from, dn.findOwnedIds(to));
@@ -968,7 +968,7 @@ contract DN69Test is SoladyTest {
                 uint256 oriLength = ids.length;
                 ids = LibSort.union(ids, _randomSampleWithoutReplacements(ids));
                 if (ids.length > oriLength) {
-                    vm.expectRevert(DN69.InsufficientBalance.selector);
+                    vm.expectRevert(DN420.InsufficientBalance.selector);
                     dn.safeBatchTransferFromNFTs(from, from, to, ids);
                 } else {
                     dn.safeBatchTransferFromNFTs(from, from, to, ids);

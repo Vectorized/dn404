@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "../../../src/DN69.sol";
+import "../../../src/DN420.sol";
 
-contract MockDN69OnlyERC20 is DN69 {
+contract MockDN420OnlyERC20 is DN420 {
     constructor() {
-        _initializeDN69(0, address(this));
+        _initializeDN420(0, address(this));
     }
 
     function name() public view virtual override returns (string memory) {
@@ -21,7 +21,7 @@ contract MockDN69OnlyERC20 is DN69 {
     }
 
     function _addressData(address a) internal virtual override returns (AddressData storage d) {
-        d = DN69._addressData(a);
+        d = DN420._addressData(a);
         d.flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
     }
 

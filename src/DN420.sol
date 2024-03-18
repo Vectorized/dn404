@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-/// @title DN69
-/// @notice DN69 is a fully standard compliant, single-contract,
+/// @title DN420
+/// @notice DN420 is a fully standard compliant, single-contract,
 /// ERC20 and ERC1155 chimera implementation that mints
 /// and burns NFTs based on an account's ERC20 token balance.
 ///
 /// On-transfer token ID burning scheme:
-/// - DN69: Largest token ID up to owned checkpoint (inclusive) first.
+/// - DN420: Largest token ID up to owned checkpoint (inclusive) first.
 /// - DN404: Most recently acquired token ID first.
 ///
 /// This implementation uses bitmap scans to find ERC1155 token IDs
@@ -24,7 +24,7 @@ pragma solidity ^0.8.4;
 /// @author cygaar (@0xCygaar)
 /// @author Thomas (@0xjustadev)
 /// @author Harrison (@PopPunkOnChain)
-abstract contract DN69 {
+abstract contract DN420 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -194,7 +194,7 @@ abstract contract DN69 {
     }
 
     /// @dev Struct containing the base token contract storage.
-    struct DN69Storage {
+    struct DN420Storage {
         // Next NFT ID to assign for a mint.
         uint32 nextTokenId;
         // The upper bound (inclusive) for token IDs minted thus far.
@@ -213,11 +213,11 @@ abstract contract DN69 {
         mapping(address => AddressData) addressData;
     }
 
-    /// @dev Returns a storage pointer for DN69Storage.
-    function _getDN69Storage() internal pure virtual returns (DN69Storage storage $) {
+    /// @dev Returns a storage pointer for DN420Storage.
+    function _getDN420Storage() internal pure virtual returns (DN420Storage storage $) {
         /// @solidity memory-safe-assembly
         assembly {
-            // `uint72(bytes9(keccak256("DN69_STORAGE")))`.
+            // `uint72(bytes9(keccak256("DN420_STORAGE")))`.
             $.slot := 0xbf77275a289f9ab11f // Truncate to 9 bytes to reduce bytecode size.
         }
     }
@@ -226,13 +226,13 @@ abstract contract DN69 {
     /*                         INITIALIZER                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Initializes the DN69 contract with an
+    /// @dev Initializes the DN420 contract with an
     /// `initialTokenSupply` and `initialTokenOwner`.
-    function _initializeDN69(uint256 initialTokenSupply, address initialSupplyOwner)
+    function _initializeDN420(uint256 initialTokenSupply, address initialSupplyOwner)
         internal
         virtual
     {
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
 
         unchecked {
             if (_unit() - 1 >= 2 ** 96 - 1) revert InvalidUnit();
@@ -315,21 +315,21 @@ abstract contract DN69 {
 
     /// @dev Returns the amount of ERC20 tokens in existence.
     function totalSupply() public view virtual returns (uint256) {
-        return uint256(_getDN69Storage().totalSupply);
+        return uint256(_getDN420Storage().totalSupply);
     }
 
     /// @dev Returns the amount of ERC20 tokens owned by `owner`.
     function balanceOf(address owner) public view virtual returns (uint256) {
-        return _getDN69Storage().addressData[owner].balance;
+        return _getDN420Storage().addressData[owner].balance;
     }
 
     /// @dev Returns the amount of ERC20 tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
         if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
-            uint8 flags = _getDN69Storage().addressData[owner].flags;
+            uint8 flags = _getDN420Storage().addressData[owner].flags;
             if (_isZero(flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)) return type(uint256).max;
         }
-        return _ref(_getDN69Storage().allowance, owner, spender).value;
+        return _ref(_getDN420Storage().allowance, owner, spender).value;
     }
 
     /// @dev Sets `amount` as the allowance of `spender` over the caller's ERC20 tokens.
@@ -378,10 +378,10 @@ abstract contract DN69 {
     ///
     /// Emits a {Transfer} event.
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
-        Uint256Ref storage a = _ref(_getDN69Storage().allowance, from, msg.sender);
+        Uint256Ref storage a = _ref(_getDN420Storage().allowance, from, msg.sender);
 
         uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
-            && _isZero(_getDN69Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)
+            && _isZero(_getDN420Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)
             ? type(uint256).max
             : a.value;
 
@@ -421,7 +421,7 @@ abstract contract DN69 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage toAddressData = _addressData(to);
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         if (_isZero($.nextTokenId)) revert DNNotInitialized();
 
         _DNMintTemps memory t;
@@ -488,7 +488,7 @@ abstract contract DN69 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         AddressData storage toAddressData = _addressData(to);
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         if (_isZero($.nextTokenId)) revert DNNotInitialized();
 
         uint256 id;
@@ -556,7 +556,7 @@ abstract contract DN69 {
     /// Emits an ERC20 {Transfer} event.
     function _burn(address from, uint256 amount) internal virtual {
         AddressData storage fromAddressData = _addressData(from);
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         if (_isZero($.nextTokenId)) revert DNNotInitialized();
 
         uint256 fromBalance = fromAddressData.balance;
@@ -621,7 +621,7 @@ abstract contract DN69 {
 
         AddressData storage fromAddressData = _addressData(from);
         AddressData storage toAddressData = _addressData(to);
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         if (_isZero($.nextTokenId)) revert DNNotInitialized();
 
         _DNTransferTemps memory t;
@@ -754,7 +754,7 @@ abstract contract DN69 {
     {
         if (to == address(0)) revert TransferToZeroAddress();
 
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         if (_isZero($.nextTokenId)) revert DNNotInitialized();
 
         if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
@@ -820,7 +820,7 @@ abstract contract DN69 {
     ) internal virtual {
         if (to == address(0)) revert TransferToZeroAddress();
 
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         if (_isZero($.nextTokenId)) revert DNNotInitialized();
 
         if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
@@ -877,9 +877,9 @@ abstract contract DN69 {
     /// Emits a {Approval} event.
     function _approve(address owner, address spender, uint256 amount) internal virtual {
         if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
-            _getDN69Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
+            _getDN420Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
         }
-        _ref(_getDN69Storage().allowance, owner, spender).value = amount;
+        _ref(_getDN420Storage().allowance, owner, spender).value = amount;
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {Approval} event.
@@ -897,14 +897,14 @@ abstract contract DN69 {
     /// Minting, transferring, burning the tokens of `owner` will not change the auxiliary data.
     /// Auxiliary data can be set for any address, even if it does not have any tokens.
     function _getAux(address owner) internal view virtual returns (uint88) {
-        return _getDN69Storage().addressData[owner].aux;
+        return _getDN420Storage().addressData[owner].aux;
     }
 
     /// @dev Set the auxiliary data for `owner` to `value`.
     /// Minting, transferring, burning the tokens of `owner` will not change the auxiliary data.
     /// Auxiliary data can be set for any address, even if it does not have any tokens.
     function _setAux(address owner, uint88 value) internal virtual {
-        _getDN69Storage().addressData[owner].aux = value;
+        _getDN420Storage().addressData[owner].aux = value;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -914,7 +914,7 @@ abstract contract DN69 {
     /// @dev Returns true if minting and transferring ERC20s to `owner` will skip minting NFTs.
     /// Returns false otherwise.
     function getSkipNFT(address owner) public view virtual returns (bool) {
-        AddressData storage d = _getDN69Storage().addressData[owner];
+        AddressData storage d = _getDN420Storage().addressData[owner];
         if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) return _hasCode(owner);
         return d.flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0;
     }
@@ -948,7 +948,7 @@ abstract contract DN69 {
     ///
     /// Initializes account `owner` AddressData if it is not currently initialized.
     function _addressData(address owner) internal virtual returns (AddressData storage d) {
-        d = _getDN69Storage().addressData[owner];
+        d = _getDN420Storage().addressData[owner];
         unchecked {
             if (d.flags & _ADDRESS_DATA_INITIALIZED_FLAG == 0) {
                 uint256 skipNFT = _toUint(_hasCode(owner)) * _ADDRESS_DATA_SKIP_NFT_FLAG;
@@ -963,7 +963,7 @@ abstract contract DN69 {
 
     /// @dev Returns the owned checkpoint of `owner`.
     function getOwnedCheckpoint(address owner) public view virtual returns (uint256) {
-        return _getDN69Storage().addressData[owner].ownedCheckpoint;
+        return _getDN420Storage().addressData[owner].ownedCheckpoint;
     }
 
     /// @dev Just in case the collection gets too large and the caller needs
@@ -976,7 +976,7 @@ abstract contract DN69 {
     /// @dev Sets the owned checkpoint of `owner` to `id`.
     /// `id` will be clamped to `[1..tokenIdUpTo]`.
     function _setOwnedCheckpoint(address owner, uint256 id) internal virtual {
-        DN69Storage storage $ = _getDN69Storage();
+        DN420Storage storage $ = _getDN420Storage();
         id = _min(_max(1, id), $.tokenIdUpTo);
         $.addressData[owner].ownedCheckpoint = uint32(id);
         emit OwnedCheckpointSet(owner, id);
@@ -988,7 +988,7 @@ abstract contract DN69 {
 
     /// @dev Returns if `owner` owns ERC1155 `id`.
     function owns(address owner, uint256 id) public view virtual returns (bool) {
-        return _owns(_getDN69Storage().owned[owner], id);
+        return _owns(_getDN420Storage().owned[owner], id);
     }
 
     /// @dev Returns if the ERC1155 `id` is set in `owned`.
@@ -998,7 +998,7 @@ abstract contract DN69 {
 
     /// @dev Returns whether `operator` is approved to manage the ERC1155 tokens of `owner`.
     function isApprovedForAll(address owner, address operator) public view virtual returns (bool) {
-        return !_isZero(_ref(_getDN69Storage().operatorApprovals, owner, operator).value);
+        return !_isZero(_ref(_getDN420Storage().operatorApprovals, owner, operator).value);
     }
 
     /// @dev Sets whether `operator` is approved to manage the ERC1155 tokens of the caller.
@@ -1015,7 +1015,7 @@ abstract contract DN69 {
         internal
         virtual
     {
-        _ref(_getDN69Storage().operatorApprovals, owner, operator).value = _toUint(isApproved);
+        _ref(_getDN420Storage().operatorApprovals, owner, operator).value = _toUint(isApproved);
         /// @solidity memory-safe-assembly
         assembly {
             // Emit the {ApprovalForAll} event.
@@ -1058,12 +1058,12 @@ abstract contract DN69 {
 
     /// @dev Returns `owner`'s ERC1155 NFT balance.
     function _balanceOfNFT(address owner) internal view virtual returns (uint256) {
-        return _getDN69Storage().addressData[owner].ownedCount;
+        return _getDN420Storage().addressData[owner].ownedCount;
     }
 
     /// @dev Returns if the ERC1155 token `id` exists.
     function _exists(uint256 id) internal view virtual returns (bool) {
-        return _get(_getDN69Storage().exists, _restrictNFTId(id));
+        return _get(_getDN420Storage().exists, _restrictNFTId(id));
     }
 
     /// @dev Returns the ERC1155 NFT IDs of `owner` in range `[begin, end)`.
@@ -1075,7 +1075,7 @@ abstract contract DN69 {
         returns (uint256[] memory ids)
     {
         unchecked {
-            DN69Storage storage $ = _getDN69Storage();
+            DN420Storage storage $ = _getDN420Storage();
             Bitmap storage owned = $.owned[owner];
             end = _min(uint256($.tokenIdUpTo) + 1, end);
             /// @solidity memory-safe-assembly
@@ -1096,7 +1096,7 @@ abstract contract DN69 {
     }
 
     /// @dev Fallback modifier for the regular ERC1155 functions and other functions.
-    modifier dn69Fallback() virtual {
+    modifier dn420Fallback() virtual {
         uint256 fnSelector = _calldataload(0x00) >> 224;
 
         // We hide the regular ERC1155 functions that has variable amounts
@@ -1158,7 +1158,7 @@ abstract contract DN69 {
             );
             _return(_toUint(result));
         }
-        // `implementsDN69()`.
+        // `implementsDN420()`.
         if (fnSelector == 0x0e0b0984) {
             _return(1);
         }
@@ -1168,8 +1168,8 @@ abstract contract DN69 {
     /// @dev Fallback function for regular ERC1155 functions and other functions.
     /// Override this if you need to implement your custom
     /// fallback with utilities like Solady's `LibZip.cdFallback()`.
-    /// And always remember to always wrap the fallback with `dn69Fallback`.
-    fallback() external payable virtual dn69Fallback {
+    /// And always remember to always wrap the fallback with `dn420Fallback`.
+    fallback() external payable virtual dn420Fallback {
         revert FnSelectorNotRecognized(); // Not mandatory. Just for quality of life.
     }
 

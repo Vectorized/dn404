@@ -4,10 +4,10 @@ pragma solidity ^0.8.4;
 import "./utils/SoladyTest.sol";
 import "./utils/InvariantTest.sol";
 
-import {DN69, MockDN69OnlyERC20} from "./utils/mocks/MockDN69OnlyERC20.sol";
+import {DN420, MockDN420OnlyERC20} from "./utils/mocks/MockDN420OnlyERC20.sol";
 
-contract DN69OnlyERC20Test is SoladyTest {
-    MockDN69OnlyERC20 token;
+contract DN420OnlyERC20Test is SoladyTest {
+    MockDN420OnlyERC20 token;
 
     uint256 private constant _WAD = 10 ** 18;
 
@@ -20,7 +20,7 @@ contract DN69OnlyERC20Test is SoladyTest {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     function setUp() public {
-        token = new MockDN69OnlyERC20();
+        token = new MockDN420OnlyERC20();
     }
 
     function testMaxSupplyTrick(uint256 amount) public {
@@ -113,13 +113,13 @@ contract DN69OnlyERC20Test is SoladyTest {
 
     function testMintOverMaxLimitReverts() public {
         token.mint(address(this), _MAX_SUPPLY);
-        vm.expectRevert(DN69.TotalSupplyOverflow.selector);
+        vm.expectRevert(DN420.TotalSupplyOverflow.selector);
         token.mint(address(this), 1);
     }
 
     function testTransferInsufficientBalanceReverts() public {
         token.mint(address(this), 0.9e18);
-        vm.expectRevert(DN69.InsufficientBalance.selector);
+        vm.expectRevert(DN420.InsufficientBalance.selector);
         token.transfer(address(0xBEEF), 1e18);
     }
 
@@ -131,7 +131,7 @@ contract DN69OnlyERC20Test is SoladyTest {
         vm.prank(from);
         token.approve(address(this), 0.9e18);
 
-        vm.expectRevert(DN69.InsufficientAllowance.selector);
+        vm.expectRevert(DN420.InsufficientAllowance.selector);
         token.transferFrom(from, address(0xBEEF), 1e18);
     }
 
@@ -143,7 +143,7 @@ contract DN69OnlyERC20Test is SoladyTest {
         vm.prank(from);
         token.approve(address(this), 1e18);
 
-        vm.expectRevert(DN69.InsufficientBalance.selector);
+        vm.expectRevert(DN420.InsufficientBalance.selector);
         token.transferFrom(from, address(0xBEEF), 1e18);
     }
 
@@ -254,7 +254,7 @@ contract DN69OnlyERC20Test is SoladyTest {
         burnAmount = _bound(burnAmount, mintAmount + 1, _MAX_SUPPLY);
 
         token.mint(to, mintAmount);
-        vm.expectRevert(DN69.InsufficientBalance.selector);
+        vm.expectRevert(DN420.InsufficientBalance.selector);
         token.burn(to, burnAmount);
     }
 
@@ -272,7 +272,7 @@ contract DN69OnlyERC20Test is SoladyTest {
         sendAmount = _bound(sendAmount, mintAmount + 1, _MAX_SUPPLY);
 
         token.mint(address(this), mintAmount);
-        vm.expectRevert(DN69.InsufficientBalance.selector);
+        vm.expectRevert(DN420.InsufficientBalance.selector);
         token.transfer(to, sendAmount);
     }
 
@@ -296,7 +296,7 @@ contract DN69OnlyERC20Test is SoladyTest {
         vm.prank(from);
         token.approve(address(this), approval);
 
-        vm.expectRevert(DN69.InsufficientAllowance.selector);
+        vm.expectRevert(DN420.InsufficientAllowance.selector);
         token.transferFrom(from, to, amount);
     }
 
@@ -319,7 +319,7 @@ contract DN69OnlyERC20Test is SoladyTest {
         vm.prank(from);
         token.approve(address(this), sendAmount);
 
-        vm.expectRevert(DN69.InsufficientBalance.selector);
+        vm.expectRevert(DN420.InsufficientBalance.selector);
         token.transferFrom(from, to, sendAmount);
     }
 }

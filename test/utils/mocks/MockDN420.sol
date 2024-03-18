@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "../../../src/DN69.sol";
+import "../../../src/DN420.sol";
 import "./MockBrutalizer.sol";
 
-contract MockDN69 is DN69, MockBrutalizer {
+contract MockDN420 is DN420, MockBrutalizer {
     string private _name;
 
     string private _symbol;
@@ -13,8 +13,8 @@ contract MockDN69 is DN69, MockBrutalizer {
 
     bool givePermit2DefaultInfiniteAllowance;
 
-    function initializeDN69(uint256 initialTokenSupply, address initialSupplyOwner) public {
-        _initializeDN69(initialTokenSupply, initialSupplyOwner);
+    function initializeDN420(uint256 initialTokenSupply, address initialSupplyOwner) public {
+        _initializeDN420(initialTokenSupply, initialSupplyOwner);
     }
 
     function setNameAndSymbol(string memory name_, string memory symbol_) public {
@@ -60,7 +60,7 @@ contract MockDN69 is DN69, MockBrutalizer {
     }
 
     function getAddressDataInitialized(address target) public view returns (bool) {
-        return _getDN69Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
+        return _getDN420Storage().addressData[target].flags & _ADDRESS_DATA_INITIALIZED_FLAG != 0;
     }
 
     function setAux(address target, uint88 value) public {
@@ -72,7 +72,7 @@ contract MockDN69 is DN69, MockBrutalizer {
     }
 
     function getNextTokenId() public view returns (uint32) {
-        return _getDN69Storage().nextTokenId;
+        return _getDN420Storage().nextTokenId;
     }
 
     function findOwnedIds(address owner, uint256 begin, uint256 end)
@@ -88,11 +88,11 @@ contract MockDN69 is DN69, MockBrutalizer {
     }
 
     function ownedCount(address owner) public view returns (uint256) {
-        return _getDN69Storage().addressData[owner].ownedCount;
+        return _getDN420Storage().addressData[owner].ownedCount;
     }
 
     function maxOwnedTokenId(address owner, uint256 upTo) public view returns (uint256 result) {
-        result = _findLastSet(_getDN69Storage().owned[owner], upTo);
+        result = _findLastSet(_getDN420Storage().owned[owner], upTo);
     }
 
     function exists(uint256 id) public view returns (bool) {
@@ -158,7 +158,7 @@ contract MockDN69 is DN69, MockBrutalizer {
         override
     {
         _brutalizeMemory();
-        DN69._transfer(_brutalized(from), _brutalized(to), amount, data);
+        DN420._transfer(_brutalized(from), _brutalized(to), amount, data);
         _checkMemory(data);
     }
 
@@ -170,7 +170,7 @@ contract MockDN69 is DN69, MockBrutalizer {
         bytes memory data
     ) internal virtual override {
         _brutalizeMemory();
-        DN69._safeBatchTransferNFTs(_brutalized(by), _brutalized(from), _brutalized(to), ids, data);
+        DN420._safeBatchTransferNFTs(_brutalized(by), _brutalized(from), _brutalized(to), ids, data);
         _checkMemory(data);
     }
 
