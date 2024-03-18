@@ -218,7 +218,7 @@ abstract contract DN420 {
         /// @solidity memory-safe-assembly
         assembly {
             // `uint72(bytes9(keccak256("DN420_STORAGE")))`.
-            $.slot := 0xbf77275a289f9ab11f // Truncate to 9 bytes to reduce bytecode size.
+            $.slot := 0xb6dffd38a260769cb2 // Truncate to 9 bytes to reduce bytecode size.
         }
     }
 
