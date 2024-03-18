@@ -126,7 +126,7 @@ contract DN404Mirror {
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from
     /// the base DN404 contract.
     function tokenURI(uint256 id) public view virtual returns (string memory) {
-        return _readString(0xc87b56dd, id); // `tokenURI()`.
+        return _readString(0xc87b56dd, id); // `tokenURI(uint256)`.
     }
 
     /// @dev Returns the total NFT supply from the base DN404 contract.

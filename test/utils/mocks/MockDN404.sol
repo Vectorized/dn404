@@ -2,8 +2,9 @@
 pragma solidity ^0.8.4;
 
 import "../../../src/DN404.sol";
+import "./MockBrutalizer.sol";
 
-contract MockDN404 is DN404 {
+contract MockDN404 is DN404, MockBrutalizer {
     string private _name;
 
     string private _symbol;
@@ -35,7 +36,7 @@ contract MockDN404 is DN404 {
         return _symbol;
     }
 
-    function tokenURI(uint256 id) public view virtual override returns (string memory) {
+    function _tokenURI(uint256 id) internal view virtual override returns (string memory) {
         return string(abi.encodePacked(_baseURI, id));
     }
 
@@ -44,15 +45,18 @@ contract MockDN404 is DN404 {
     }
 
     function mint(address to, uint256 amount) public {
-        _mint(to, amount);
+        _brutalizeMemory();
+        _mint(_brutalized(to), amount);
     }
 
     function mintNext(address to, uint256 amount) public {
-        _mintNext(to, amount);
+        _brutalizeMemory();
+        _mintNext(_brutalized(to), amount);
     }
 
     function burn(address from, uint256 amount) public {
-        _burn(from, amount);
+        _brutalizeMemory();
+        _burn(_brutalized(from), amount);
     }
 
     function initializeDN404(
@@ -143,7 +147,22 @@ contract MockDN404 is DN404 {
         view
         returns (uint256[] memory)
     {
+        _brutalizeMemory();
         return _ownedIds(owner, start, end);
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal virtual override {
+        _brutalizeMemory();
+        DN404._transfer(_brutalized(from), _brutalized(to), amount);
+    }
+
+    function _transferFromNFT(address from, address to, uint256 id, address msgSender)
+        internal
+        virtual
+        override
+    {
+        _brutalizeMemory();
+        DN404._transferFromNFT(_brutalized(from), _brutalized(to), id, _brutalized(msgSender));
     }
 
     function _afterNFTTransfer(address from, address to, uint256 id) internal virtual override {

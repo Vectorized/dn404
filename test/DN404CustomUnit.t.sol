@@ -17,8 +17,29 @@ contract DN404CustomUnitTest is SoladyTest {
 
     function testInitializeWithZeroUnitReverts() public {
         dn.setUnit(0);
-        vm.expectRevert(DN404.UnitIsZero.selector);
+        vm.expectRevert(DN404.InvalidUnit.selector);
         dn.initializeDN404(1000, address(this), address(mirror));
+    }
+
+    function testInitializeCorrectUnitSuccess() public {
+        dn.setUnit(2 ** 96 - 1);
+        dn.initializeDN404(1000, address(this), address(mirror));
+    }
+
+    function testInitializeWithUnitTooLargeReverts() public {
+        dn.setUnit(2 ** 96);
+        vm.expectRevert(DN404.InvalidUnit.selector);
+        dn.initializeDN404(1000, address(this), address(mirror));
+    }
+
+    function testUnitInvalidCheckTrick(uint256 unit) public {
+        unchecked {
+            bool expected = unit == 0 || unit > type(uint96).max;
+            bool computed = unit - 1 >= 2 ** 96 - 1;
+            assertEq(computed, expected);
+            bool isValid = 0 < unit && unit < 2 ** 96;
+            assertEq(computed, !isValid);
+        }
     }
 
     function testMint() public {

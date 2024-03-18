@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
-import {SimpleDN404} from "../src/example/SimpleDN404.sol";
+import {SimpleDN404, DN404Mirror} from "../src/example/SimpleDN404.sol";
 
 contract SimpleDN404Test is SoladyTest {
     SimpleDN404 dn;
@@ -30,7 +30,7 @@ contract SimpleDN404Test is SoladyTest {
     function testSetBaseURI() public {
         vm.prank(alice);
         dn.setBaseURI("https://example.com/");
-        assertEq(dn.tokenURI(1), "https://example.com/1");
+        assertEq(DN404Mirror(payable(dn.mirrorERC721())).tokenURI(1), "https://example.com/1");
     }
 
     function testWithdraw() public {
