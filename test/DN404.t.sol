@@ -118,6 +118,7 @@ contract DN404Test is SoladyTest {
     function testBurnOnTransfer(uint32 totalNFTSupply, address recipient) public {
         testMintOnTransfer(totalNFTSupply, recipient);
 
+        if (recipient == address(42069)) return;
         vm.prank(recipient);
         dn.transfer(address(42069), totalNFTSupply + 1);
 
@@ -264,6 +265,17 @@ contract DN404Test is SoladyTest {
         assertEq(mirror.ownerAt(1), alice);
     }
 
+    struct _TestMixedTemps {
+        address from;
+        address to;
+        uint256 nftBalance;
+        uint256 balance;
+        uint256 nftBalanceSum;
+        uint256 balanceSum;
+        uint256[] tokens;
+        uint256 numOwned;
+    }
+
     function testMixed(uint256) public {
         dn.setUseExistsLookup(_random() % 2 == 0);
 
@@ -276,6 +288,8 @@ contract DN404Test is SoladyTest {
         addresses[2] = address(1111);
 
         do {
+            _TestMixedTemps memory t;
+
             if (_random() % 4 == 0) {
                 dn.setAddToBurnedPool(_random() % 2 == 0);
             }
@@ -285,12 +299,12 @@ contract DN404Test is SoladyTest {
             }
 
             if (_random() % 16 > 0) {
-                address from = addresses[_random() % 3];
-                address to = addresses[_random() % 3];
+                t.from = addresses[_random() % 3];
+                t.to = addresses[_random() % 3];
 
-                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
-                vm.prank(from);
-                dn.transfer(to, amount);
+                uint256 amount = _bound(_random(), 0, dn.balanceOf(t.from));
+                vm.prank(t.from);
+                dn.transfer(t.to, amount);
             }
 
             if (_random() % 4 == 0) {
@@ -298,12 +312,12 @@ contract DN404Test is SoladyTest {
             }
 
             if (_random() % 4 == 0) {
-                address from = addresses[_random() % 3];
-                address to = addresses[_random() % 3];
+                t.from = addresses[_random() % 3];
+                t.to = addresses[_random() % 3];
 
-                uint256 amount = _bound(_random(), 0, dn.balanceOf(from));
-                dn.burn(from, amount);
-                dn.mint(to, amount);
+                uint256 amount = _bound(_random(), 0, dn.balanceOf(t.from));
+                dn.burn(t.from, amount);
+                dn.mint(t.to, amount);
             }
 
             if (_random() % 4 == 0) {
@@ -316,40 +330,51 @@ contract DN404Test is SoladyTest {
             }
 
             if (_random() % 4 == 0) {
-                address from = addresses[_random() % 3];
-                address to = addresses[_random() % 3];
+                t.from = addresses[_random() % 3];
+                t.to = addresses[_random() % 3];
 
                 for (uint256 id = 1; id <= n; ++id) {
-                    if (mirror.ownerAt(id) == from && _random() % 2 == 0) {
-                        vm.prank(from);
-                        mirror.transferFrom(from, to, id);
+                    if (mirror.ownerAt(id) == t.from && _random() % 2 == 0) {
+                        if (t.from == t.to) {
+                            t.nftBalance = mirror.balanceOf(t.from);
+                            t.balance = dn.balanceOf(t.from);
+                            t.tokens = dn.tokensOf(t.from);
+                            LibSort.insertionSort(t.tokens);
+                            vm.prank(t.from);
+                            mirror.transferFrom(t.from, t.to, id);
+                            assertEq(dn.balanceOf(t.from), t.balance);
+                            assertEq(mirror.balanceOf(t.from), t.nftBalance);
+                            uint256[] memory tokensAfter = dn.tokensOf(t.from);
+                            LibSort.insertionSort(tokensAfter);
+                            assertEq(tokensAfter, t.tokens);
+                            break;
+                        }
+                        vm.prank(t.from);
+                        mirror.transferFrom(t.from, t.to, id);
                         break;
                     }
                 }
             }
 
-            uint256 nftBalanceSum;
             unchecked {
-                uint256 balanceSum;
                 for (uint256 i; i != 3; ++i) {
                     address a = addresses[i];
-                    uint256 balance = dn.balanceOf(a);
-                    balanceSum += balance;
-                    uint256 nftBalance = mirror.balanceOf(a);
-                    assertLe(nftBalance, balance / _WAD);
-                    nftBalanceSum += nftBalance;
+                    t.balance = dn.balanceOf(a);
+                    t.balanceSum += t.balance;
+                    t.nftBalance = mirror.balanceOf(a);
+                    assertLe(t.nftBalance, t.balance / _WAD);
+                    t.nftBalanceSum += t.nftBalance;
                 }
-                assertEq(balanceSum, dn.totalSupply());
-                assertEq(nftBalanceSum, mirror.totalSupply());
-                assertLe(nftBalanceSum, balanceSum / _WAD);
+                assertEq(t.balanceSum, dn.totalSupply());
+                assertEq(t.nftBalanceSum, mirror.totalSupply());
+                assertLe(t.nftBalanceSum, t.balanceSum / _WAD);
             }
 
             unchecked {
-                uint256 numOwned;
                 for (uint256 i = 1; i <= n; ++i) {
-                    if (mirror.ownerAt(i) != address(0)) numOwned++;
+                    if (mirror.ownerAt(i) != address(0)) t.numOwned++;
                 }
-                assertEq(numOwned, nftBalanceSum);
+                assertEq(t.numOwned, t.nftBalanceSum);
                 assertEq(mirror.ownerAt(0), address(0));
                 assertEq(mirror.ownerAt(n + 1), address(0));
             }
