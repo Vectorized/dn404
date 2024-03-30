@@ -264,6 +264,24 @@ contract DN404Test is SoladyTest {
         assertEq(mirror.ownerAt(1), alice);
     }
 
+    function testTransferWithMirrorEvent() public {
+        address initialSupplyOwner = address(1111);
+        address alice = address(111);
+        address bob = address(222);
+
+        dn.initializeDN404(10 * _WAD, initialSupplyOwner, address(mirror));
+
+        vm.prank(initialSupplyOwner);
+        dn.transfer(alice, 10 * _WAD);
+
+        vm.expectEmit(true, true, true, true, address(mirror));
+        emit DN404Mirror.Transfer(alice, bob, 3);
+        vm.prank(alice);
+        dn.transferFromNFTWithMirrorEvent(alice, bob, 3);
+
+        assertEq(mirror.ownerAt(3), bob);
+    }
+
     function testMixed(uint256) public {
         dn.setUseExistsLookup(_random() % 2 == 0);
 
