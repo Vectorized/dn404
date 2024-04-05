@@ -315,7 +315,7 @@ abstract contract DN404 {
     /// @dev Returns the decimals places of the token. Defaults to 18.
     /// Does not affect DN404's internal calculations.
     /// Will only affect the frontend UI on most protocols.
-    function decimals() public pure virtual returns (uint8) {
+    function decimals() public view virtual returns (uint8) {
         return 18;
     }
 
