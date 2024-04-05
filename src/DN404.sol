@@ -780,6 +780,29 @@ abstract contract DN404 {
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
+    /// Also emits an ERC721 {Transfer} event on the `mirrorERC721`.
+    ///
+    /// Requirements:
+    ///
+    /// - Call must originate from the mirror contract.
+    /// - Token `id` must exist.
+    /// - `from` must be the owner of the token.
+    /// - `to` cannot be the zero address.
+    ///   `msgSender` must be the owner of the token, or be approved to manage the token.
+    ///
+    /// Emits a {Transfer} event.
+    function _initiateTransferFromNFT(address from, address to, uint256 id, address msgSender)
+        internal
+        virtual
+    {
+        _transferFromNFT(from, to, id, msgSender);
+        // Emit ERC721 {Transfer} event.
+        _DNDirectLogs memory directLogs = _directLogsMalloc(1, from, to);
+        _directLogsAppend(directLogs, id);
+        _directLogsSend(directLogs, _getDN404Storage().mirrorERC721);
+    }
+
+    /// @dev Transfers token `id` from `from` to `to`.
     ///
     /// Requirements:
     ///
