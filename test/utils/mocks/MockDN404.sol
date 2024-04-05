@@ -158,8 +158,8 @@ contract MockDN404 is DN404 {
         DN404._transferFromNFT(_brutalized(from), _brutalized(to), id, _brutalized(msgSender));
     }
 
-    function transferFromNFTWithMirrorEvent(address from, address to, uint256 id) external {
-        _transferFromNFTWithMirrorEvent(from, to, id, msg.sender);
+    function initiateTransferFromNFT(address from, address to, uint256 id) external {
+        _initiateTransferFromNFT(from, to, id, msg.sender);
     }
 
     function _brutalized(address a) internal pure returns (address result) {
