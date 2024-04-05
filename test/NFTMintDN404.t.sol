@@ -3,27 +3,23 @@ pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
 import {NFTMintDN404} from "../src/example/NFTMintDN404.sol";
-import {Merkle} from "murky/src/Merkle.sol";
 
 contract NFTMintDN404Test is SoladyTest {
     uint256 internal constant _WAD = 10 ** 18;
 
     NFTMintDN404 dn;
-    Merkle allowlistMerkle;
 
     address alice = address(111);
     address bob = address(222);
 
     bytes32 allowlistRoot;
-    bytes32[] allowlistData = new bytes32[](2);
 
     uint96 publicPrice = 0.02 ether;
     uint96 allowlistPrice = 0.01 ether;
 
     function setUp() public {
-        allowlistMerkle = new Merkle();
-        allowlistData[0] = bytes32(keccak256(abi.encodePacked(alice)));
-        allowlistRoot = allowlistMerkle.getRoot(allowlistData);
+        // Single leaf, so the root is the leaf.
+        allowlistRoot = bytes32(keccak256(abi.encodePacked(alice)));
 
         dn = new NFTMintDN404(
             "DN404",
@@ -76,7 +72,7 @@ contract NFTMintDN404Test is SoladyTest {
     function testAllowlistMint() public {
         vm.prank(bob);
 
-        bytes32[] memory proof = allowlistMerkle.getProof(allowlistData, 0);
+        bytes32[] memory proof; // Height one tree, so empty proof.
         vm.expectRevert(NFTMintDN404.InvalidProof.selector);
         dn.allowlistMint{value: 5 * allowlistPrice}(5, proof);
 

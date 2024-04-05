@@ -12,7 +12,6 @@ optimizer_runs = 1_000
 gas_limit = 1_000_000_000 # ETH is 30M, but we use a higher value.
 remappings = [
   "forge-std=test/utils/forge-std/",
-  "murky=lib/murky",
   "solady=lib/solady/src"
 ]
 
