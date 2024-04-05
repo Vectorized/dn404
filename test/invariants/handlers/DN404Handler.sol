@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {Test} from "forge-std/Test.sol";
+import "../../utils/SoladyTest.sol";
 import {MockDN404} from "../../utils/mocks/MockDN404.sol";
 import {DN404Mirror} from "../../../src/DN404Mirror.sol";
 
-contract DN404Handler is Test {
+contract DN404Handler is SoladyTest {
     uint256 private constant _WAD = 1000000000000000000;
     uint256 private constant START_SLOT =
         0x0000000000000000000000000000000000000000000000a20d6e21d0e5255308;
@@ -58,7 +58,7 @@ contract DN404Handler is Test {
     }
 
     function randomAddress(uint256 seed) private view returns (address) {
-        return actors[bound(seed, 0, actors.length - 1)];
+        return actors[_bound(seed, 0, actors.length - 1)];
     }
 
     function approve(uint256 ownerIndexSeed, uint256 spenderIndexSeed, uint256 amount) external {
@@ -74,7 +74,7 @@ contract DN404Handler is Test {
     function transfer(uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amount) external {
         address from = randomAddress(fromIndexSeed);
         address to = randomAddress(toIndexSeed);
-        amount = bound(amount, 0, dn404.balanceOf(from));
+        amount = _bound(amount, 0, dn404.balanceOf(from));
         vm.startPrank(from);
 
         uint256 fromPreBalance = dn404.balanceOf(from);
@@ -100,7 +100,7 @@ contract DN404Handler is Test {
         address sender = randomAddress(senderIndexSeed);
         address from = randomAddress(fromIndexSeed);
         address to = randomAddress(toIndexSeed);
-        amount = bound(amount, 0, dn404.balanceOf(from));
+        amount = _bound(amount, 0, dn404.balanceOf(from));
         vm.startPrank(sender);
 
         uint256 fromPreBalance = dn404.balanceOf(from);
@@ -124,7 +124,7 @@ contract DN404Handler is Test {
 
     function mint(uint256 toIndexSeed, uint256 amount) external {
         address to = randomAddress(toIndexSeed);
-        amount = bound(amount, 0, 100e18);
+        amount = _bound(amount, 0, 100e18);
 
         uint256 toPreBalance = dn404.balanceOf(to);
 
@@ -138,7 +138,7 @@ contract DN404Handler is Test {
     function burn(uint256 fromIndexSeed, uint256 amount) external {
         address from = randomAddress(fromIndexSeed);
         vm.startPrank(from);
-        amount = bound(amount, 0, dn404.balanceOf(from));
+        amount = _bound(amount, 0, dn404.balanceOf(from));
 
         uint256 fromPreBalance = dn404.balanceOf(from);
 

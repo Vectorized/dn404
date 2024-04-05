@@ -2,7 +2,6 @@
 pragma solidity ^0.8.4;
 
 import "./utils/SoladyTest.sol";
-import "./utils/InvariantTest.sol";
 
 import {DN404, MockDN404OnlyERC20} from "./utils/mocks/MockDN404OnlyERC20.sol";
 

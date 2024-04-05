@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {Test} from "forge-std/Test.sol";
+import {Test} from "../utils/forge-std/Test.sol";
+import {StdInvariant} from "../utils/forge-std/StdInvariant.sol";
 import {DN404} from "../../src/DN404.sol";
 import {DN404Mirror} from "../../src/DN404Mirror.sol";
 import {MockDN404} from "../utils/mocks/MockDN404.sol";
@@ -22,7 +23,7 @@ import {DN404Handler} from "./handlers/DN404Handler.sol";
 /*** Vault Invariants                                                                                                               ***/
 /**************************************************************************************************************************************/
 // forgefmt: disable-end
-contract BaseInvariantTest is Test {
+contract BaseInvariantTest is Test, StdInvariant {
     address user0 = vm.addr(uint256(keccak256("User0")));
     address user1 = vm.addr(uint256(keccak256("User1")));
     address user2 = vm.addr(uint256(keccak256("User2")));
