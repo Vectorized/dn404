@@ -41,7 +41,7 @@ contract DN404Test is SoladyTest {
         dn.initializeDN404(1000 * _WAD, address(this), address(mirror));
         dn.setBaseURI(baseURI);
         string memory expected = string(abi.encodePacked(baseURI, id));
-        assertEq(DN404Mirror(mirror).tokenURI(id), expected);
+        assertEq(DN404Mirror(payable(address(dn))).tokenURI(id), expected);
         assertEq(mirror.tokenURI(id), expected);
     }
 
