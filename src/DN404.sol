@@ -1178,9 +1178,11 @@ abstract contract DN404 {
             /// @solidity memory-safe-assembly
             assembly {
                 // Memory safe, as we've advanced the free memory pointer by a word.
-                let o := sub(uri, 0x20)
+                let o := sub(uri, 0x20) // Start of the returndata.
+                let z := add(mload(uri), 0x40) // Unpadded length of returndata.
+                mstore(add(o, z), 0) // Zeroize the word after the end of the string.
                 mstore(o, 0x20) // Store the offset of `uri`.
-                return(o, add(0x60, mload(uri)))
+                return(o, and(not(0x1f), add(0x1f, z)))
             }
         }
         // `implementsDN404()`.
