@@ -4,6 +4,7 @@
 [![CI][ci-shield]][ci-url]
 
 DN404 is an implementation of a co-joined ERC20 and ERC721 pair.
+To learn more about how these dual natured tokens work, you can read the full [ERC-7631 spec](https://eips.ethereum.org/EIPS/eip-7631).
 
 - Full compliance with the ERC20 and ERC721 specifications.
 - Transfers on one side will be reflected on the other side.
