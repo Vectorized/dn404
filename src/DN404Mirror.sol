@@ -313,8 +313,8 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             let s := shr(224, interfaceId)
-            // ERC165: 0x01ffc9a7, ERC721: 0x80ac58cd, ERC721Metadata: 0x5b5e139f.
-            result := or(or(eq(s, 0x01ffc9a7), eq(s, 0x80ac58cd)), eq(s, 0x5b5e139f))
+            // ERC165: 0x01ffc9a7, ERC721: 0x80ac58cd, ERC721Metadata: 0x5b5e139f, DN404: 0x04040404.
+            result := or(or(eq(s, 0x01ffc9a7), eq(s, 0x80ac58cd)), eq(s, 0x5b5e139f), eq(s, 0x04040404))
         }
     }
 
