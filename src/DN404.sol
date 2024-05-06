@@ -438,7 +438,7 @@ abstract contract DN404 {
             $.totalSupply = uint96(totalSupply_);
             uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
             if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-            maxId = totalSupply_ / _unit();
+            maxId = totalSupply_ + amount / _unit();
         }
         unchecked {
             if (_isZero(toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG)) {
@@ -520,7 +520,7 @@ abstract contract DN404 {
             $.totalSupply = uint96(totalSupply_);
             uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
             if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-            maxId = totalSupply_ / _unit();
+            maxId = totalSupply_ + amount / _unit();
         }
         unchecked {
             if (_isZero(toAddressData.flags & _ADDRESS_DATA_SKIP_NFT_FLAG)) {

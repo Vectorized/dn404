@@ -156,7 +156,12 @@ contract DN404Test is SoladyTest {
         dn.mint(initialSupplyOwner, 3 * _WAD);
         assertEq(mirror.balanceOf(initialSupplyOwner), 5);
 
-        for (uint256 i = 1; i <= 5; ++i) {
+        for (uint256 i = 1; i <= 2; ++i) {
+            assertEq(mirror.ownerOf(i), initialSupplyOwner);
+        }
+
+        // leave out the burned range
+        for (uint256 i = 5; i <= 7; ++i) {
             assertEq(mirror.ownerOf(i), initialSupplyOwner);
         }
 
@@ -195,7 +200,38 @@ contract DN404Test is SoladyTest {
         dn.mint(initialSupplyOwner, 1);
         assertEq(mirror.balanceOf(initialSupplyOwner), 2);
 
-        for (uint256 i = 1; i <= 2; ++i) {
+        assertEq(mirror.ownerOf(1), initialSupplyOwner);
+        assertEq(mirror.ownerOf(3), initialSupplyOwner);
+
+        uint256 count;
+        for (uint256 i = 0; i < 10; ++i) {
+            if (mirror.ownerAt(i) == initialSupplyOwner) ++count;
+        }
+        assertEq(count, 2);
+    }
+
+    function testMintAndBurn3() public {
+        address initialSupplyOwner = address(1111);
+
+        dn.initializeDN404(0, initialSupplyOwner, address(mirror));
+
+        assertEq(dn.getSkipNFT(initialSupplyOwner), false);
+        assertEq(dn.getSkipNFT(address(this)), true);
+
+        vm.prank(initialSupplyOwner);
+        dn.setSkipNFT(false);
+        dn.setAddToBurnedPool(true);
+
+        dn.mint(initialSupplyOwner, 4 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 4);
+
+        dn.burn(initialSupplyOwner, 2 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 2);
+
+        dn.mint(initialSupplyOwner, 3 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 5);
+
+        for (uint256 i = 1; i <= 5; ++i) {
             assertEq(mirror.ownerOf(i), initialSupplyOwner);
         }
 
@@ -203,7 +239,10 @@ contract DN404Test is SoladyTest {
         for (uint256 i = 0; i < 10; ++i) {
             if (mirror.ownerAt(i) == initialSupplyOwner) ++count;
         }
-        assertEq(count, 2);
+        assertEq(count, 5);
+
+        dn.mint(initialSupplyOwner, 3 * _WAD);
+        assertEq(mirror.balanceOf(initialSupplyOwner), 8);
     }
 
     function testSetAndGetSkipNFT() public {
