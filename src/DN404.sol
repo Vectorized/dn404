@@ -361,7 +361,9 @@ abstract contract DN404 {
     function allowance(address owner, address spender) public view returns (uint256) {
         if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
             uint8 flags = _getDN404Storage().addressData[owner].flags;
-            if (_isZero(flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)) return type(uint256).max;
+            if ((flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == uint256(0)) {
+                return type(uint256).max;
+            }
         }
         return _ref(_getDN404Storage().allowance, owner, spender).value;
     }
@@ -412,9 +414,8 @@ abstract contract DN404 {
         Uint256Ref storage a = _ref(_getDN404Storage().allowance, from, msg.sender);
 
         uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
-            && _isZero(_getDN404Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)
-            ? type(uint256).max
-            : a.value;
+            && (_getDN404Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)
+                == uint256(0) ? type(uint256).max : a.value;
 
         if (allowed != type(uint256).max) {
             if (amount > allowed) revert InsufficientAllowance();
@@ -465,58 +466,56 @@ abstract contract DN404 {
 
         _DNMintTemps memory t;
         unchecked {
+            uint256 maxId;
             {
                 uint256 toBalance = uint256(toAddressData.balance) + amount;
                 toAddressData.balance = uint96(toBalance);
                 t.toEnd = toBalance / _unit();
-            }
-            uint256 maxId;
-            {
+
                 uint256 totalSupply_ = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
                 uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
                 if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
                 maxId = totalSupply_ / _unit();
             }
-            if (!getSkipNFT(to)) {
+            while (!getSkipNFT(to)) {
                 Uint32Map storage toOwned = $.owned[to];
                 Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
-                t.numNFTMints = _zeroFloorSub(t.toEnd, toIndex);
+                if ((t.numNFTMints = _zeroFloorSub(t.toEnd, toIndex)) == uint256(0)) break;
 
-                if (t.numNFTMints != 0) {
-                    t.packedLogs = _packedLogsMalloc(t.numNFTMints);
-                    _packedLogsSet(t.packedLogs, to, 0);
-                    $.totalNFTSupply += uint32(t.numNFTMints);
-                    toAddressData.ownedLength = uint32(t.toEnd);
-                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                    uint32 burnedPoolHead = $.burnedPoolHead;
-                    t.burnedPoolTail = $.burnedPoolTail;
-                    t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
-                    // Mint loop.
-                    do {
-                        uint256 id;
-                        if (burnedPoolHead != t.burnedPoolTail) {
-                            id = _get($.burnedPool, burnedPoolHead++);
-                        } else {
-                            id = t.nextTokenId;
-                            while (_get(oo, _ownershipIndex(id)) != 0) {
-                                id = _useExistsLookup()
-                                    ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
-                                    : _wrapNFTId(id + 1, maxId);
-                            }
-                            t.nextTokenId = _wrapNFTId(id + 1, maxId);
+                t.packedLogs = _packedLogsMalloc(t.numNFTMints);
+                _packedLogsSet(t.packedLogs, to, 0);
+                $.totalNFTSupply += uint32(t.numNFTMints);
+                toAddressData.ownedLength = uint32(t.toEnd);
+                t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                uint32 burnedPoolHead = $.burnedPoolHead;
+                t.burnedPoolTail = $.burnedPoolTail;
+                t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
+                // Mint loop.
+                do {
+                    uint256 id;
+                    if (burnedPoolHead != t.burnedPoolTail) {
+                        id = _get($.burnedPool, burnedPoolHead++);
+                    } else {
+                        id = t.nextTokenId;
+                        while (_get(oo, _ownershipIndex(id)) != 0) {
+                            id = _useExistsLookup()
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
+                                : _wrapNFTId(id + 1, maxId);
                         }
-                        if (_useExistsLookup()) _set($.exists, id, true);
-                        _set(toOwned, toIndex, uint32(id));
-                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                        _packedLogsAppend(t.packedLogs, id);
-                    } while (toIndex != t.toEnd);
+                        t.nextTokenId = _wrapNFTId(id + 1, maxId);
+                    }
+                    if (_useExistsLookup()) _set($.exists, id, true);
+                    _set(toOwned, toIndex, uint32(id));
+                    _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                    _packedLogsAppend(t.packedLogs, id);
+                } while (toIndex != t.toEnd);
 
-                    $.nextTokenId = uint32(t.nextTokenId);
-                    $.burnedPoolHead = burnedPoolHead;
-                    _packedLogsSend(t.packedLogs, $);
-                }
+                $.nextTokenId = uint32(t.nextTokenId);
+                $.burnedPoolHead = burnedPoolHead;
+                _packedLogsSend(t.packedLogs, $);
+                break;
             }
         }
         /// @solidity memory-safe-assembly
@@ -557,14 +556,13 @@ abstract contract DN404 {
 
         _DNMintTemps memory t;
         unchecked {
+            uint256 id;
+            uint256 maxId;
             {
                 uint256 toBalance = uint256(toAddressData.balance) + amount;
                 toAddressData.balance = uint96(toBalance);
                 t.toEnd = toBalance / _unit();
-            }
-            uint256 id;
-            uint256 maxId;
-            {
+
                 uint256 preTotalSupply = uint256($.totalSupply);
                 uint256 totalSupply_ = uint256(preTotalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
@@ -573,37 +571,36 @@ abstract contract DN404 {
                 maxId = totalSupply_ / _unit();
                 id = _wrapNFTId(preTotalSupply / _unit() + 1, maxId);
             }
-            if (!getSkipNFT(to)) {
+            while (!getSkipNFT(to)) {
                 Uint32Map storage toOwned = $.owned[to];
                 Uint32Map storage oo = $.oo;
                 uint256 toIndex = toAddressData.ownedLength;
-                t.numNFTMints = _zeroFloorSub(t.toEnd, toIndex);
+                if ((t.numNFTMints = _zeroFloorSub(t.toEnd, toIndex)) == uint256(0)) break;
 
-                if (t.numNFTMints != 0) {
-                    t.packedLogs = _packedLogsMalloc(t.numNFTMints);
-                    // Invalidate (empty) the burned pool.
-                    $.burnedPoolHead = 0;
-                    $.burnedPoolTail = 0;
-                    _packedLogsSet(t.packedLogs, to, 0);
-                    $.totalNFTSupply += uint32(t.numNFTMints);
-                    toAddressData.ownedLength = uint32(t.toEnd);
-                    t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                    // Mint loop.
-                    do {
-                        while (_get(oo, _ownershipIndex(id)) != 0) {
-                            id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
-                                : _wrapNFTId(id + 1, maxId);
-                        }
-                        if (_useExistsLookup()) _set($.exists, id, true);
-                        _set(toOwned, toIndex, uint32(id));
-                        _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
-                        _packedLogsAppend(t.packedLogs, id);
-                        id = _wrapNFTId(id + 1, maxId);
-                    } while (toIndex != t.toEnd);
+                t.packedLogs = _packedLogsMalloc(t.numNFTMints);
+                // Invalidate (empty) the burned pool.
+                $.burnedPoolHead = 0;
+                $.burnedPoolTail = 0;
+                _packedLogsSet(t.packedLogs, to, 0);
+                $.totalNFTSupply += uint32(t.numNFTMints);
+                toAddressData.ownedLength = uint32(t.toEnd);
+                t.toAlias = _registerAndResolveAlias(toAddressData, to);
+                // Mint loop.
+                do {
+                    while (_get(oo, _ownershipIndex(id)) != 0) {
+                        id = _useExistsLookup()
+                            ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
+                            : _wrapNFTId(id + 1, maxId);
+                    }
+                    if (_useExistsLookup()) _set($.exists, id, true);
+                    _set(toOwned, toIndex, uint32(id));
+                    _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
+                    _packedLogsAppend(t.packedLogs, id);
+                    id = _wrapNFTId(id + 1, maxId);
+                } while (toIndex != t.toEnd);
 
-                    _packedLogsSend(t.packedLogs, $);
-                }
+                _packedLogsSend(t.packedLogs, $);
+                break;
             }
         }
         /// @solidity memory-safe-assembly
@@ -740,7 +737,7 @@ abstract contract DN404 {
 
             while (_useDirectTransfersIfPossible()) {
                 uint256 n = _min(t.fromOwnedLength, _min(t.numNFTBurns, t.numNFTMints));
-                if (_isZero(n)) break;
+                if (n == uint256(0)) break;
                 t.numNFTBurns -= n;
                 t.numNFTMints -= n;
                 if (from == to) {
@@ -1055,13 +1052,13 @@ abstract contract DN404 {
     {
         DN404Storage storage $ = _getDN404Storage();
         addressAlias = toAddressData.addressAlias;
-        if (_isZero(addressAlias)) {
+        if (addressAlias == uint256(0)) {
             unchecked {
                 addressAlias = ++$.numAliases;
             }
             toAddressData.addressAlias = addressAlias;
             $.aliasToAddress[addressAlias] = to;
-            if (_isZero(addressAlias)) revert(); // Overflow.
+            if (addressAlias == uint256(0)) revert(); // Overflow.
         }
     }
 
@@ -1107,7 +1104,7 @@ abstract contract DN404 {
         virtual
         returns (bool)
     {
-        return !_isZero(_ref(_getDN404Storage().operatorApprovals, owner, operator).value);
+        return _ref(_getDN404Storage().operatorApprovals, owner, operator).value != 0;
     }
 
     /// @dev Returns if token `id` exists.
@@ -1472,14 +1469,6 @@ abstract contract DN404 {
         }
     }
 
-    /// @dev Returns `x == 0`. This is because solc is sometimes dumb.
-    function _isZero(uint256 x) internal pure returns (bool result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := iszero(x)
-        }
-    }
-
     /// @dev Initiates memory allocation for direct logs with `n` log items.
     function _directLogsMalloc(uint256 n, address from, address to)
         private
@@ -1643,8 +1632,8 @@ abstract contract DN404 {
     {
         uint256 aN = a.length;
         uint256 bN = b.length;
-        if (_isZero(aN)) return b;
-        if (_isZero(bN)) return a;
+        if (aN == uint256(0)) return b;
+        if (bN == uint256(0)) return a;
         /// @solidity memory-safe-assembly
         assembly {
             let n := add(aN, bN)
