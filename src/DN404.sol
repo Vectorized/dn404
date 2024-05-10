@@ -473,12 +473,11 @@ abstract contract DN404 {
             }
             uint256 maxId;
             {
-                uint256 totalSupply_ = uint256($.totalSupply) + amount;
-                $.totalSupply = uint96(totalSupply_);
-                // forgefmt: disable-next-item
-                if (_toUint(_totalSupplyOverflows(totalSupply_)) | _toUint(totalSupply_ < amount) != 0)
-                    revert TotalSupplyOverflow();
-                maxId = totalSupply_ / _unit();
+                uint256 newTotalSupply = uint256($.totalSupply) + amount;
+                $.totalSupply = uint96(newTotalSupply);
+                uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
+                if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
+                maxId = newTotalSupply / _unit();
             }
             while (!getSkipNFT(to)) {
                 Uint32Map storage toOwned = $.owned[to];
@@ -567,12 +566,11 @@ abstract contract DN404 {
             uint256 maxId;
             {
                 uint256 preTotalSupply = uint256($.totalSupply);
-                uint256 totalSupply_ = uint256(preTotalSupply) + amount;
-                $.totalSupply = uint96(totalSupply_);
-                // forgefmt: disable-next-item
-                if (_toUint(_totalSupplyOverflows(totalSupply_)) | _toUint(totalSupply_ < amount) != 0)
-                    revert TotalSupplyOverflow();
-                maxId = totalSupply_ / _unit();
+                uint256 newTotalSupply = uint256(preTotalSupply) + amount;
+                $.totalSupply = uint96(newTotalSupply);
+                uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
+                if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
+                maxId = newTotalSupply / _unit();
                 id = _wrapNFTId(preTotalSupply / _unit() + 1, maxId);
             }
             while (!getSkipNFT(to)) {
