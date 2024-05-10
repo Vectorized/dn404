@@ -42,30 +42,32 @@ contract ArrayOpsTest is SoladyTest {
         view
         returns (uint256[] memory result)
     {
+        uint256 aN = a.length;
+        uint256 bN = b.length;
+        if (aN == uint256(0)) return b;
+        if (bN == uint256(0)) return a;
         /// @solidity memory-safe-assembly
         assembly {
-            result := mload(0x40)
-            let aLength := mload(a)
-            let bLength := mload(b)
-            let n := add(aLength, bLength)
-            mstore(result, n)
-            let o := add(result, 0x20)
-            mstore(0x40, add(o, shl(5, n)))
-            n := shl(5, aLength)
-            pop(staticcall(gas(), 4, add(a, 0x20), n, o, n))
-            o := add(o, n)
-            n := shl(5, bLength)
-            pop(staticcall(gas(), 4, add(b, 0x20), n, o, n))
+            let n := add(aN, bN)
+            if n {
+                result := mload(0x40)
+                mstore(result, n)
+                let o := add(result, 0x20)
+                mstore(0x40, add(o, shl(5, n)))
+                let aL := shl(5, aN)
+                pop(staticcall(gas(), 4, add(a, 0x20), aL, o, aL))
+                pop(staticcall(gas(), 4, add(b, 0x20), shl(5, bN), add(o, aL), shl(5, bN)))
+            }
         }
     }
 
     /// @dev Concatenates the arrays.
-    function _concat(address[] memory a, address[] memory b, address[] memory c)
+    function _concat(address[] memory a, address[] memory b)
         private
         view
         returns (address[] memory result)
     {
-        result = _toAddresses(_concat(_toUints(a), _concat(_toUints(b), _toUints(c))));
+        result = _toAddresses(_concat(_toUints(a), _toUints(b)));
     }
 
     /// @dev Reinterpret cast to an uint array.
