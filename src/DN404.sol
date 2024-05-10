@@ -466,16 +466,18 @@ abstract contract DN404 {
 
         _DNMintTemps memory t;
         unchecked {
-            uint256 maxId;
             {
                 uint256 toBalance = uint256(toAddressData.balance) + amount;
                 toAddressData.balance = uint96(toBalance);
                 t.toEnd = toBalance / _unit();
-
+            }
+            uint256 maxId;
+            {
                 uint256 totalSupply_ = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
-                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+                // forgefmt: disable-next-item
+                if (_toUint(_totalSupplyOverflows(totalSupply_)) | _toUint(totalSupply_ < amount) != 0)
+                    revert TotalSupplyOverflow();
                 maxId = totalSupply_ / _unit();
             }
             while (!getSkipNFT(to)) {
@@ -556,18 +558,20 @@ abstract contract DN404 {
 
         _DNMintTemps memory t;
         unchecked {
-            uint256 id;
-            uint256 maxId;
             {
                 uint256 toBalance = uint256(toAddressData.balance) + amount;
                 toAddressData.balance = uint96(toBalance);
                 t.toEnd = toBalance / _unit();
-
+            }
+            uint256 id;
+            uint256 maxId;
+            {
                 uint256 preTotalSupply = uint256($.totalSupply);
                 uint256 totalSupply_ = uint256(preTotalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
-                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+                // forgefmt: disable-next-item
+                if (_toUint(_totalSupplyOverflows(totalSupply_)) | _toUint(totalSupply_ < amount) != 0)
+                    revert TotalSupplyOverflow();
                 maxId = totalSupply_ / _unit();
                 id = _wrapNFTId(preTotalSupply / _unit() + 1, maxId);
             }
