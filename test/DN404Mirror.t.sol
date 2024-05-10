@@ -41,9 +41,14 @@ contract DN404MirrorTest is SoladyTest {
     }
 
     function testTokenURI(string memory baseURI, uint256 id) public {
-        dn.initializeDN404(1000, address(this), address(mirror));
+        id = _bound(id, 1, 5);
+        dn.initializeDN404(0, address(this), address(mirror));
         dn.setBaseURI(baseURI);
+        address alice = address(111);
+        dn.mint(alice, _WAD * uint256(id));
         assertEq(mirror.tokenURI(id), string(abi.encodePacked(baseURI, id)));
+        vm.expectRevert(DN404.TokenDoesNotExist.selector);
+        mirror.tokenURI(id + 1);
     }
 
     function testSupportsInterface() public {
