@@ -60,10 +60,6 @@ contract DN404Mirror {
     /// does not implement ERC721Receiver.
     error TransferToNonERC721ReceiverImplementer();
 
-    /// @dev Thrown when linking to the DN404 base contract and the
-    /// DN404 supportsInterface check fails or the call reverts.
-    error CannotLink();
-
     /// @dev Thrown when a linkMirrorContract call is received and the
     /// NFT mirror contract has already been linked to a DN404 base contract.
     error AlreadyLinked();
@@ -84,7 +80,7 @@ contract DN404Mirror {
         // Address of the ERC20 base contract.
         address baseERC20;
         // The deployer, if provided. If non-zero, the initialization of the
-        // ERC20 <-> ERC721 link can only be done be the deployer via the ERC20 base contract.
+        // ERC20 <-> ERC721 link can only be done by the deployer via the ERC20 base contract.
         address deployer;
         // The owner of the ERC20 base contract. For marketplace signaling.
         address owner;
@@ -126,6 +122,9 @@ contract DN404Mirror {
     /// @dev Returns the Uniform Resource Identifier (URI) for token `id` from
     /// the base DN404 contract.
     function tokenURI(uint256 id) public view virtual returns (string memory) {
+        ownerOf(id); // `ownerOf` reverts if the token does not exist.
+        // We'll leave if optional for `_tokenURI` to revert for non-existent token
+        // on the ERC20 side, since this is only recommended by the ERC721 standard.
         return _readString(0xc87b56dd, id); // `tokenURI(uint256)`.
     }
 

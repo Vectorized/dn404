@@ -22,9 +22,8 @@ contract MockDN404OnlyERC20 is DN404 {
         return "";
     }
 
-    function _addressData(address a) internal virtual override returns (AddressData storage d) {
-        d = DN404._addressData(a);
-        d.flags |= _ADDRESS_DATA_SKIP_NFT_FLAG;
+    function getSkipNFT(address) public view virtual override returns (bool) {
+        return true;
     }
 
     function mint(address to, uint256 amount) public {

@@ -27,12 +27,6 @@ contract SimpleDN404Test is SoladyTest {
         assertEq(dn.symbol(), "DN");
     }
 
-    function testSetBaseURI() public {
-        vm.prank(alice);
-        dn.setBaseURI("https://example.com/");
-        assertEq(DN404Mirror(payable(dn.mirrorERC721())).tokenURI(1), "https://example.com/1");
-    }
-
     function testWithdraw() public {
         vm.deal(address(dn), 1 ether);
         assertEq(address(dn).balance, 1 ether);
