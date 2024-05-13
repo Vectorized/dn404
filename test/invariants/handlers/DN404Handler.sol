@@ -83,58 +83,79 @@ contract DN404Handler is SoladyTest {
         return actors[_bound(seed, 0, actors.length - 1)];
     }
 
-    function approve(uint256 ownerIndexSeed, uint256 spenderIndexSeed, uint256 amount) public {
-        // PRE-CONDITIONS
-        address owner = randomAddress(ownerIndexSeed);
-        address spender = randomAddress(spenderIndexSeed);
-        uint88 ownerAuxBefore = dn404.getAux(owner);
-        uint88 spenderAuxBefore = dn404.getAux(spender);
+    struct ApproveTemps {
+        address owner;
+        address spender;
+        uint256 ownerAuxBefore;
+        uint256 ownerAuxAfter;
+        uint256 spenderAuxBefore;
+        uint256 spenderAuxAfter;
+    }
 
-        if (owner == spender) return;
+    function approve(uint256 ownerIndexSeed, uint256 spenderIndexSeed, uint256 amount) public {
+        ApproveTemps memory t;
+        // PRE-CONDITIONS
+        t.owner = randomAddress(ownerIndexSeed);
+        t.spender = randomAddress(spenderIndexSeed);
+        t.ownerAuxBefore = dn404.getAux(t.owner);
+        t.spenderAuxBefore = dn404.getAux(t.spender);
+
+        if (t.owner == t.spender) return;
 
         // ACTION
-        vm.startPrank(owner);
-        dn404.approve(spender, amount);
+        vm.startPrank(t.owner);
+        dn404.approve(t.spender, amount);
 
         // POST-CONDITIONS
-        uint88 ownerAuxAfter = dn404.getAux(owner);
-        uint88 spenderAuxAfter = dn404.getAux(spender);
+        t.ownerAuxAfter = dn404.getAux(t.owner);
+        t.spenderAuxAfter = dn404.getAux(t.spender);
 
-        assertEq(dn404.allowance(owner, spender), amount, "Allowance != Amount");
+        assertEq(dn404.allowance(t.owner, t.spender), amount, "Allowance != Amount");
         // Assert auxiliary data is unchanged.
-        assertEq(ownerAuxBefore, ownerAuxAfter, "owner auxiliary data has changed");
-        assertEq(spenderAuxBefore, spenderAuxAfter, "spender auxiliary data has changed");
+        assertEq(t.ownerAuxBefore, t.ownerAuxAfter, "owner auxiliary data has changed");
+        assertEq(t.spenderAuxBefore, t.spenderAuxAfter, "spender auxiliary data has changed");
+    }
+
+    struct TransferTemps {
+        address from;
+        address to;
+        uint256 numNFTBurns;
+        uint256 numNFTMints;
+        uint256 n;
+        uint256[] burnedIds;
+        bool success;
     }
 
     function transfer(uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amount) public {
+        TransferTemps memory t;
         // PRE-CONDITIONS
-        address from = randomAddress(fromIndexSeed);
-        address to = randomAddress(toIndexSeed);
-        amount = _bound(amount, 0, dn404.balanceOf(from));
-        vm.startPrank(from);
+        t.from = randomAddress(fromIndexSeed);
+        t.to = randomAddress(toIndexSeed);
+        amount = _bound(amount, 0, dn404.balanceOf(t.from));
+        vm.startPrank(t.from);
 
         BeforeAfter memory beforeAfter;
-        beforeAfter.fromBalanceBefore = dn404.balanceOf(from);
-        beforeAfter.toBalanceBefore = dn404.balanceOf(to);
+        beforeAfter.fromBalanceBefore = dn404.balanceOf(t.from);
+        beforeAfter.toBalanceBefore = dn404.balanceOf(t.to);
         beforeAfter.totalSupplyBefore = dn404.totalSupply();
-        beforeAfter.toAuxBefore = dn404.getAux(to);
+        beforeAfter.toAuxBefore = dn404.getAux(t.to);
 
-        uint256 numNFTBurns = _zeroFloorSub(
-            mirror.balanceOf(from), (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
+        t.numNFTBurns = _zeroFloorSub(
+            mirror.balanceOf(t.from), (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
         );
-        uint256 numNFTMints = _zeroFloorSub(
-            (beforeAfter.toBalanceBefore + amount) / dn404.unit(), mirror.balanceOf(to)
+        t.numNFTMints = _zeroFloorSub(
+            (beforeAfter.toBalanceBefore + amount) / dn404.unit(), mirror.balanceOf(t.to)
         );
-        uint256 n = _min(mirror.balanceOf(from), _min(numNFTBurns, numNFTMints));
-        uint256[] memory burnedIds = dn404.burnedPool();
+        t.n = _min(mirror.balanceOf(t.from), _min(t.numNFTBurns, t.numNFTMints));
+        t.burnedIds = dn404.burnedPool();
 
         // ACTION
         vm.recordLogs();
-        (bool success,) =
-            address(dn404).call(abi.encodeWithSelector(DN404.transfer.selector, to, amount));
+        (t.success,) =
+            address(dn404).call(abi.encodeWithSelector(DN404.transfer.selector, t.to, amount));
 
         // POST-CONDITIONS
-        if (success) {
+        if (t.success) {
             Vm.Log[] memory logs = vm.getRecordedLogs();
             uint256 id;
             for (uint256 i = 0; i < logs.length; i++) {
@@ -144,12 +165,12 @@ contract DN404Handler is SoladyTest {
                 ) {
                     // Grab minted ID from logs.
                     if (logs[i].topics.length > 3) id = uint256(logs[i].topics[3]);
-                    if (n > 0 && from != to) {
-                        for (uint256 j = 0; j < burnedIds.length; j++) {
+                    if (t.n > 0 && t.from != t.to) {
+                        for (uint256 j = 0; j < t.burnedIds.length; j++) {
                             // Assert direct transfers do not overlap with burned pool.
-                            if (dn404.useDirectTransfersIfPossible() && i < n) {
+                            if (dn404.useDirectTransfersIfPossible() && i < t.n) {
                                 assertNotEq(
-                                    burnedIds[j], id, "transfer direct went over burned ids"
+                                    t.burnedIds[j], id, "transfer direct went over burned ids"
                                 );
                             }
                         }
@@ -161,23 +182,23 @@ contract DN404Handler is SoladyTest {
                 }
             }
 
-            nftsOwned[from] -= _zeroFloorSub(
-                nftsOwned[from], (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
+            nftsOwned[t.from] -= _zeroFloorSub(
+                nftsOwned[t.from], (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
             );
-            if (!dn404.getSkipNFT(to)) {
-                if (from == to) beforeAfter.toBalanceBefore -= amount;
-                nftsOwned[to] += _zeroFloorSub(
-                    (beforeAfter.toBalanceBefore + amount) / dn404.unit(), nftsOwned[to]
+            if (!dn404.getSkipNFT(t.to)) {
+                if (t.from == t.to) beforeAfter.toBalanceBefore -= amount;
+                nftsOwned[t.to] += _zeroFloorSub(
+                    (beforeAfter.toBalanceBefore + amount) / dn404.unit(), nftsOwned[t.to]
                 );
             }
 
-            beforeAfter.fromBalanceAfter = dn404.balanceOf(from);
-            beforeAfter.toBalanceAfter = dn404.balanceOf(to);
+            beforeAfter.fromBalanceAfter = dn404.balanceOf(t.from);
+            beforeAfter.toBalanceAfter = dn404.balanceOf(t.to);
             beforeAfter.totalSupplyAfter = dn404.totalSupply();
-            beforeAfter.toAuxAfter = dn404.getAux(to);
+            beforeAfter.toAuxAfter = dn404.getAux(t.to);
 
             // Assert balance updates between addresses are valid.
-            if (from != to) {
+            if (t.from != t.to) {
                 assertEq(
                     beforeAfter.fromBalanceAfter + amount,
                     beforeAfter.fromBalanceBefore,
@@ -207,47 +228,59 @@ contract DN404Handler is SoladyTest {
         }
     }
 
+    struct TransferFromTemps {
+        address sender;
+        address from;
+        address to;
+        uint256 numNFTBurns;
+        uint256 numNFTMints;
+        uint256 n;
+        uint256[] burnedIds;
+        bool success;
+    }
+
     function transferFrom(
         uint256 senderIndexSeed,
         uint256 fromIndexSeed,
         uint256 toIndexSeed,
         uint256 amount
     ) public {
+        TransferFromTemps memory t;
         // PRE-CONDITIONS
-        address sender = randomAddress(senderIndexSeed);
-        address from = randomAddress(fromIndexSeed);
-        address to = randomAddress(toIndexSeed);
-        amount = _bound(amount, 0, dn404.balanceOf(from));
-        vm.startPrank(sender);
+        t.sender = randomAddress(senderIndexSeed);
+        t.from = randomAddress(fromIndexSeed);
+        t.to = randomAddress(toIndexSeed);
+        amount = _bound(amount, 0, dn404.balanceOf(t.from));
+        vm.startPrank(t.sender);
 
         BeforeAfter memory beforeAfter;
-        beforeAfter.fromBalanceBefore = dn404.balanceOf(from);
-        beforeAfter.toBalanceBefore = dn404.balanceOf(to);
+        beforeAfter.fromBalanceBefore = dn404.balanceOf(t.from);
+        beforeAfter.toBalanceBefore = dn404.balanceOf(t.to);
         beforeAfter.totalSupplyBefore = dn404.totalSupply();
-        beforeAfter.toAuxBefore = dn404.getAux(to);
+        beforeAfter.toAuxBefore = dn404.getAux(t.to);
 
-        uint256 numNFTBurns = _zeroFloorSub(
-            mirror.balanceOf(from), (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
+        t.numNFTBurns = _zeroFloorSub(
+            mirror.balanceOf(t.from), (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
         );
-        uint256 numNFTMints = _zeroFloorSub(
-            (beforeAfter.toBalanceBefore + amount) / dn404.unit(), mirror.balanceOf(to)
+        t.numNFTMints = _zeroFloorSub(
+            (beforeAfter.toBalanceBefore + amount) / dn404.unit(), mirror.balanceOf(t.to)
         );
-        uint256 n = _min(mirror.balanceOf(from), _min(numNFTBurns, numNFTMints));
-        uint256[] memory burnedIds = dn404.burnedPool();
+        t.n = _min(mirror.balanceOf(t.from), _min(t.numNFTBurns, t.numNFTMints));
+        t.burnedIds = dn404.burnedPool();
 
-        if (dn404.allowance(from, sender) < amount) {
-            sender = from;
-            vm.startPrank(sender);
+        if (dn404.allowance(t.from, t.sender) < amount) {
+            t.sender = t.from;
+            vm.startPrank(t.sender);
         }
 
         // ACTION
         vm.recordLogs();
-        (bool success,) = address(dn404).call(
-            abi.encodeWithSelector(DN404.transferFrom.selector, from, to, amount)
+        (t.success,) = address(dn404).call(
+            abi.encodeWithSelector(DN404.transferFrom.selector, t.from, t.to, amount)
         );
 
         // POST-CONDITIONS
-        if (success) {
+        if (t.success) {
             Vm.Log[] memory logs = vm.getRecordedLogs();
             uint256 id;
             for (uint256 i = 0; i < logs.length; i++) {
@@ -257,12 +290,12 @@ contract DN404Handler is SoladyTest {
                 ) {
                     // Grab minted ID from logs.
                     if (logs[i].topics.length > 3) id = uint256(logs[i].topics[3]);
-                    if (n > 0 && from != to) {
-                        for (uint256 j = 0; j < burnedIds.length; j++) {
+                    if (t.n > 0 && t.from != t.to) {
+                        for (uint256 j = 0; j < t.burnedIds.length; j++) {
                             // Assert direct transfers not overlap with burned pool.
-                            if (dn404.useDirectTransfersIfPossible() && i < n) {
+                            if (dn404.useDirectTransfersIfPossible() && i < t.n) {
                                 assertNotEq(
-                                    burnedIds[j], id, "transfer direct went over burned ids"
+                                    t.burnedIds[j], id, "transfer direct went over burned ids"
                                 );
                             }
                         }
@@ -274,30 +307,30 @@ contract DN404Handler is SoladyTest {
                 }
             }
 
-            nftsOwned[from] -= _zeroFloorSub(
-                nftsOwned[from], (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
+            nftsOwned[t.from] -= _zeroFloorSub(
+                nftsOwned[t.from], (beforeAfter.fromBalanceBefore - amount) / dn404.unit()
             );
-            if (!dn404.getSkipNFT(to)) {
-                if (from == to) beforeAfter.toBalanceBefore -= amount;
-                nftsOwned[to] += _zeroFloorSub(
-                    (beforeAfter.toBalanceBefore + amount) / dn404.unit(), nftsOwned[to]
+            if (!dn404.getSkipNFT(t.to)) {
+                if (t.from == t.to) beforeAfter.toBalanceBefore -= amount;
+                nftsOwned[t.to] += _zeroFloorSub(
+                    (beforeAfter.toBalanceBefore + amount) / dn404.unit(), nftsOwned[t.to]
                 );
             }
 
-            beforeAfter.fromBalanceAfter = dn404.balanceOf(from);
-            beforeAfter.toBalanceAfter = dn404.balanceOf(to);
+            beforeAfter.fromBalanceAfter = dn404.balanceOf(t.from);
+            beforeAfter.toBalanceAfter = dn404.balanceOf(t.to);
             beforeAfter.totalSupplyAfter = dn404.totalSupply();
-            beforeAfter.toAuxAfter = dn404.getAux(to);
+            beforeAfter.toAuxAfter = dn404.getAux(t.to);
 
             // Assert balance updates between addresses are valid.
-            if (from != to) {
+            if (t.from != t.to) {
                 assertEq(
                     beforeAfter.fromBalanceAfter + amount,
                     beforeAfter.fromBalanceBefore,
                     "balance after + amount != balance before"
                 );
                 assertEq(
-                    dn404.balanceOf(to),
+                    dn404.balanceOf(t.to),
                     beforeAfter.toBalanceBefore + amount,
                     "balance after != balance before + amount"
                 );
@@ -497,47 +530,67 @@ contract DN404Handler is SoladyTest {
         assertEq(beforeAfter.toAuxBefore, beforeAfter.toAuxAfter, "auxiliary data has changed");
     }
 
-    function burn(uint256 fromIndexSeed, uint256 amount) public {
-        // PRE-CONDITIONS
-        address from = randomAddress(fromIndexSeed);
-        vm.startPrank(from);
-        amount = _bound(amount, 0, dn404.balanceOf(from));
+    struct BurnTemps {
+        address from;
+        uint256 fromBalanceBefore;
+        uint256 totalSupplyBefore;
+        uint256 fromNFTBalanceBefore;
+        uint256 totalNFTSupplyBefore;
+        uint256 fromAuxBefore;
+        uint256 numToBurn;
+        uint256[] tokensAfter;
+        uint256 totalSupplyAfter;
+        uint256 fromNFTBalanceAfter;
+        uint256 totalNFTSupplyAfter;
+        uint256 fromAuxAfter;
+    }
 
-        uint256 fromBalanceBefore = dn404.balanceOf(from);
-        uint256 totalSupplyBefore = dn404.totalSupply();
-        uint256 fromNFTBalanceBefore = mirror.balanceOf(from);
-        uint256 totalNFTSupplyBefore = mirror.totalSupply();
-        uint256 fromAuxBefore = dn404.getAux(from);
+    function burn(uint256 fromIndexSeed, uint256 amount) public {
+        BurnTemps memory t;
+        // PRE-CONDITIONS
+        t.from = randomAddress(fromIndexSeed);
+        vm.startPrank(t.from);
+        amount = _bound(amount, 0, dn404.balanceOf(t.from));
+
+        t.fromBalanceBefore = dn404.balanceOf(t.from);
+        t.totalSupplyBefore = dn404.totalSupply();
+        t.fromNFTBalanceBefore = mirror.balanceOf(t.from);
+        t.totalNFTSupplyBefore = mirror.totalSupply();
+        t.fromAuxBefore = dn404.getAux(t.from);
 
         // ACTION
-        dn404.burn(from, amount);
+        dn404.burn(t.from, amount);
 
         // POST-CONDITIONS
-        uint256 numToBurn =
-            _zeroFloorSub(nftsOwned[from], (fromBalanceBefore - amount) / dn404.unit());
-        nftsOwned[from] -= numToBurn;
+        t.numToBurn =
+            _zeroFloorSub(nftsOwned[t.from], (t.fromBalanceBefore - amount) / dn404.unit());
+        nftsOwned[t.from] -= t.numToBurn;
 
-        uint256[] memory tokensAfter = dn404.tokensOf(from);
-        uint256 totalSupplyAfter = dn404.totalSupply();
-        uint256 fromNFTBalanceAfter = mirror.balanceOf(from);
-        uint256 totalNFTSupplyAfter = mirror.totalSupply();
-        uint256 fromAuxAfter = dn404.getAux(from);
+        t.tokensAfter = dn404.tokensOf(t.from);
+        t.totalSupplyAfter = dn404.totalSupply();
+        t.fromNFTBalanceAfter = mirror.balanceOf(t.from);
+        t.totalNFTSupplyAfter = mirror.totalSupply();
+        t.fromAuxAfter = dn404.getAux(t.from);
         // Assert user tokensOf was reduced by numToBurn.
-        assertEq(tokensAfter.length, nftsOwned[from], "owned != len(tokensOf)");
+        assertEq(t.tokensAfter.length, nftsOwned[t.from], "owned != len(tokensOf)");
         // Assert totalSupply decreased by burned amount.
         assertEq(
-            totalSupplyBefore, totalSupplyAfter + amount, "supply before != supply after + amount"
+            t.totalSupplyBefore,
+            t.totalSupplyAfter + amount,
+            "supply before != supply after + amount"
         );
         // Assert NFT balance decreased by numToBurn.
         assertEq(
-            fromNFTBalanceBefore,
-            fromNFTBalanceAfter + numToBurn,
+            t.fromNFTBalanceBefore,
+            t.fromNFTBalanceAfter + t.numToBurn,
             "NFT balance did not decrease appropriately"
         );
         // Assert totalNFTSupply is at most equal to prior state before mint.
-        assertLe(totalNFTSupplyAfter, totalNFTSupplyBefore, "nft supply after > nft supply before");
+        assertLe(
+            t.totalNFTSupplyAfter, t.totalNFTSupplyBefore, "nft supply after > nft supply before"
+        );
         // Assert auxiliary data is unchanged.
-        assertEq(fromAuxBefore, fromAuxAfter, "auxiliary data has changed");
+        assertEq(t.fromAuxBefore, t.fromAuxAfter, "auxiliary data has changed");
     }
 
     function setSkipNFT(uint256 actorIndexSeed, bool status) public {
@@ -558,36 +611,59 @@ contract DN404Handler is SoladyTest {
         assertEq(actorAuxBefore, actorAuxAfter, "auxiliary data has changed");
     }
 
+    struct ApproveNFTTemps {
+        address owner;
+        address spender;
+        address approvedSpenderMirror;
+        address approvedSpenderDN;
+        uint256 ownerAuxBefore;
+        uint256 spenderAuxBefore;
+        address ownerAfter;
+        uint256 ownerAuxAfter;
+        uint256 spenderAuxAfter;
+    }
+
     function approveNFT(uint256 ownerIndexSeed, uint256 spenderIndexSeed, uint256 id) public {
+        ApproveNFTTemps memory t;
         // PRE-CONDITIONS
-        address owner = randomAddress(ownerIndexSeed);
-        address spender = randomAddress(spenderIndexSeed);
+        t.owner = randomAddress(ownerIndexSeed);
+        t.spender = randomAddress(spenderIndexSeed);
 
         if (mirror.ownerAt(id) == address(0)) return;
-        if (mirror.ownerAt(id) != owner) {
-            owner = mirror.ownerAt(id);
+        if (mirror.ownerAt(id) != t.owner) {
+            t.owner = mirror.ownerAt(id);
         }
-        uint256 ownerAuxBefore = dn404.getAux(owner);
-        uint256 spenderAuxBefore = dn404.getAux(spender);
+        t.ownerAuxBefore = dn404.getAux(t.owner);
+        t.spenderAuxBefore = dn404.getAux(t.spender);
 
         // ACTION
-        vm.startPrank(owner);
-        mirror.approve(spender, id);
+        vm.startPrank(t.owner);
+        mirror.approve(t.spender, id);
 
         // POST-CONDITIONS
-        address approvedSpenderMirror = mirror.getApproved(id);
-        address approvedSpenderDN = dn404.getApproved(id);
-        address ownerAfter = mirror.ownerAt(id);
-        uint256 ownerAuxAfter = dn404.getAux(owner);
-        uint256 spenderAuxAfter = dn404.getAux(spender);
+        t.approvedSpenderMirror = mirror.getApproved(id);
+        t.approvedSpenderDN = dn404.getApproved(id);
+        t.ownerAfter = mirror.ownerAt(id);
+        t.ownerAuxAfter = dn404.getAux(t.owner);
+        t.spenderAuxAfter = dn404.getAux(t.spender);
         // Assert approved spender is requested spender.
-        assertEq(approvedSpenderMirror, spender, "spender != approved spender mirror");
-        assertEq(approvedSpenderDN, spender, "spender != approved spender DN");
+        assertEq(t.approvedSpenderMirror, t.spender, "spender != approved spender mirror");
+        assertEq(t.approvedSpenderDN, t.spender, "spender != approved spender DN");
         // Assert that owner of ID did not change.
-        assertEq(owner, ownerAfter, "owner changed on approval");
+        assertEq(t.owner, t.ownerAfter, "owner changed on approval");
         // Assert auxiliary data is unchanged.
-        assertEq(ownerAuxBefore, ownerAuxAfter, "owner auxiliary data has changed");
-        assertEq(spenderAuxBefore, spenderAuxAfter, "spender auxiliary data has changed");
+        assertEq(t.ownerAuxBefore, t.ownerAuxAfter, "owner auxiliary data has changed");
+        assertEq(t.spenderAuxBefore, t.spenderAuxAfter, "spender auxiliary data has changed");
+    }
+
+    struct SetApprovalForAllTemps {
+        address owner;
+        address spender;
+        uint256 ownerAuxBefore;
+        uint256 spenderAuxBefore;
+        bool approvedForAll;
+        uint256 ownerAuxAfter;
+        uint256 spenderAuxAfter;
     }
 
     function setApprovalForAll(
@@ -597,25 +673,34 @@ contract DN404Handler is SoladyTest {
         bool approval
     ) public {
         id = id; // Silence unused variable warning.
+        SetApprovalForAllTemps memory t;
         // PRE-CONDITIONS
-        address owner = randomAddress(ownerIndexSeed);
-        address spender = randomAddress(spenderIndexSeed);
-        uint256 ownerAuxBefore = dn404.getAux(owner);
-        uint256 spenderAuxBefore = dn404.getAux(spender);
+        t.owner = randomAddress(ownerIndexSeed);
+        t.spender = randomAddress(spenderIndexSeed);
+        t.ownerAuxBefore = dn404.getAux(t.owner);
+        t.spenderAuxBefore = dn404.getAux(t.spender);
 
         // ACTION
-        vm.startPrank(owner);
-        mirror.setApprovalForAll(spender, approval);
+        vm.startPrank(t.owner);
+        mirror.setApprovalForAll(t.spender, approval);
 
         // POST-CONDITIONS
-        bool approvedForAll = mirror.isApprovedForAll(owner, spender);
-        uint256 ownerAuxAfter = dn404.getAux(owner);
-        uint256 spenderAuxAfter = dn404.getAux(spender);
+        t.approvedForAll = mirror.isApprovedForAll(t.owner, t.spender);
+        t.ownerAuxAfter = dn404.getAux(t.owner);
+        t.spenderAuxAfter = dn404.getAux(t.spender);
         // Assert approval status is updated correctly.
-        assertEq(approvedForAll, approval, "approved for all != approval");
+        assertEq(t.approvedForAll, approval, "approved for all != approval");
         // Assert auxiliary data is unchanged.
-        assertEq(ownerAuxBefore, ownerAuxAfter, "owner auxiliary data has changed");
-        assertEq(spenderAuxBefore, spenderAuxAfter, "spender auxiliary data has changed");
+        assertEq(t.ownerAuxBefore, t.ownerAuxAfter, "owner auxiliary data has changed");
+        assertEq(t.spenderAuxBefore, t.spenderAuxAfter, "spender auxiliary data has changed");
+    }
+
+    struct TransferFromNFTTemps {
+        address sender;
+        address from;
+        address to;
+        uint256[] tokensFromAfter;
+        uint256[] tokensToAfter;
     }
 
     function transferFromNFT(
@@ -624,48 +709,49 @@ contract DN404Handler is SoladyTest {
         uint256 toIndexSeed,
         uint32 id
     ) public {
+        TransferFromNFTTemps memory t;
         // PRE-CONDITIONS
-        address sender = randomAddress(senderIndexSeed);
-        address from = randomAddress(fromIndexSeed);
-        address to = randomAddress(toIndexSeed);
+        t.sender = randomAddress(senderIndexSeed);
+        t.from = randomAddress(fromIndexSeed);
+        t.to = randomAddress(toIndexSeed);
 
         if (mirror.ownerAt(id) == address(0)) return;
-        if (mirror.getApproved(id) != sender || mirror.isApprovedForAll(from, sender)) {
-            sender = from;
+        if (mirror.getApproved(id) != t.sender || mirror.isApprovedForAll(t.from, t.sender)) {
+            t.sender = t.from;
         }
-        if (mirror.ownerAt(id) != from) {
-            from = mirror.ownerAt(id);
-            sender = from;
+        if (mirror.ownerAt(id) != t.from) {
+            t.from = mirror.ownerAt(id);
+            t.sender = t.from;
         }
 
         BeforeAfter memory beforeAfter;
-        beforeAfter.fromBalanceBefore = dn404.balanceOf(from);
-        beforeAfter.toBalanceBefore = dn404.balanceOf(to);
+        beforeAfter.fromBalanceBefore = dn404.balanceOf(t.from);
+        beforeAfter.toBalanceBefore = dn404.balanceOf(t.to);
         beforeAfter.totalNFTSupplyBefore = mirror.totalSupply();
-        beforeAfter.fromAuxBefore = dn404.getAux(from);
-        beforeAfter.toAuxBefore = dn404.getAux(to);
+        beforeAfter.fromAuxBefore = dn404.getAux(t.from);
+        beforeAfter.toAuxBefore = dn404.getAux(t.to);
 
         // ACTION
-        vm.startPrank(sender);
-        mirror.transferFrom(from, to, id);
+        vm.startPrank(t.sender);
+        mirror.transferFrom(t.from, t.to, id);
 
         // POST-CONDITIONS
-        --nftsOwned[from];
-        ++nftsOwned[to];
+        --nftsOwned[t.from];
+        ++nftsOwned[t.to];
 
-        uint256[] memory tokensFromAfter = dn404.tokensOf(from);
-        uint256[] memory tokensToAfter = dn404.tokensOf(to);
-        beforeAfter.fromBalanceAfter = dn404.balanceOf(from);
-        beforeAfter.toBalanceAfter = dn404.balanceOf(to);
+        t.tokensFromAfter = dn404.tokensOf(t.from);
+        t.tokensToAfter = dn404.tokensOf(t.to);
+        beforeAfter.fromBalanceAfter = dn404.balanceOf(t.from);
+        beforeAfter.toBalanceAfter = dn404.balanceOf(t.to);
         beforeAfter.totalNFTSupplyAfter = mirror.totalSupply();
-        beforeAfter.fromAuxAfter = dn404.getAux(from);
-        beforeAfter.toAuxAfter = dn404.getAux(to);
+        beforeAfter.fromAuxAfter = dn404.getAux(t.from);
+        beforeAfter.toAuxAfter = dn404.getAux(t.to);
 
         // Assert length matches internal tracking.
-        assertEq(tokensFromAfter.length, nftsOwned[from], "Owned != len(tokensOfFrom)");
-        assertEq(tokensToAfter.length, nftsOwned[to], "Owned != len(tokensOfTo)");
+        assertEq(t.tokensFromAfter.length, nftsOwned[t.from], "Owned != len(tokensOfFrom)");
+        assertEq(t.tokensToAfter.length, nftsOwned[t.to], "Owned != len(tokensOfTo)");
         // Assert token balances for `from` and `to` was updated.
-        if (from != to) {
+        if (t.from != t.to) {
             assertEq(
                 beforeAfter.fromBalanceBefore,
                 beforeAfter.fromBalanceAfter + dn404.unit(),
@@ -681,7 +767,7 @@ contract DN404Handler is SoladyTest {
             assertEq(beforeAfter.toBalanceAfter, beforeAfter.toBalanceBefore, "after != before");
         }
         // Assert `to` address owns the transferred NFT.
-        assertEq(mirror.ownerAt(id), to, "to != ownerOf");
+        assertEq(mirror.ownerAt(id), t.to, "to != ownerOf");
         // Assert totalNFTSupply is unchanged.
         assertEq(
             beforeAfter.totalNFTSupplyBefore,
