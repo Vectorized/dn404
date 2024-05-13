@@ -12,7 +12,7 @@ contract MockDN404 is DN404 {
 
     bool addToBurnedPool;
 
-    bool useDirectTransfersIfPossible;
+    bool public useDirectTransfersIfPossible;
 
     bool givePermit2DefaultInfiniteAllowance;
 
@@ -43,6 +43,11 @@ contract MockDN404 is DN404 {
         return _registerAndResolveAlias(_getDN404Storage().addressData[target], target);
     }
 
+    function getAddressDataSkipNFTInitialized(address target) public view returns (bool) {
+        return _getDN404Storage().addressData[target].flags
+            & _ADDRESS_DATA_SKIP_NFT_INITIALIZED_FLAG != 0;
+    }
+
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
     }
@@ -61,11 +66,6 @@ contract MockDN404 is DN404 {
         address mirrorNFTContract
     ) public {
         _initializeDN404(initialTokenSupply, initialSupplyOwner, mirrorNFTContract);
-    }
-
-    function getAddressDataSkipNFTInitialized(address target) public view returns (bool) {
-        return _getDN404Storage().addressData[target].flags
-            & _ADDRESS_DATA_SKIP_NFT_INITIALIZED_FLAG != 0;
     }
 
     function setAux(address target, uint88 value) public {
@@ -104,8 +104,9 @@ contract MockDN404 is DN404 {
             uint256 id = _get($.owned[owner], i);
             result[i] = id;
             // Check invariants.
-            require(_ownerAt(id) == owner);
-            require(_get($.oo, _ownedIndex(id)) == i);
+            require(_ownerAt(id) == owner, "ownerAt != owner");
+            require(_get($.oo, _ownedIndex(id)) == i, "ownedIndex != i");
+            if (useExistsLookup) require(_get($.exists, id), "id not in exists bitmap");
         }
     }
 
@@ -223,5 +224,18 @@ contract MockDN404 is DN404 {
                 ++i;
             }
         }
+    }
+
+    function burnedPoolHeadTail() public view returns (uint256, uint256) {
+        DN404Storage storage $ = _getDN404Storage();
+        return ($.burnedPoolHead, $.burnedPoolTail);
+    }
+
+    function balanceOfNFT(address owner) public view returns (uint256) {
+        return _balanceOfNFT(owner);
+    }
+
+    function getApproved(uint256 id) public view returns (address) {
+        return _getApproved(id);
     }
 }
