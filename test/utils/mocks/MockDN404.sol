@@ -171,6 +171,10 @@ contract MockDN404 is DN404 {
         }
     }
 
+    function _useAfterNFTTransfers() internal view virtual override returns (bool) {
+        return true;
+    }
+
     function _afterNFTTransfers(address[] memory from, address[] memory to, uint256[] memory ids)
         internal
         virtual
