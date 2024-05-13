@@ -124,6 +124,7 @@ contract DN404Handler is SoladyTest {
         uint256 n;
         uint256[] burnedIds;
         bool success;
+        uint256 id;
     }
 
     function transfer(uint256 fromIndexSeed, uint256 toIndexSeed, uint256 amount) public {
@@ -157,27 +158,26 @@ contract DN404Handler is SoladyTest {
         // POST-CONDITIONS
         if (t.success) {
             Vm.Log[] memory logs = vm.getRecordedLogs();
-            uint256 id;
             for (uint256 i = 0; i < logs.length; i++) {
                 if (
                     i < logs.length
                         && logs[i].topics[0] == keccak256("Transfer(address,address,uint256)")
                 ) {
                     // Grab minted ID from logs.
-                    if (logs[i].topics.length > 3) id = uint256(logs[i].topics[3]);
+                    if (logs[i].topics.length > 3) t.id = uint256(logs[i].topics[3]);
                     if (t.n > 0 && t.from != t.to) {
                         for (uint256 j = 0; j < t.burnedIds.length; j++) {
                             // Assert direct transfers do not overlap with burned pool.
                             if (dn404.useDirectTransfersIfPossible() && i < t.n) {
                                 assertNotEq(
-                                    t.burnedIds[j], id, "transfer direct went over burned ids"
+                                    t.burnedIds[j], t.id, "transfer direct went over burned ids"
                                 );
                             }
                         }
                     }
                     // Assert approval for id has been reset during transfer.
-                    if (mirror.ownerAt(id) != address(0)) {
-                        assertEq(mirror.getApproved(id), address(0));
+                    if (mirror.ownerAt(t.id) != address(0)) {
+                        assertEq(mirror.getApproved(t.id), address(0));
                     }
                 }
             }
@@ -237,6 +237,7 @@ contract DN404Handler is SoladyTest {
         uint256 n;
         uint256[] burnedIds;
         bool success;
+        uint256 id;
     }
 
     function transferFrom(
@@ -282,27 +283,26 @@ contract DN404Handler is SoladyTest {
         // POST-CONDITIONS
         if (t.success) {
             Vm.Log[] memory logs = vm.getRecordedLogs();
-            uint256 id;
             for (uint256 i = 0; i < logs.length; i++) {
                 if (
                     i < logs.length
                         && logs[i].topics[0] == keccak256("Transfer(address,address,uint256)")
                 ) {
                     // Grab minted ID from logs.
-                    if (logs[i].topics.length > 3) id = uint256(logs[i].topics[3]);
+                    if (logs[i].topics.length > 3) t.id = uint256(logs[i].topics[3]);
                     if (t.n > 0 && t.from != t.to) {
                         for (uint256 j = 0; j < t.burnedIds.length; j++) {
                             // Assert direct transfers not overlap with burned pool.
                             if (dn404.useDirectTransfersIfPossible() && i < t.n) {
                                 assertNotEq(
-                                    t.burnedIds[j], id, "transfer direct went over burned ids"
+                                    t.burnedIds[j], t.id, "transfer direct went over burned ids"
                                 );
                             }
                         }
                     }
                     // Assert approval for id has been reset during transfer.
-                    if (mirror.ownerAt(id) != address(0)) {
-                        assertEq(mirror.getApproved(id), address(0));
+                    if (mirror.ownerAt(t.id) != address(0)) {
+                        assertEq(mirror.getApproved(t.id), address(0));
                     }
                 }
             }
@@ -353,38 +353,44 @@ contract DN404Handler is SoladyTest {
         }
     }
 
+    struct MintTemps {
+        address to;
+        bool success;
+        uint256 transferCounter;
+    }
+
     function mint(uint256 toIndexSeed, uint256 amount) public {
+        MintTemps memory t;
         // PRE-CONDITIONS
-        address to = randomAddress(toIndexSeed);
+        t.to = randomAddress(toIndexSeed);
         amount = _bound(amount, 0, 100e18);
 
         BeforeAfter memory beforeAfter;
-        beforeAfter.toBalanceBefore = dn404.balanceOf(to);
+        beforeAfter.toBalanceBefore = dn404.balanceOf(t.to);
         beforeAfter.totalSupplyBefore = dn404.totalSupply();
         beforeAfter.totalNFTSupplyBefore = mirror.totalSupply();
-        beforeAfter.toNFTBalanceBefore = dn404.balanceOfNFT(to);
-        beforeAfter.toAuxBefore = dn404.getAux(to);
+        beforeAfter.toNFTBalanceBefore = dn404.balanceOfNFT(t.to);
+        beforeAfter.toAuxBefore = dn404.getAux(t.to);
 
         // ACTION
         vm.recordLogs();
-        (bool success,) =
-            address(dn404).call(abi.encodeWithSelector(MockDN404.mint.selector, to, amount)); // mint(to, amount);
+        (t.success,) =
+            address(dn404).call(abi.encodeWithSelector(MockDN404.mint.selector, t.to, amount)); // mint(to, amount);
 
         // POST-CONDITIONS
-        if (success) {
-            beforeAfter.toBalanceAfter = dn404.balanceOf(to);
+        if (t.success) {
+            beforeAfter.toBalanceAfter = dn404.balanceOf(t.to);
             beforeAfter.totalSupplyAfter = dn404.totalSupply();
             beforeAfter.totalNFTSupplyAfter = mirror.totalSupply();
-            beforeAfter.toAuxAfter = dn404.getAux(to);
+            beforeAfter.toAuxAfter = dn404.getAux(t.to);
 
             Vm.Log[] memory logs = vm.getRecordedLogs();
-            uint256 transferCounter;
             for (uint256 i = 0; i < logs.length; i++) {
                 if (
                     i < logs.length
                         && logs[i].topics[0] == keccak256("Transfer(address,address,uint256)")
                 ) {
-                    transferCounter += 1;
+                    t.transferCounter += 1;
                     assertEq(
                         address(uint160(uint256(logs[i].topics[1]))),
                         address(0),
@@ -392,27 +398,26 @@ contract DN404Handler is SoladyTest {
                     );
                     assertEq(
                         address(uint160(uint256(logs[i].topics[2]))),
-                        to,
+                        t.to,
                         "to address does not match event"
                     );
                     if (logs[i].topics.length > 3) {
                         assertEq(
                             mirror.ownerAt(uint256(logs[i].topics[3])),
-                            to,
+                            t.to,
                             "to address does not own minted id"
                         );
                     }
                 }
             }
 
-            if (!dn404.getSkipNFT(to)) {
-                nftsOwned[to] = (beforeAfter.toBalanceBefore + amount) / dn404.unit();
-                uint256[] memory tokensAfter = dn404.tokensOf(to);
-                assertEq(tokensAfter.length, nftsOwned[to], "owned != len(tokensOf)");
+            if (!dn404.getSkipNFT(t.to)) {
+                nftsOwned[t.to] = (beforeAfter.toBalanceBefore + amount) / dn404.unit();
+                assertEq(dn404.tokensOf(t.to).length, nftsOwned[t.to], "owned != len(tokensOf)");
                 // Assert that number of (Transfer events - 1) should match the loop iterations to mint an NFT in `mint`.
                 // Subtract by 1 because one of the Transfer events is for the ERC20 transfer.
                 assertEq(
-                    transferCounter - 1,
+                    t.transferCounter - 1,
                     _zeroFloorSub(
                         (beforeAfter.toBalanceAfter / dn404.unit()), beforeAfter.toNFTBalanceBefore
                     ),
@@ -443,28 +448,35 @@ contract DN404Handler is SoladyTest {
         }
     }
 
+    struct MintNextTemps {
+        address to;
+        uint256 transferCounter;
+        uint256 head;
+        uint256 tail;
+    }
+
     function mintNext(uint256 toIndexSeed, uint256 amount) public {
+        MintNextTemps memory t;
         // PRE-CONDITIONS
-        address to = randomAddress(toIndexSeed);
+        t.to = randomAddress(toIndexSeed);
         amount = _bound(amount, 0, 100e18);
 
         BeforeAfter memory beforeAfter;
-        beforeAfter.toBalanceBefore = dn404.balanceOf(to);
+        beforeAfter.toBalanceBefore = dn404.balanceOf(t.to);
         beforeAfter.totalSupplyBefore = dn404.totalSupply();
         beforeAfter.totalNFTSupplyBefore = mirror.totalSupply();
-        beforeAfter.toNFTBalanceBefore = dn404.balanceOfNFT(to);
-        beforeAfter.toAuxBefore = dn404.getAux(to);
+        beforeAfter.toNFTBalanceBefore = dn404.balanceOfNFT(t.to);
+        beforeAfter.toAuxBefore = dn404.getAux(t.to);
 
         // ACTION
         vm.recordLogs();
-        dn404.mintNext(to, amount);
+        dn404.mintNext(t.to, amount);
 
         // POST-CONDITIONS
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        uint256 transferCounter;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == keccak256("Transfer(address,address,uint256)")) {
-                transferCounter += 1;
+                t.transferCounter += 1;
                 assertEq(
                     address(uint160(uint256(logs[i].topics[1]))),
                     address(0),
@@ -472,30 +484,29 @@ contract DN404Handler is SoladyTest {
                 );
                 assertEq(
                     address(uint160(uint256(logs[i].topics[2]))),
-                    to,
+                    t.to,
                     "to address does not match event"
                 );
                 if (logs[i].topics.length > 3) {
                     assertEq(
                         mirror.ownerAt(uint256(logs[i].topics[3])),
-                        to,
+                        t.to,
                         "to address does not own minted id"
                     );
                 }
             }
         }
 
-        beforeAfter.toBalanceAfter = dn404.balanceOf(to);
+        beforeAfter.toBalanceAfter = dn404.balanceOf(t.to);
         beforeAfter.totalSupplyAfter = dn404.totalSupply();
         beforeAfter.totalNFTSupplyAfter = mirror.totalSupply();
-        beforeAfter.toAuxAfter = dn404.getAux(to);
+        beforeAfter.toAuxAfter = dn404.getAux(t.to);
 
-        if (!dn404.getSkipNFT(to)) {
-            nftsOwned[to] = (beforeAfter.toBalanceBefore + amount) / dn404.unit();
-            uint256[] memory tokensAfter = dn404.tokensOf(to);
-            assertEq(tokensAfter.length, nftsOwned[to], "owned != len(tokensOf)");
+        if (!dn404.getSkipNFT(t.to)) {
+            nftsOwned[t.to] = (beforeAfter.toBalanceBefore + amount) / dn404.unit();
+            assertEq(dn404.tokensOf(t.to).length, nftsOwned[t.to], "owned != len(tokensOf)");
             assertEq(
-                transferCounter - 1,
+                t.transferCounter - 1,
                 _zeroFloorSub(
                     (beforeAfter.toBalanceAfter / dn404.unit()), beforeAfter.toNFTBalanceBefore
                 ),
@@ -503,9 +514,9 @@ contract DN404Handler is SoladyTest {
             );
         }
         // If NFT was minted, ensure burned pool head and tail are 0.
-        if (transferCounter > 1) {
-            (uint256 head, uint256 tail) = dn404.burnedPoolHeadTail();
-            assertTrue(head == 0 && tail == 0, "Head or Tail != 0");
+        if (t.transferCounter > 1) {
+            (t.head, t.tail) = dn404.burnedPoolHeadTail();
+            assertTrue(t.head == 0 && t.tail == 0, "Head or Tail != 0");
         }
 
         // Assert user balance increased by minted amount.
