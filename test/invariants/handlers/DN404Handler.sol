@@ -596,6 +596,7 @@ contract DN404Handler is SoladyTest {
         uint256 id,
         bool approval
     ) public {
+        id = id; // Silence unused variable warning.
         // PRE-CONDITIONS
         address owner = randomAddress(ownerIndexSeed);
         address spender = randomAddress(spenderIndexSeed);

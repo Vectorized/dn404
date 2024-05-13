@@ -15,7 +15,7 @@ contract NonMultipleUnitInvariant is StaticUnitInvariant {
         StaticUnitInvariant.setUp();
     }
 
-    function _unit() internal override returns (uint256) {
+    function _unit() internal override pure returns (uint256) {
         return 1e18 + 999999999999999999;
     }
 }

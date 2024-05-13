@@ -15,7 +15,7 @@ contract MaxUnitInvariant is StaticUnitInvariant {
         StaticUnitInvariant.setUp();
     }
 
-    function _unit() internal override returns (uint256) {
+    function _unit() internal override pure returns (uint256) {
         return type(uint96).max;
     }
 }
