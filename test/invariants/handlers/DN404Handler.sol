@@ -37,16 +37,16 @@ contract DN404Handler is SoladyTest {
         uint256 totalNFTSupplyBefore;
         uint256 fromNFTBalanceBefore;
         uint256 toNFTBalanceBefore;
-        uint88 fromAuxBefore;
-        uint88 toAuxBefore;
+        uint256 fromAuxBefore;
+        uint256 toAuxBefore;
         uint256 fromBalanceAfter;
         uint256 toBalanceAfter;
         uint256 totalSupplyAfter;
         uint256 totalNFTSupplyAfter;
         uint256 fromNFTBalanceAfter;
         uint256 toNFTBalanceAfter;
-        uint88 fromAuxAfter;
-        uint88 toAuxAfter;
+        uint256 fromAuxAfter;
+        uint256 toAuxAfter;
     }
 
     constructor(MockDN404CustomUnit _dn404) {
