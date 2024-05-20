@@ -15,15 +15,30 @@ pragma solidity ^0.8.4;
 ///
 /// @dev Note:
 /// - On-transfer token ID burning scheme:
-///     - DN420: Largest token ID up to owned checkpoint (inclusive) first.
-///     - DN404: Most recently acquired token ID first.
+///     * DN420: Largest token ID up to owned checkpoint (inclusive) first.
+///     * DN404: Most recently acquired token ID first.
 /// - This implementation uses bitmap scans to find ERC1155 token IDs
 ///   to transfer / burn upon ERC20 transfers.
 /// - For long-term gas efficiency, please ensure that the maximum
 ///   supply of NFTs is bounded and not too big.
 ///   10k is fine; it will cost less than 100k gas to bitmap scan 10k bits.
 ///   Otherwise, users can still always call `setOwnedCheckpoint` to unblock.
-/// - All other precautionary measures for DN404 applies.
+/// - A unit worth of ERC20 tokens equates to a deed to one NFT token.
+///   The skip NFT status determines if this deed is automatically exercised.
+///   An account can configure their skip NFT status.
+///     * If `getSkipNFT(owner) == true`, ERC20 mints / transfers to `owner`
+///       will NOT trigger NFT mints / transfers to `owner` (i.e. deeds are left unexercised).
+///     * If `getSkipNFT(owner) == false`, ERC20 mints / transfers to `owner`
+///       will trigger NFT mints / transfers to `owner`, until the NFT balance of `owner`
+///       is equal to its ERC20 balance divided by the unit (rounded down).
+/// - Invariant: `_balanceOfNFT(owner) <= balanceOf(owner) / _unit()`.
+/// - The gas costs for automatic minting / transferring / burning of NFTs is O(n).
+///   This can exceed the block gas limit.
+///   Applications and users may need to break up large transfers into a few transactions.
+/// - This implementation uses safe transfers for automatic NFT transfers,
+///   as all transfers require the recipient check by the ERC1155 spec.
+/// - The ERC20 token allowances and ERC1155 token / operator approvals are separate.
+/// - For MEV safety, users should NOT have concurrently open orders for the ERC20 and ERC1155.
 abstract contract DN420 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
@@ -228,6 +243,8 @@ abstract contract DN420 {
 
     /// @dev Initializes the DN420 contract with an
     /// `initialTokenSupply` and `initialTokenOwner`.
+    ///
+    /// Note: The `initialSupplyOwner` will have their skip NFT status set to true.
     function _initializeDN420(uint256 initialTokenSupply, address initialSupplyOwner)
         internal
         virtual
