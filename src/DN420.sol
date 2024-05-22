@@ -212,7 +212,7 @@ abstract contract DN420 {
     struct DN420Storage {
         // Next NFT ID to assign for a mint.
         uint32 nextTokenId;
-        // This is greater than or equal to the largest token ID minted thus far.
+        // This is greater than or equal to the largest NFT ID minted thus far.
         // A non-zero value is used to denote that the contract has been initialized.
         uint32 tokenIdUpTo;
         // Total supply of tokens.
