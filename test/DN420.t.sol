@@ -531,6 +531,12 @@ contract DN420Test is SoladyTest {
         uint256 numExists;
     }
 
+    function _sampleAddress(address[] memory addresses) internal returns (address) {
+        unchecked {
+            return addresses[_random() % addresses.length];
+        }
+    }
+
     function _maxOwnedTokenId(address[] memory addresses) internal view returns (uint256 result) {
         unchecked {
             uint256 upTo = dn.totalSupply() * (addresses.length + 2) / _WAD + 2048;
@@ -593,12 +599,12 @@ contract DN420Test is SoladyTest {
         if (_random() % 8 == 0) {
             unchecked {
                 uint256 n = dn.totalSupply() / _WAD * 4 + 1;
-                vm.prank(addresses[_random() % addresses.length]);
+                vm.prank(_sampleAddress(addresses));
                 dn.setOwnedCheckpoint(_random() % n);
             }
         }
         if (_random() % 4 == 0) {
-            vm.prank(addresses[_random() % addresses.length]);
+            vm.prank(_sampleAddress(addresses));
             dn.setSkipNFT(_random() & 1 == 0);
         }
     }
@@ -606,35 +612,34 @@ contract DN420Test is SoladyTest {
     function _doDirectNFTTransfer(address[] memory addresses) internal {
         _TestMixedTemps memory t;
         if (_random() % 4 == 0) {
-            t.from = addresses[_random() % addresses.length];
-            t.to = addresses[_random() % addresses.length];
+            t.from = _sampleAddress(addresses);
+            t.to = _sampleAddress(addresses);
             t.fromIds = dn.findOwnedIds(t.from);
-            if (t.fromIds.length != 0) {
-                uint256 id = t.fromIds[_random() % t.fromIds.length];
-                if (t.to == t.from) {
-                    t.balance = dn.balanceOf(t.from);
-                    t.nftBalance = dn.ownedCount(t.from);
-                    vm.prank(t.from);
-                    dn.safeTransferFromNFT(t.from, t.to, id);
-                    assertEq(dn.ownedCount(t.from), t.nftBalance);
-                    assertEq(dn.balanceOf(t.from), t.balance);
-                    uint256[] memory idsAfter = dn.findOwnedIds(t.from);
-                    LibSort.sort(idsAfter);
-                    LibSort.sort(t.fromIds);
-                    assertEq(idsAfter, t.fromIds);
-                } else {
-                    vm.prank(t.from);
-                    dn.safeTransferFromNFT(t.from, t.to, id);
-                }
+            if (t.fromIds.length == 0) return;
+            uint256 id = t.fromIds[_random() % t.fromIds.length];
+            if (t.to == t.from) {
+                t.balance = dn.balanceOf(t.from);
+                t.nftBalance = dn.ownedCount(t.from);
+                vm.prank(t.from);
+                dn.safeTransferFromNFT(t.from, t.to, id);
+                assertEq(dn.ownedCount(t.from), t.nftBalance);
+                assertEq(dn.balanceOf(t.from), t.balance);
+                uint256[] memory idsAfter = dn.findOwnedIds(t.from);
+                LibSort.sort(idsAfter);
+                LibSort.sort(t.fromIds);
+                assertEq(idsAfter, t.fromIds);
+                return;
             }
+            vm.prank(t.from);
+            dn.safeTransferFromNFT(t.from, t.to, id);
         }
     }
 
     function _doDirectNFTBatchTransfer(address[] memory addresses) internal {
         _TestMixedTemps memory t;
         if (_random() % 4 == 0) {
-            t.from = addresses[_random() % addresses.length];
-            t.to = addresses[_random() % addresses.length];
+            t.from = _sampleAddress(addresses);
+            t.to = _sampleAddress(addresses);
             t.fromIds = dn.findOwnedIds(t.from);
             if (t.to == t.from) {
                 if (_random() % 2 == 0) {
@@ -652,7 +657,9 @@ contract DN420Test is SoladyTest {
                 LibSort.sort(t.idsCopy);
                 LibSort.sort(t.fromIds);
                 assertEq(t.idsCopy, t.fromIds);
-            } else if (_random() % 2 == 0) {
+                return;
+            }
+            if (_random() % 2 == 0) {
                 t.ids = _randomSampleWithReplacements(t.fromIds);
                 t.idsCopy = LibSort.copy(t.ids);
                 LibSort.sort(t.idsCopy);
@@ -665,19 +672,19 @@ contract DN420Test is SoladyTest {
                     vm.prank(t.from);
                     dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
                 }
-            } else {
-                t.ids = _randomSampleWithoutReplacements(t.fromIds);
-                vm.prank(t.from);
-                dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
+                return;
             }
+            t.ids = _randomSampleWithoutReplacements(t.fromIds);
+            vm.prank(t.from);
+            dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
         }
     }
 
     function _doTransfer(address[] memory addresses) internal {
         _TestMixedTemps memory t;
         if (_random() % 16 > 0) {
-            t.from = addresses[_random() % addresses.length];
-            t.to = addresses[_random() % addresses.length];
+            t.from = _sampleAddress(addresses);
+            t.to = _sampleAddress(addresses);
 
             t.amount = _bound(_random(), 0, dn.balanceOf(t.from));
             vm.prank(t.from);
@@ -688,8 +695,8 @@ contract DN420Test is SoladyTest {
     function _doBurnAndMint(address[] memory addresses) internal {
         _TestMixedTemps memory t;
         if (_random() % 4 == 0) {
-            t.from = addresses[_random() % addresses.length];
-            t.to = addresses[_random() % addresses.length];
+            t.from = _sampleAddress(addresses);
+            t.to = _sampleAddress(addresses);
 
             t.amount = _bound(_random(), 0, dn.balanceOf(t.from));
             if (_random() % 2 == 0) {
