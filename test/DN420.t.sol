@@ -749,6 +749,7 @@ contract DN420Test is SoladyTest {
                 assertEq(dn.ownedCount(a), dn.balanceOf(a) / _WAD);
             }
         }
+        _maybeCheckInvariants(addresses);
 
         if (_random() % 32 == 0) {
             for (uint256 i; i != addresses.length; ++i) {
@@ -761,6 +762,7 @@ contract DN420Test is SoladyTest {
                 assertEq(dn.ownedCount(a), 0);
             }
         }
+        _maybeCheckInvariants(addresses);
     }
 
     function testMintToZeroReverts(uint256) public {
