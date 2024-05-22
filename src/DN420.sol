@@ -1115,9 +1115,9 @@ abstract contract DN420 {
         return _get(_getDN420Storage().exists, _restrictNFTId(id));
     }
 
-    /// @dev Returns the ERC1155 NFT IDs of `owner` in range `[begin, end)`.
+    /// @dev Returns the ERC1155 NFT IDs of `owner` in range `[lower, upper)`.
     /// Optimized for smaller bytecode size, as this function is intended for off-chain calling.
-    function _findOwnedIds(address owner, uint256 begin, uint256 end)
+    function _findOwnedIds(address owner, uint256 lower, uint256 upper)
         internal
         view
         virtual
@@ -1126,13 +1126,13 @@ abstract contract DN420 {
         unchecked {
             DN420Storage storage $ = _getDN420Storage();
             Bitmap storage owned = $.owned[owner];
-            end = _min(uint256($.tokenIdUpTo) + 1, end);
+            upper = _min(uint256($.tokenIdUpTo) + 1, upper);
             /// @solidity memory-safe-assembly
             assembly {
                 ids := mload(0x40)
                 let n := 0
                 let s := shl(96, owned.slot)
-                for { let id := begin } lt(id, end) { id := add(1, id) } {
+                for { let id := lower } lt(id, upper) { id := add(1, id) } {
                     if and(1, shr(and(0xff, id), sload(add(s, shr(8, id))))) {
                         mstore(add(add(ids, 0x20), shl(5, n)), id)
                         n := add(1, n)

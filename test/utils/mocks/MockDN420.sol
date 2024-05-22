@@ -76,12 +76,12 @@ contract MockDN420 is DN420, MockBrutalizer {
         return _getDN420Storage().nextTokenId;
     }
 
-    function findOwnedIds(address owner, uint256 begin, uint256 end)
+    function findOwnedIds(address owner, uint256 lower, uint256 upper)
         public
         view
         returns (uint256[] memory)
     {
-        return _findOwnedIds(owner, begin, end);
+        return _findOwnedIds(owner, lower, upper);
     }
 
     function findOwnedIds(address owner) public view returns (uint256[] memory) {

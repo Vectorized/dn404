@@ -531,6 +531,16 @@ contract DN420Test is SoladyTest {
         uint256 numExists;
     }
 
+    function _maxOwnedTokenId(address[] memory addresses) internal view returns (uint256 result) {
+        unchecked {
+            uint256 upTo = dn.totalSupply() * (addresses.length + 2) / _WAD + 2048;
+            for (uint256 i; i < addresses.length; ++i) {
+                uint256 id = dn.maxOwnedTokenId(addresses[i], upTo);
+                if (id > result) result = id;
+            }
+        }
+    }
+
     function _maybeCheckInvariants(address[] memory addresses) internal {
         if (_random() % 16 == 0) {
             _TestMixedTemps memory t;
@@ -557,6 +567,7 @@ contract DN420Test is SoladyTest {
                     for (uint256 i; i <= maxId; ++i) {
                         if (dn.exists(i)) ++t.numExists;
                     }
+                    assertEq(maxId, _maxOwnedTokenId(addresses));
                     assertEq(t.allIds.length, t.numExists);
                     uint256 end = maxId + (_random() % 32) * (_random() % 32);
                     for (uint256 i = maxId + 1; i <= end; ++i) {
