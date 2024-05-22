@@ -271,7 +271,7 @@ abstract contract DN420 {
 
             /// @solidity memory-safe-assembly
             assembly {
-                // Emit the {Transfer} event.
+                // Emit the ERC20 {Transfer} event.
                 mstore(0x00, initialTokenSupply)
                 log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, initialSupplyOwner)))
             }
@@ -495,7 +495,7 @@ abstract contract DN420 {
         }
         /// @solidity memory-safe-assembly
         assembly {
-            // Emit the {Transfer} event.
+            // Emit the ERC20 {Transfer} event.
             mstore(0x00, amount)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, to)))
         }
@@ -572,7 +572,7 @@ abstract contract DN420 {
         }
         /// @solidity memory-safe-assembly
         assembly {
-            // Emit the {Transfer} event.
+            // Emit the ERC20 {Transfer} event.
             mstore(0x00, amount)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, to)))
         }
@@ -631,7 +631,7 @@ abstract contract DN420 {
         }
         /// @solidity memory-safe-assembly
         assembly {
-            // Emit the {Transfer} event.
+            // Emit the ERC20 {Transfer} event.
             mstore(0x00, amount)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), 0)
         }
@@ -766,7 +766,7 @@ abstract contract DN420 {
         }
         /// @solidity memory-safe-assembly
         assembly {
-            // Emit the {Transfer} event.
+            // Emit the ERC20 {Transfer} event.
             mstore(0x00, amount)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
@@ -839,11 +839,11 @@ abstract contract DN420 {
         assembly {
             from := shr(96, shl(96, from))
             to := shr(96, shl(96, to))
-            // Emit a {TransferSingle} event.
+            // Emit the ERC1155 {TransferSingle} event.
             mstore(0x00, id)
             mstore(0x20, 1)
             log4(0x00, 0x40, _TRANSFER_SINGLE_EVENT_SIGNATURE, caller(), from, to)
-            // Emit the {Transfer} event.
+            // Emit the ERC20 {Transfer} event.
             mstore(0x00, unit)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, from, to)
         }
@@ -911,7 +911,7 @@ abstract contract DN420 {
         _batchTransferEmit(from, to, ids);
         /// @solidity memory-safe-assembly
         assembly {
-            // Emit the {Transfer} event.
+            // Emit the ERC20 {Transfer} event.
             mstore(0x00, amount)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
@@ -1516,7 +1516,7 @@ abstract contract DN420 {
         }
     }
 
-    /// @dev Emits a {TransferBatch} event with `from`, `to`, and `ids`.
+    /// @dev Emits the ERC1155 {TransferBatch} event with `from`, `to`, and `ids`.
     function _batchTransferEmit(address from, address to, uint256[] memory ids) private {
         if (ids.length == uint256(0)) return;
         /// @solidity memory-safe-assembly
