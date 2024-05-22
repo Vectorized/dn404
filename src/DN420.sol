@@ -212,7 +212,8 @@ abstract contract DN420 {
     struct DN420Storage {
         // Next NFT ID to assign for a mint.
         uint32 nextTokenId;
-        // The upper bound (inclusive) for token IDs minted thus far.
+        // This is greater than or equal to the largest token ID minted thus far.
+        // A non-zero value is used to denote that the contract has been initialized.
         uint32 tokenIdUpTo;
         // Total supply of tokens.
         uint96 totalSupply;
@@ -251,10 +252,11 @@ abstract contract DN420 {
     {
         DN420Storage storage $ = _getDN420Storage();
 
+        if ($.tokenIdUpTo != 0) revert DNAlreadyInitialized();
         unchecked {
+            $.tokenIdUpTo = uint32((initialTokenSupply / _unit()) | 1);
             if (_unit() - 1 >= 2 ** 96 - 1) revert InvalidUnit();
         }
-        if ($.nextTokenId != 0) revert DNAlreadyInitialized();
         $.nextTokenId = 1;
 
         if (initialTokenSupply != 0) {
@@ -262,9 +264,6 @@ abstract contract DN420 {
             if (_totalSupplyOverflows(initialTokenSupply)) revert TotalSupplyOverflow();
 
             $.totalSupply = uint96(initialTokenSupply);
-            unchecked {
-                $.tokenIdUpTo = uint32(initialTokenSupply / _unit());
-            }
 
             AddressData storage initialOwnerAddressData = $.addressData[initialSupplyOwner];
             initialOwnerAddressData.balance = uint96(initialTokenSupply);
@@ -449,7 +448,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
         AddressData storage toAddressData = $.addressData[to];
 
         _DNMintTemps memory t;
@@ -525,7 +524,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
         AddressData storage toAddressData = $.addressData[to];
 
         _DNMintTemps memory t;
@@ -597,7 +596,7 @@ abstract contract DN420 {
     /// Emits an ERC20 {Transfer} event.
     function _burn(address from, uint256 amount) internal virtual {
         DN420Storage storage $ = _getDN420Storage();
-        if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
         AddressData storage fromAddressData = $.addressData[from];
 
         uint256[] memory ids;
@@ -664,7 +663,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
         AddressData storage fromAddressData = $.addressData[from];
         AddressData storage toAddressData = $.addressData[to];
 
@@ -811,7 +810,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
 
         if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
             if (!isApprovedForAll(from, by)) revert NotOwnerNorApproved();
@@ -875,7 +874,7 @@ abstract contract DN420 {
         if (to == address(0)) revert TransferToZeroAddress();
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
 
         if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
             if (!isApprovedForAll(from, by)) revert NotOwnerNorApproved();
