@@ -285,6 +285,8 @@ abstract contract DN420 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Amount of token balance that is equal to one NFT.
+    ///
+    /// Note: The return value MUST be kept constant after `_initializeDN420` is called.
     function _unit() internal view virtual returns (uint256) {
         return 10 ** 18;
     }
@@ -318,8 +320,16 @@ abstract contract DN420 {
         return true;
     }
 
-    /// @dev Hook that is called after any NFT token transfers, including minting and burning.
-    function _afterNFTTransfer(address from, address to, uint256 id) internal virtual {}
+    /// @dev Hook that is called after a batch of NFT transfers.
+    /// The lengths of `from`, `to`, and `ids` are guaranteed to be the same.
+    function _afterNFTTransfers(address[] memory from, address[] memory to, uint256[] memory ids)
+        internal
+        virtual
+    {}
+
+    /// @dev Override this function to return true if `_afterNFTTransfers` is used.
+    /// This is to help the compiler avoid producing dead bytecode.
+    function _useAfterNFTTransfers() internal virtual returns (bool) {}
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                      ERC20 OPERATIONS                      */
@@ -444,20 +454,20 @@ abstract contract DN420 {
 
         _DNMintTemps memory t;
         unchecked {
-            uint256 toBalance = uint256(toAddressData.balance) + amount;
-            toAddressData.balance = uint96(toBalance);
-            t.toEnd = toBalance / _unit();
-        }
-        uint256 maxId;
-        unchecked {
-            uint256 totalSupply_ = uint256($.totalSupply) + amount;
-            $.totalSupply = uint96(totalSupply_);
-            uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-            if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-            maxId = totalSupply_ / _unit();
-            $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
-        }
-        unchecked {
+            {
+                uint256 toBalance = uint256(toAddressData.balance) + amount;
+                toAddressData.balance = uint96(toBalance);
+                t.toEnd = toBalance / _unit();
+            }
+            uint256 maxId;
+            {
+                uint256 totalSupply_ = uint256($.totalSupply) + amount;
+                $.totalSupply = uint96(totalSupply_);
+                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
+                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+                maxId = totalSupply_ / _unit();
+                $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
+            }
             if (!getSkipNFT(to)) {
                 t.mintIds = _idsMalloc(_zeroFloorSub(t.toEnd, toAddressData.ownedCount));
                 if (t.mintIds.length != 0) {
@@ -473,7 +483,6 @@ abstract contract DN420 {
                         _set(toOwned, id, true);
                         ownedCheckpoint = _max(ownedCheckpoint, id);
                         _idsAppend(t.mintIds, id);
-                        _afterNFTTransfer(address(0), to, id);
                         id = _wrapNFTId(id + 1, maxId);
                         if (--n == uint256(0)) break;
                     }
@@ -489,6 +498,11 @@ abstract contract DN420 {
             // Emit the {Transfer} event.
             mstore(0x00, amount)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, to)))
+        }
+        if (_useAfterNFTTransfers()) {
+            _afterNFTTransfers(
+                _zeroAddresses(t.mintIds.length), _filled(t.mintIds.length, to), t.mintIds
+            );
         }
         if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, t.mintIds, data);
     }
@@ -514,25 +528,25 @@ abstract contract DN420 {
         if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
         AddressData storage toAddressData = $.addressData[to];
 
-        uint256 id;
-        uint256 maxId;
-        unchecked {
-            uint256 preTotalSupply = uint256($.totalSupply);
-            id = preTotalSupply / _unit() + 1;
-            uint256 totalSupply_ = uint256(preTotalSupply) + amount;
-            $.totalSupply = uint96(totalSupply_);
-            uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-            if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-            maxId = totalSupply_ / _unit();
-            $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
-        }
         _DNMintTemps memory t;
         unchecked {
-            uint256 toBalance = uint256(toAddressData.balance) + amount;
-            toAddressData.balance = uint96(toBalance);
-            t.toEnd = toBalance / _unit();
-        }
-        unchecked {
+            {
+                uint256 toBalance = uint256(toAddressData.balance) + amount;
+                toAddressData.balance = uint96(toBalance);
+                t.toEnd = toBalance / _unit();
+            }
+            uint256 id;
+            uint256 maxId;
+            {
+                uint256 preTotalSupply = uint256($.totalSupply);
+                id = preTotalSupply / _unit() + 1;
+                uint256 totalSupply_ = uint256(preTotalSupply) + amount;
+                $.totalSupply = uint96(totalSupply_);
+                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
+                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+                maxId = totalSupply_ / _unit();
+                $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
+            }
             if (!getSkipNFT(to)) {
                 t.mintIds = _idsMalloc(_zeroFloorSub(t.toEnd, toAddressData.ownedCount));
                 if (t.mintIds.length != 0) {
@@ -547,7 +561,6 @@ abstract contract DN420 {
                         _set(toOwned, id, true);
                         ownedCheckpoint = _max(ownedCheckpoint, id);
                         _idsAppend(t.mintIds, id);
-                        _afterNFTTransfer(address(0), to, id);
                         id = _wrapNFTId(id + 1, maxId);
                         if (--n == uint256(0)) break;
                     }
@@ -562,6 +575,11 @@ abstract contract DN420 {
             // Emit the {Transfer} event.
             mstore(0x00, amount)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, 0, shr(96, shl(96, to)))
+        }
+        if (_useAfterNFTTransfers()) {
+            _afterNFTTransfers(
+                _zeroAddresses(t.mintIds.length), _filled(t.mintIds.length, to), t.mintIds
+            );
         }
         if (_hasCode(to)) _checkOnERC1155BatchReceived(address(0), to, t.mintIds, data);
     }
@@ -582,10 +600,11 @@ abstract contract DN420 {
         if ($.nextTokenId == uint256(0)) revert DNNotInitialized();
         AddressData storage fromAddressData = $.addressData[from];
 
-        uint256 fromBalance = fromAddressData.balance;
-        if (amount > fromBalance) revert InsufficientBalance();
-
+        uint256[] memory ids;
         unchecked {
+            uint256 fromBalance = fromAddressData.balance;
+            if (amount > fromBalance) revert InsufficientBalance();
+
             fromAddressData.balance = uint96(fromBalance -= amount);
             $.totalSupply -= uint96(amount);
 
@@ -594,7 +613,7 @@ abstract contract DN420 {
             uint256 numNFTBurns = _zeroFloorSub(fromIndex, fromBalance / _unit());
 
             if (numNFTBurns != 0) {
-                uint256[] memory ids = _idsMalloc(numNFTBurns);
+                ids = _idsMalloc(numNFTBurns);
                 fromAddressData.ownedCount = uint32(fromIndex - numNFTBurns);
                 uint256 id = fromAddressData.ownedCheckpoint;
                 // Burn loop.
@@ -603,7 +622,6 @@ abstract contract DN420 {
                     if (id == uint256(0)) id = _findLastSet(fromOwned, $.tokenIdUpTo);
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
-                    _afterNFTTransfer(from, address(0), id);
                     _idsAppend(ids, id);
                     if (--numNFTBurns == uint256(0)) break;
                 }
@@ -616,6 +634,9 @@ abstract contract DN420 {
             // Emit the {Transfer} event.
             mstore(0x00, amount)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), 0)
+        }
+        if (_useAfterNFTTransfers()) {
+            _afterNFTTransfers(_filled(ids.length, from), _zeroAddresses(ids.length), ids);
         }
     }
 
@@ -692,7 +713,6 @@ abstract contract DN420 {
                     _set(fromOwned, id, false);
                     _set(toOwned, id, true);
                     _idsAppend(t.directIds, id);
-                    _afterNFTTransfer(from, to, id);
                     if (--n == uint256(0)) break;
                 }
                 fromAddressData.ownedCheckpoint = uint32(id);
@@ -702,7 +722,7 @@ abstract contract DN420 {
 
             if (t.numNFTBurns != 0) {
                 uint256 n = t.numNFTBurns;
-                uint256[] memory burnIds = _idsMalloc(n);
+                t.burnIds = _idsMalloc(n);
                 Bitmap storage fromOwned = $.owned[from];
                 fromAddressData.ownedCount = uint32(t.fromOwnedCount - n);
                 uint256 id = fromAddressData.ownedCheckpoint;
@@ -712,12 +732,11 @@ abstract contract DN420 {
                     if (id == uint256(0)) id = _findLastSet(fromOwned, $.tokenIdUpTo);
                     _set(fromOwned, id, false);
                     _set($.exists, id, false);
-                    _idsAppend(burnIds, id);
-                    _afterNFTTransfer(from, address(0), id);
+                    _idsAppend(t.burnIds, id);
                     if (--n == uint256(0)) break;
                 }
                 fromAddressData.ownedCheckpoint = uint32(id);
-                _batchTransferEmit(from, address(0), burnIds);
+                _batchTransferEmit(from, address(0), t.burnIds);
             }
 
             if (t.numNFTMints != 0) {
@@ -737,7 +756,6 @@ abstract contract DN420 {
                     _set(toOwned, id, true);
                     ownedCheckpoint = _max(ownedCheckpoint, id);
                     _idsAppend(t.mintIds, id);
-                    _afterNFTTransfer(address(0), to, id);
                     id = _wrapNFTId(id + 1, maxId);
                     if (--n == uint256(0)) break;
                 }
@@ -752,6 +770,21 @@ abstract contract DN420 {
             mstore(0x00, amount)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
+        if (_useAfterNFTTransfers()) {
+            uint256[] memory ids = t.directIds;
+            unchecked {
+                _afterNFTTransfers(
+                    _concat(
+                        _filled(ids.length + t.numNFTBurns, from), _zeroAddresses(t.numNFTMints)
+                    ),
+                    _concat(
+                        _concat(_filled(ids.length, to), _zeroAddresses(t.numNFTBurns)),
+                        _filled(t.numNFTMints, to)
+                    ),
+                    _concat(_concat(ids, t.burnIds), t.mintIds)
+                );
+            }
         }
         if (_hasCode(to)) {
             _checkOnERC1155BatchReceived(from, to, t.directIds, data);
@@ -802,7 +835,6 @@ abstract contract DN420 {
             sstore(toAddressData.slot, add(diff,
                 xor(toPacked, shl(96, mul(gt(id, toCheckpoint), xor(id, toCheckpoint))))))
         }
-        _afterNFTTransfer(from, to, id);
         /// @solidity memory-safe-assembly
         assembly {
             from := shr(96, shl(96, from))
@@ -814,6 +846,9 @@ abstract contract DN420 {
             // Emit the {Transfer} event.
             mstore(0x00, unit)
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, from, to)
+        }
+        if (_useAfterNFTTransfers()) {
+            _afterNFTTransfers(_filled(1, from), _filled(1, to), _filled(1, id));
         }
         if (_hasCode(to)) _checkOnERC1155Received(from, to, id, data);
     }
@@ -860,7 +895,6 @@ abstract contract DN420 {
                 if (!_owns(fromOwned, id)) revert TransferFromIncorrectOwner();
                 _set(fromOwned, id, false);
                 _set(toOwned, id, true);
-                _afterNFTTransfer(from, to, id);
                 upTo = _max(upTo, id);
             }
         }
@@ -881,6 +915,9 @@ abstract contract DN420 {
             mstore(0x00, amount)
             // forgefmt: disable-next-item
             log3(0x00, 0x20, _TRANSFER_EVENT_SIGNATURE, shr(96, shl(96, from)), shr(96, shl(96, to)))
+        }
+        if (_useAfterNFTTransfers()) {
+            _afterNFTTransfers(_filled(ids.length, from), _filled(ids.length, to), ids);
         }
         if (_hasCode(to)) _checkOnERC1155BatchReceived(from, to, ids, data);
     }
@@ -1304,7 +1341,7 @@ abstract contract DN420 {
     }
 
     /// @dev Returns the index of the least significant unset bit in `[begin..upTo]`.
-    /// If no set bit is found, returns `type(uint256).max`.
+    /// If no unset bit is found, returns `type(uint256).max`.
     function _findFirstUnset(Bitmap storage bitmap, uint256 begin, uint256 upTo)
         internal
         view
@@ -1315,9 +1352,9 @@ abstract contract DN420 {
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
             let s := shl(96, bitmap.slot) // Storage offset of the bitmap.
             let bucket := add(s, shr(8, begin))
-            let lastBucket := add(s, shr(8, upTo))
             let negBits := shl(and(0xff, begin), shr(and(0xff, begin), not(sload(bucket))))
             if iszero(negBits) {
+                let lastBucket := add(s, shr(8, upTo))
                 for {} 1 {} {
                     bucket := add(bucket, 1)
                     negBits := not(sload(bucket))
@@ -1506,6 +1543,85 @@ abstract contract DN420 {
         }
     }
 
+    /// @dev Returns an array of zero addresses.
+    function _zeroAddresses(uint256 n) private pure returns (address[] memory result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            mstore(0x40, add(add(result, 0x20), shl(5, n)))
+            mstore(result, n)
+            codecopy(add(result, 0x20), codesize(), shl(5, n))
+        }
+    }
+
+    /// @dev Returns an array each set to `value`.
+    function _filled(uint256 n, uint256 value) private pure returns (uint256[] memory result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            let o := add(result, 0x20)
+            let end := add(o, shl(5, n))
+            mstore(0x40, end)
+            mstore(result, n)
+            for {} iszero(eq(o, end)) { o := add(o, 0x20) } { mstore(o, value) }
+        }
+    }
+
+    /// @dev Returns an array each set to `value`.
+    function _filled(uint256 n, address value) private pure returns (address[] memory result) {
+        result = _toAddresses(_filled(n, uint160(value)));
+    }
+
+    /// @dev Concatenates the arrays.
+    function _concat(uint256[] memory a, uint256[] memory b)
+        private
+        view
+        returns (uint256[] memory result)
+    {
+        uint256 aN = a.length;
+        uint256 bN = b.length;
+        if (aN == uint256(0)) return b;
+        if (bN == uint256(0)) return a;
+        /// @solidity memory-safe-assembly
+        assembly {
+            let n := add(aN, bN)
+            if n {
+                result := mload(0x40)
+                mstore(result, n)
+                let o := add(result, 0x20)
+                mstore(0x40, add(o, shl(5, n)))
+                let aL := shl(5, aN)
+                pop(staticcall(gas(), 4, add(a, 0x20), aL, o, aL))
+                pop(staticcall(gas(), 4, add(b, 0x20), shl(5, bN), add(o, aL), shl(5, bN)))
+            }
+        }
+    }
+
+    /// @dev Concatenates the arrays.
+    function _concat(address[] memory a, address[] memory b)
+        private
+        view
+        returns (address[] memory result)
+    {
+        result = _toAddresses(_concat(_toUints(a), _toUints(b)));
+    }
+
+    /// @dev Reinterpret cast to an uint array.
+    function _toUints(address[] memory a) private pure returns (uint256[] memory casted) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            casted := a
+        }
+    }
+
+    /// @dev Reinterpret cast to an address array.
+    function _toAddresses(uint256[] memory a) private pure returns (address[] memory casted) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            casted := a
+        }
+    }
+
     /// @dev Struct of temporary variables for mints.
     struct _DNMintTemps {
         uint256 toEnd;
@@ -1520,6 +1636,7 @@ abstract contract DN420 {
         uint256 toOwnedCount;
         uint256 ownedCheckpoint;
         uint256[] directIds;
+        uint256[] burnIds;
         uint256[] mintIds;
     }
 

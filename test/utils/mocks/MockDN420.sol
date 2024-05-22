@@ -191,12 +191,44 @@ contract MockDN420 is DN420, MockBrutalizer {
         return useDirectTransfersIfPossible;
     }
 
-    function _afterNFTTransfer(address from, address to, uint256 id) internal virtual override {
-        /// @solidity memory-safe-assembly
-        assembly {
-            mstore(0x00, from)
-            mstore(0x20, to)
-            mstore(0x10, id)
+    function _useAfterNFTTransfers() internal view virtual override returns (bool) {
+        return true;
+    }
+
+    function _afterNFTTransfers(address[] memory from, address[] memory to, uint256[] memory ids)
+        internal
+        virtual
+        override
+    {
+        uint256 n = ids.length;
+        require(from.length == n);
+        require(to.length == n);
+        unchecked {
+            for (uint256 i; i != n; ++i) {
+                uint256 id = ids[i];
+                require(id <= 2 ** 32 - 1);
+                if (from[i] != address(0) && to[i] != address(0)) {
+                    require(owns(to[i], id));
+                }
+                if (from[i] == address(0)) {
+                    require(to[i] != address(0));
+                    require(owns(to[i], id));
+                }
+                if (to[i] == address(0)) {
+                    require(from[i] != address(0));
+                    bool hasRemint = false;
+                    for (uint256 j = i + 1; j < n; ++j) {
+                        if (ids[j] == id && to[j] != address(0)) {
+                            hasRemint = true;
+                            j = n;
+                        }
+                    }
+                    if (!hasRemint) {
+                        require(!owns(to[i], id));
+                        require(!owns(from[i], id));
+                    }
+                }
+            }
         }
     }
 }
