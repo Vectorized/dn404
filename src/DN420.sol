@@ -6,6 +6,8 @@ pragma solidity ^0.8.4;
 /// ERC20 and ERC1155 chimera implementation that mints
 /// and burns NFTs based on an account's ERC20 token balance.
 ///
+/// This contract has not yet been audited. USE AT YOUR OWN RISK!
+///
 /// @author vectorized.eth (@optimizoor)
 /// @author Quit (@0xQuit)
 /// @author Michael Amadi (@AmadiMichaels)
