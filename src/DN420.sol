@@ -539,12 +539,12 @@ abstract contract DN420 {
             uint256 maxId;
             {
                 uint256 preTotalSupply = uint256($.totalSupply);
-                id = preTotalSupply / _unit() + 1;
-                uint256 totalSupply_ = uint256(preTotalSupply) + amount;
-                $.totalSupply = uint96(totalSupply_);
-                uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
-                maxId = totalSupply_ / _unit();
+                uint256 newTotalSupply = uint256(preTotalSupply) + amount;
+                $.totalSupply = uint96(newTotalSupply);
+                uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
+                if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
+                maxId = newTotalSupply / _unit();
+                id = _wrapNFTId(preTotalSupply / _unit() + 1, maxId);
                 $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
             }
             if (!getSkipNFT(to)) {

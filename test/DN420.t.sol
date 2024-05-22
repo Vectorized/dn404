@@ -531,163 +531,204 @@ contract DN420Test is SoladyTest {
         uint256 numExists;
     }
 
+    function _maybeCheckInvariants(address[] memory addresses) internal {
+        if (_random() % 16 == 0) {
+            _TestMixedTemps memory t;
+            unchecked {
+                for (uint256 i; i < addresses.length; ++i) {
+                    address a = addresses[i];
+                    t.ids = dn.findOwnedIds(a);
+                    t.balanceSum += dn.balanceOf(a);
+                    // Might not be sorted.
+                    LibSort.sort(t.ids);
+                    assertEq(LibSort.intersection(t.allIds, t.ids).length, 0);
+                    t.allIds = LibSort.union(t.allIds, t.ids);
+                    assertEq(t.ids.length, dn.ownedCount(a));
+                    assertLe(t.ids.length, dn.balanceOf(a) / _WAD);
+                }
+                assertEq(t.balanceSum, dn.totalSupply());
+                for (uint256 i; i < t.allIds.length; ++i) {
+                    assertEq(dn.exists(t.allIds[i]), true);
+                }
+                assertLe(t.allIds.length, dn.totalSupply() / _WAD);
+
+                if (t.allIds.length != 0) {
+                    uint256 maxId = t.allIds[t.allIds.length - 1];
+                    for (uint256 i; i <= maxId; ++i) {
+                        if (dn.exists(i)) ++t.numExists;
+                    }
+                    assertEq(t.allIds.length, t.numExists);
+                    uint256 end = maxId + (_random() % 32) * (_random() % 32);
+                    for (uint256 i = maxId + 1; i <= end; ++i) {
+                        assertEq(dn.exists(i), false);
+                    }
+                }
+            }
+        }
+    }
+
+    function _mintOrMintNext(address to, uint256 amount) internal {
+        if (_random() % 2 == 0) {
+            dn.mint(to, amount);
+        } else {
+            dn.mintNext(to, amount);
+        }
+    }
+
+    function _randomizeConfigurations(address[] memory addresses) internal {
+        if (_random() % 4 == 0) {
+            dn.setUseDirectTransfersIfPossible(_random() % 2 == 0);
+        }
+        if (_random() % 8 == 0) {
+            unchecked {
+                uint256 n = dn.totalSupply() / _WAD * 4 + 1;
+                vm.prank(addresses[_random() % addresses.length]);
+                dn.setOwnedCheckpoint(_random() % n);
+            }
+        }
+        if (_random() % 4 == 0) {
+            vm.prank(addresses[_random() % addresses.length]);
+            dn.setSkipNFT(_random() & 1 == 0);
+        }
+    }
+
+    function _doDirectNFTTransfer(address[] memory addresses) internal {
+        _TestMixedTemps memory t;
+        if (_random() % 4 == 0) {
+            t.from = addresses[_random() % addresses.length];
+            t.to = addresses[_random() % addresses.length];
+            t.fromIds = dn.findOwnedIds(t.from);
+            if (t.fromIds.length != 0) {
+                uint256 id = t.fromIds[_random() % t.fromIds.length];
+                if (t.to == t.from) {
+                    t.balance = dn.balanceOf(t.from);
+                    t.nftBalance = dn.ownedCount(t.from);
+                    vm.prank(t.from);
+                    dn.safeTransferFromNFT(t.from, t.to, id);
+                    assertEq(dn.ownedCount(t.from), t.nftBalance);
+                    assertEq(dn.balanceOf(t.from), t.balance);
+                    uint256[] memory idsAfter = dn.findOwnedIds(t.from);
+                    LibSort.sort(idsAfter);
+                    LibSort.sort(t.fromIds);
+                    assertEq(idsAfter, t.fromIds);
+                } else {
+                    vm.prank(t.from);
+                    dn.safeTransferFromNFT(t.from, t.to, id);
+                }
+            }
+        }
+    }
+
+    function _doDirectNFTBatchTransfer(address[] memory addresses) internal {
+        _TestMixedTemps memory t;
+        if (_random() % 4 == 0) {
+            t.from = addresses[_random() % addresses.length];
+            t.to = addresses[_random() % addresses.length];
+            t.fromIds = dn.findOwnedIds(t.from);
+            if (t.to == t.from) {
+                if (_random() % 2 == 0) {
+                    t.ids = _randomSampleWithReplacements(t.fromIds);
+                } else {
+                    t.ids = _randomSampleWithoutReplacements(t.fromIds);
+                }
+                t.balance = dn.balanceOf(t.from);
+                t.nftBalance = dn.ownedCount(t.from);
+                vm.prank(t.from);
+                dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
+                assertEq(dn.ownedCount(t.from), t.nftBalance);
+                assertEq(dn.balanceOf(t.from), t.balance);
+                t.idsCopy = dn.findOwnedIds(t.from);
+                LibSort.sort(t.idsCopy);
+                LibSort.sort(t.fromIds);
+                assertEq(t.idsCopy, t.fromIds);
+            } else if (_random() % 2 == 0) {
+                t.ids = _randomSampleWithReplacements(t.fromIds);
+                t.idsCopy = LibSort.copy(t.ids);
+                LibSort.sort(t.idsCopy);
+                LibSort.uniquifySorted(t.idsCopy);
+                if (t.idsCopy.length < t.ids.length) {
+                    vm.prank(t.from);
+                    vm.expectRevert(DN420.TransferFromIncorrectOwner.selector);
+                    dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
+                } else {
+                    vm.prank(t.from);
+                    dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
+                }
+            } else {
+                t.ids = _randomSampleWithoutReplacements(t.fromIds);
+                vm.prank(t.from);
+                dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
+            }
+        }
+    }
+
+    function _doTransfer(address[] memory addresses) internal {
+        _TestMixedTemps memory t;
+        if (_random() % 16 > 0) {
+            t.from = addresses[_random() % addresses.length];
+            t.to = addresses[_random() % addresses.length];
+
+            t.amount = _bound(_random(), 0, dn.balanceOf(t.from));
+            vm.prank(t.from);
+            dn.transfer(t.to, t.amount);
+        }
+    }
+
+    function _doBurnAndMint(address[] memory addresses) internal {
+        _TestMixedTemps memory t;
+        if (_random() % 4 == 0) {
+            t.from = addresses[_random() % addresses.length];
+            t.to = addresses[_random() % addresses.length];
+
+            t.amount = _bound(_random(), 0, dn.balanceOf(t.from));
+            if (_random() % 2 == 0) {
+                _mintOrMintNext(t.to, t.amount);
+                _maybeCheckInvariants(addresses);
+                _randomizeConfigurations(addresses);
+                dn.burn(t.from, t.amount);
+                _maybeCheckInvariants(addresses);
+            } else {
+                dn.burn(t.from, t.amount);
+                _maybeCheckInvariants(addresses);
+                _randomizeConfigurations(addresses);
+                _mintOrMintNext(t.to, t.amount);
+                _maybeCheckInvariants(addresses);
+            }
+        }
+    }
+
     function testMixed(uint256) public {
         uint256 n = _random() % 8 == 0 ? _bound(_random(), 0, 512) : _bound(_random(), 0, 16);
-        dn.initializeDN420(n * _WAD, address(1111));
+        dn.initializeDN420(n * _WAD, address(333));
 
         address[] memory addresses = new address[](3);
         addresses[0] = address(111);
         addresses[1] = address(222);
-        addresses[2] = address(1111);
+        addresses[2] = address(333);
 
         do {
-            _TestMixedTemps memory t;
-            if (_random() % 4 == 0) {
-                dn.setUseDirectTransfersIfPossible(_random() % 2 == 0);
-            }
-
-            if (_random() % 16 > 0) {
-                t.from = addresses[_random() % 3];
-                t.to = addresses[_random() % 3];
-
-                t.amount = _bound(_random(), 0, dn.balanceOf(t.from));
-                vm.prank(t.from);
-                dn.transfer(t.to, t.amount);
-            }
-
-            if (_random() % 4 == 0) {
-                dn.setUseDirectTransfersIfPossible(_random() % 2 == 0);
-            }
-
-            if (_random() % 4 == 0) {
-                t.from = addresses[_random() % 3];
-                t.to = addresses[_random() % 3];
-
-                t.amount = _bound(_random(), 0, dn.balanceOf(t.from));
-                dn.burn(t.from, t.amount);
-                dn.mint(t.to, t.amount);
-            }
+            _randomizeConfigurations(addresses);
 
             if (_random() % 2 == 0) {
-                vm.prank(addresses[_random() % 3]);
-                unchecked {
-                    dn.setOwnedCheckpoint(_random() % (2 * n + 1));
-                }
+                _doBurnAndMint(addresses);
+            } else {
+                _doTransfer(addresses);
             }
 
-            if (_random() % 4 == 0) {
-                vm.prank(addresses[_random() % 3]);
-                dn.setSkipNFT(_random() & 1 == 0);
+            _maybeCheckInvariants(addresses);
+            _randomizeConfigurations(addresses);
+
+            if (_random() % 2 == 0) {
+                _doDirectNFTTransfer(addresses);
+            } else {
+                _doDirectNFTBatchTransfer(addresses);
             }
 
-            if (_random() % 4 == 0) {
-                t.from = addresses[_random() % 3];
-                t.to = addresses[_random() % 3];
-                t.fromIds = dn.findOwnedIds(t.from);
-                if (t.fromIds.length != 0) {
-                    uint256 id = t.fromIds[_random() % t.fromIds.length];
-                    if (t.to == t.from) {
-                        t.balance = dn.balanceOf(t.from);
-                        t.nftBalance = dn.ownedCount(t.from);
-                        vm.prank(t.from);
-                        dn.safeTransferFromNFT(t.from, t.to, id);
-                        assertEq(dn.ownedCount(t.from), t.nftBalance);
-                        assertEq(dn.balanceOf(t.from), t.balance);
-                        uint256[] memory idsAfter = dn.findOwnedIds(t.from);
-                        LibSort.sort(idsAfter);
-                        LibSort.sort(t.fromIds);
-                        assertEq(idsAfter, t.fromIds);
-                    } else {
-                        vm.prank(t.from);
-                        dn.safeTransferFromNFT(t.from, t.to, id);
-                    }
-                }
-            }
-
-            if (_random() % 4 == 0) {
-                t.from = addresses[_random() % 3];
-                t.to = addresses[_random() % 3];
-                t.fromIds = dn.findOwnedIds(t.from);
-                if (t.to == t.from) {
-                    if (_random() % 2 == 0) {
-                        t.ids = _randomSampleWithReplacements(t.fromIds);
-                    } else {
-                        t.ids = _randomSampleWithoutReplacements(t.fromIds);
-                    }
-                    t.balance = dn.balanceOf(t.from);
-                    t.nftBalance = dn.ownedCount(t.from);
-                    vm.prank(t.from);
-                    dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
-                    assertEq(dn.ownedCount(t.from), t.nftBalance);
-                    assertEq(dn.balanceOf(t.from), t.balance);
-                    t.idsCopy = dn.findOwnedIds(t.from);
-                    LibSort.sort(t.idsCopy);
-                    LibSort.sort(t.fromIds);
-                    assertEq(t.idsCopy, t.fromIds);
-                } else if (_random() % 2 == 0) {
-                    t.ids = _randomSampleWithReplacements(t.fromIds);
-                    t.idsCopy = LibSort.copy(t.ids);
-                    LibSort.sort(t.idsCopy);
-                    LibSort.uniquifySorted(t.idsCopy);
-                    if (t.idsCopy.length < t.ids.length) {
-                        vm.prank(t.from);
-                        vm.expectRevert(DN420.TransferFromIncorrectOwner.selector);
-                        dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
-                    } else {
-                        vm.prank(t.from);
-                        dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
-                    }
-                } else {
-                    t.ids = _randomSampleWithoutReplacements(t.fromIds);
-                    vm.prank(t.from);
-                    dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
-                }
-            }
-
-            if (_random() % 8 == 0) {
-                unchecked {
-                    for (uint256 i; i != 3; ++i) {
-                        address a = addresses[i];
-                        t.balance = dn.balanceOf(a);
-                        t.balanceSum += t.balance;
-                        t.nftBalance = dn.ownedCount(a);
-                        assertLe(t.nftBalance, t.balance / _WAD);
-                        t.nftBalanceSum += t.nftBalance;
-                    }
-                    assertEq(t.balanceSum, dn.totalSupply());
-                    assertLe(t.nftBalanceSum, t.balanceSum / _WAD);
-                }
-            }
+            _maybeCheckInvariants(addresses);
         } while (_random() % 8 > 0);
 
-        if (_random() % 8 == 0) {
-            _TestMixedTemps memory t;
-            for (uint256 i; i < 3; ++i) {
-                t.ids = dn.findOwnedIds(addresses[i]);
-                // Might not be sorted.
-                LibSort.sort(t.ids);
-                t.allIds = LibSort.union(t.allIds, t.ids);
-                assertLe(t.ids.length, dn.balanceOf(addresses[i]) / _WAD);
-            }
-            for (uint256 i; i < t.allIds.length; ++i) {
-                assertEq(dn.exists(t.allIds[i]), true);
-            }
-            for (uint256 i; i <= n; ++i) {
-                if (dn.exists(i)) ++t.numExists;
-            }
-            assertEq(t.allIds.length, t.numExists);
-            assertLe(t.allIds.length, dn.totalSupply() / _WAD);
-        }
-
         if (_random() % 4 == 0) {
-            uint256 end = n + 1 + n;
-            for (uint256 i = n + 1; i <= end; ++i) {
-                assertEq(dn.exists(i), false);
-            }
-        }
-
-        if (_random() % 4 == 0) {
-            for (uint256 i; i != 3; ++i) {
+            for (uint256 i; i != addresses.length; ++i) {
                 address a = addresses[i];
                 vm.prank(a);
                 dn.setSkipNFT(false);
@@ -699,7 +740,7 @@ contract DN420Test is SoladyTest {
         }
 
         if (_random() % 32 == 0) {
-            for (uint256 i; i != 3; ++i) {
+            for (uint256 i; i != addresses.length; ++i) {
                 address a = addresses[i];
                 vm.prank(a);
                 dn.setSkipNFT(true);
