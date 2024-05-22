@@ -529,6 +529,8 @@ contract DN420Test is SoladyTest {
         uint256[] ids;
         uint256[] idsCopy;
         uint256 numExists;
+        uint256 maxId;
+        uint256 end;
     }
 
     function _sampleAddress(address[] memory addresses) internal returns (address) {
@@ -547,36 +549,61 @@ contract DN420Test is SoladyTest {
         }
     }
 
+    function _findAndCheckOwnedIds(address a) internal returns (uint256[] memory ids) {
+        unchecked {
+            ids = dn.findOwnedIds(a);
+            assertEq(ids.length, dn.ownedCount(a));
+            assertLe(ids.length, dn.balanceOf(a) / _WAD);
+        }
+    }
+
+    function _findAndCheckAllOwnedIds(address[] memory addresses)
+        internal
+        returns (uint256[] memory allIds)
+    {
+        unchecked {
+            for (uint256 i; i < addresses.length; ++i) {
+                uint256[] memory ids = _findAndCheckOwnedIds(addresses[i]);
+                // Might not be sorted.
+                LibSort.sort(ids);
+                assertEq(LibSort.intersection(allIds, ids).length, 0);
+                allIds = LibSort.union(allIds, ids);
+            }
+            for (uint256 i; i < allIds.length; ++i) {
+                assertEq(dn.exists(allIds[i]), true);
+            }
+        }
+        assertLe(allIds.length, dn.totalSupply() / _WAD);
+    }
+
+    function _checkBalanceSum(address[] memory addresses) internal {
+        unchecked {
+            uint256 balanceSum;
+            for (uint256 i; i < addresses.length; ++i) {
+                balanceSum += dn.balanceOf(addresses[i]);
+            }
+            assertEq(balanceSum, dn.totalSupply());
+        }
+    }
+
     function _maybeCheckInvariants(address[] memory addresses) internal {
+        if (_random() % 32 == 0) {
+            _checkBalanceSum(addresses);
+        }
         if (_random() % 16 == 0) {
             _TestMixedTemps memory t;
             unchecked {
-                for (uint256 i; i < addresses.length; ++i) {
-                    address a = addresses[i];
-                    t.ids = dn.findOwnedIds(a);
-                    t.balanceSum += dn.balanceOf(a);
-                    // Might not be sorted.
-                    LibSort.sort(t.ids);
-                    assertEq(LibSort.intersection(t.allIds, t.ids).length, 0);
-                    t.allIds = LibSort.union(t.allIds, t.ids);
-                    assertEq(t.ids.length, dn.ownedCount(a));
-                    assertLe(t.ids.length, dn.balanceOf(a) / _WAD);
-                }
-                assertEq(t.balanceSum, dn.totalSupply());
-                for (uint256 i; i < t.allIds.length; ++i) {
-                    assertEq(dn.exists(t.allIds[i]), true);
-                }
-                assertLe(t.allIds.length, dn.totalSupply() / _WAD);
+                t.allIds = _findAndCheckAllOwnedIds(addresses);
 
                 if (t.allIds.length != 0) {
-                    uint256 maxId = t.allIds[t.allIds.length - 1];
-                    for (uint256 i; i <= maxId; ++i) {
+                    t.maxId = t.allIds[t.allIds.length - 1];
+                    for (uint256 i; i <= t.maxId; ++i) {
                         if (dn.exists(i)) ++t.numExists;
                     }
-                    assertEq(maxId, _maxOwnedTokenId(addresses));
+                    assertEq(t.maxId, _maxOwnedTokenId(addresses));
                     assertEq(t.allIds.length, t.numExists);
-                    uint256 end = maxId + (_random() % 32) * (_random() % 32);
-                    for (uint256 i = maxId + 1; i <= end; ++i) {
+                    t.end = t.maxId + (_random() % 32) * (_random() % 32);
+                    for (uint256 i = t.maxId + 1; i <= t.end; ++i) {
                         assertEq(dn.exists(i), false);
                     }
                 }
