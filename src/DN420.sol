@@ -812,7 +812,7 @@ abstract contract DN420 {
         DN420Storage storage $ = _getDN420Storage();
         if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
 
-        if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
+        if (_toUint(by == address(0)) | _toUint(by == from) == uint256(0)) {
             if (!isApprovedForAll(from, by)) revert NotOwnerNorApproved();
         }
 
@@ -876,7 +876,7 @@ abstract contract DN420 {
         DN420Storage storage $ = _getDN420Storage();
         if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
 
-        if (_toUint(by == address(0)) | _toUint(by == from) == 0) {
+        if (_toUint(by == address(0)) | _toUint(by == from) == uint256(0)) {
             if (!isApprovedForAll(from, by)) revert NotOwnerNorApproved();
         }
 
