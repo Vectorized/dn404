@@ -2,8 +2,9 @@
 pragma solidity ^0.8.4;
 
 import "../../../src/DN404.sol";
+import "./MockBrutalizer.sol";
 
-contract MockDN404 is DN404 {
+contract MockDN404 is DN404, MockBrutalizer {
     string private _name;
 
     string private _symbol;
@@ -162,13 +163,6 @@ contract MockDN404 is DN404 {
 
     function initiateTransferFromNFT(address from, address to, uint256 id) external {
         _initiateTransferFromNFT(from, to, id, msg.sender);
-    }
-
-    function _brutalized(address a) internal pure returns (address result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := or(0xf348aeebbad597df99cf9f4f0000000000000000000000000000000000000000, a)
-        }
     }
 
     function _useAfterNFTTransfers() internal view virtual override returns (bool) {

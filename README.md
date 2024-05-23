@@ -33,6 +33,7 @@ The Solidity smart contracts are located in the `src` directory.
 src
 ├─ DN404 — "ERC20 contract for DN404"
 ├─ DN404Mirror — "ERC721 contract for DN404"
+├─ DN420 — "Single-contract ERC20 ERC1155 chimera"
 └─ example
    ├─ SimpleDN404 — "Simple DN404 example as ERC20"
    └─ NFTMintDN404 — "Simple DN404 example as ERC721"
