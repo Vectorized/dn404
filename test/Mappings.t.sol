@@ -425,13 +425,6 @@ contract MappingsTest is SoladyTest {
         }
     }
 
-    function _brutalized(address a) internal pure returns (address result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := or(0xf348aeebbad597df99cf9f4f0000000000000000000000000000000000000000, a)
-        }
-    }
-
     function testStorageSlotsNoCollision(uint256 slot0, uint256 slot1, uint256 i0, uint256 i1)
         public
     {

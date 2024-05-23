@@ -520,8 +520,6 @@ contract DN420Test is SoladyTest {
         address from;
         address to;
         uint256 amount;
-        uint256 balanceSum;
-        uint256 nftBalanceSum;
         uint256 balance;
         uint256 nftBalance;
         uint256[] fromIds;
@@ -570,7 +568,7 @@ contract DN420Test is SoladyTest {
                 allIds = LibSort.union(allIds, ids);
             }
             for (uint256 i; i < allIds.length; ++i) {
-                assertEq(dn.exists(allIds[i]), true);
+                assertTrue(dn.exists(allIds[i]));
             }
         }
         assertLe(allIds.length, dn.totalSupply() / _WAD);
@@ -586,6 +584,14 @@ contract DN420Test is SoladyTest {
         }
     }
 
+    function _countNumExists(uint256 maxId) internal view returns (uint256 numExists) {
+        unchecked {
+            for (uint256 i; i <= maxId; ++i) {
+                if (dn.exists(i)) ++numExists;
+            }
+        }
+    }
+
     function _maybeCheckInvariants(address[] memory addresses) internal {
         if (_random() % 32 == 0) {
             _checkBalanceSum(addresses);
@@ -594,17 +600,13 @@ contract DN420Test is SoladyTest {
             _TestMixedTemps memory t;
             unchecked {
                 t.allIds = _findAndCheckAllOwnedIds(addresses);
-
                 if (t.allIds.length != 0) {
                     t.maxId = t.allIds[t.allIds.length - 1];
-                    for (uint256 i; i <= t.maxId; ++i) {
-                        if (dn.exists(i)) ++t.numExists;
-                    }
                     assertEq(t.maxId, _maxOwnedTokenId(addresses));
-                    assertEq(t.allIds.length, t.numExists);
+                    assertEq(t.allIds.length, _countNumExists(t.maxId));
                     t.end = t.maxId + (_random() % 32) * (_random() % 32);
                     for (uint256 i = t.maxId + 1; i <= t.end; ++i) {
-                        assertEq(dn.exists(i), false);
+                        assertFalse(dn.exists(i));
                     }
                 }
             }
@@ -636,6 +638,15 @@ contract DN420Test is SoladyTest {
         }
     }
 
+    function _checkAfterNFTTransfer(_TestMixedTemps memory t) internal {
+        assertEq(dn.ownedCount(t.from), t.nftBalance);
+        assertEq(dn.balanceOf(t.from), t.balance);
+        t.idsCopy = dn.findOwnedIds(t.from);
+        LibSort.sort(t.idsCopy);
+        LibSort.sort(t.fromIds);
+        assertEq(t.idsCopy, t.fromIds);
+    }
+
     function _doDirectNFTTransfer(address[] memory addresses) internal {
         _TestMixedTemps memory t;
         if (_random() % 4 == 0) {
@@ -649,12 +660,7 @@ contract DN420Test is SoladyTest {
                 t.nftBalance = dn.ownedCount(t.from);
                 vm.prank(t.from);
                 dn.safeTransferFromNFT(t.from, t.to, id);
-                assertEq(dn.ownedCount(t.from), t.nftBalance);
-                assertEq(dn.balanceOf(t.from), t.balance);
-                uint256[] memory idsAfter = dn.findOwnedIds(t.from);
-                LibSort.sort(idsAfter);
-                LibSort.sort(t.fromIds);
-                assertEq(idsAfter, t.fromIds);
+                _checkAfterNFTTransfer(t);
                 return;
             }
             vm.prank(t.from);
@@ -678,12 +684,7 @@ contract DN420Test is SoladyTest {
                 t.nftBalance = dn.ownedCount(t.from);
                 vm.prank(t.from);
                 dn.safeBatchTransferFromNFTs(t.from, t.to, t.ids);
-                assertEq(dn.ownedCount(t.from), t.nftBalance);
-                assertEq(dn.balanceOf(t.from), t.balance);
-                t.idsCopy = dn.findOwnedIds(t.from);
-                LibSort.sort(t.idsCopy);
-                LibSort.sort(t.fromIds);
-                assertEq(t.idsCopy, t.fromIds);
+                _checkAfterNFTTransfer(t);
                 return;
             }
             if (_random() % 2 == 0) {
