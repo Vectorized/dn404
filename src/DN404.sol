@@ -1296,17 +1296,17 @@ abstract contract DN404 {
     /*                 INTERNAL / PRIVATE HELPERS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns `(i - 1) << 1`.
+    /// @dev Returns `(i - _toUint(_useOneIndexed())) << 1`.
     function _ownershipIndex(uint256 i) internal pure returns (uint256) {
         unchecked {
-            return (i - _toUint(_useOneIndexed())) << 1; // Minus 1 as token IDs start from 1.
+            return (i - _toUint(_useOneIndexed())) << 1;
         }
     }
 
-    /// @dev Returns `((i - 1) << 1) + 1`.
+    /// @dev Returns `((i - _toUint(_useOneIndexed())) << 1) + 1`.
     function _ownedIndex(uint256 i) internal pure returns (uint256) {
         unchecked {
-            return ((i - _toUint(_useOneIndexed())) << 1) + 1; // Minus 1 as token IDs start from 1.
+            return ((i - _toUint(_useOneIndexed())) << 1) + 1;
         }
     }
 
@@ -1337,10 +1337,10 @@ abstract contract DN404 {
         uint32 ownership,
         uint32 ownedIndex
     ) internal {
-        bool t = _useOneIndexed();
+        uint256 t = _toUint(_useOneIndexed());
         /// @solidity memory-safe-assembly
         assembly {
-            let i := sub(id, iszero(iszero(t))) // Index of the uint64 combined value.
+            let i := sub(id, t) // Index of the uint64 combined value.
             let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
             let v := sload(s) // Storage slot value.
             let o := shl(6, and(i, 3)) // Storage slot offset (bits).
@@ -1431,13 +1431,13 @@ abstract contract DN404 {
 
     /// @dev Wraps the NFT ID.
     function _wrapNFTId(uint256 id, uint256 idLimit) internal pure returns (uint256 result) {
-        bool t = _useOneIndexed();
+        uint256 t = _toUint(_useOneIndexed());
         /// @solidity memory-safe-assembly
         assembly {
             result :=
                 or(
-                    mul(iszero(iszero(t)), or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit))),
-                    mul(iszero(t), mul(lt(id, idLimit), id))
+                    mul(iszero(t), or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit))),
+                    mul(t, mul(lt(id, idLimit), id))
                 )
         }
     }
