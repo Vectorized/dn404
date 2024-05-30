@@ -1436,8 +1436,8 @@ abstract contract DN404 {
         assembly {
             result :=
                 or(
-                    mul(iszero(t), or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit))),
-                    mul(t, mul(lt(id, idLimit), id))
+                    mul(t, or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit))),
+                    mul(iszero(t), mul(lt(id, idLimit), id))
                 )
         }
     }
