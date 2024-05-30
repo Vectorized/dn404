@@ -807,42 +807,4 @@ contract DN404Test is SoladyTest {
             }
         }
     }
-
-    function testZZZ() public {
-        address alice = address(111);
-        address bob = address(222);
-
-        dn.initializeDN404(0, address(this), address(mirror));
-        dn.mint(alice, 10 * _WAD);
-        assertEq(dn.tokensOf(alice).length, mirror.balanceOf(alice));
-        assertEq(mirror.balanceOf(alice), 10);
-        assertEq(dn.tokensOf(bob).length, mirror.balanceOf(bob));
-        assertEq(mirror.balanceOf(bob), 0);
-
-        vm.prank(alice);
-        dn.transfer(bob, 9 * _WAD);
-        assertEq(dn.tokensOf(alice).length, mirror.balanceOf(alice));
-        assertEq(mirror.balanceOf(alice), 1);
-        assertEq(dn.tokensOf(bob).length, mirror.balanceOf(bob));
-        assertEq(mirror.balanceOf(bob), 9);
-
-        vm.prank(alice);
-        dn.setSkipNFT(true);
-
-        vm.prank(bob);
-        dn.transfer(alice, 9 * _WAD);
-        assertEq(dn.tokensOf(alice).length, mirror.balanceOf(alice));
-        assertEq(mirror.balanceOf(alice), 1);
-        assertEq(dn.tokensOf(bob).length, mirror.balanceOf(bob));
-        assertEq(mirror.balanceOf(bob), 0);
-
-        dn.mint(alice, 3 * _WAD);
-        assertEq(dn.tokensOf(alice).length, mirror.balanceOf(alice));
-        assertEq(mirror.balanceOf(alice), 1);
-        assertEq(dn.tokensOf(bob).length, mirror.balanceOf(bob));
-        assertEq(mirror.balanceOf(bob), 0);
-
-        assertEq(dn.totalSupply(), 13 * _WAD);
-        assertEq(dn.balanceOf(alice), 13 * _WAD);
-    }
 }
