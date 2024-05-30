@@ -459,7 +459,7 @@ abstract contract DN404 {
     /// Note:
     /// - May mint more NFTs than `amount / _unit()`.
     ///   The number of NFTs minted is what is needed to make `to`'s NFT balance whole.
-    /// - Token IDs wraps back to `_toUint(_useOneIndexed())` if it exceeds the upper limit.
+    /// - Token IDs wraps back to `_toUint(_useOneIndexed())` upon exceeding the upper limit.
     ///
     /// Emits a {Transfer} event.
     function _mint(address to, uint256 amount) internal virtual {
@@ -551,7 +551,7 @@ abstract contract DN404 {
     /// Note:
     /// - May mint more NFTs than `amount / _unit()`.
     ///   The number of NFTs minted is what is needed to make `to`'s NFT balance whole.
-    /// - Token IDs wraps back to `_toUint(_useOneIndexed())` if it exceeds the upper limit.
+    /// - Token IDs wraps back to `_toUint(_useOneIndexed())` upon exceeding the upper limit.
     ///
     /// Emits a {Transfer} event.
     function _mintNext(address to, uint256 amount) internal virtual {

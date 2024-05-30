@@ -76,6 +76,11 @@ contract DN404ZeroIndexedTest is SoladyTest {
         totalNFTSupply = uint32(_bound(totalNFTSupply, 1, 5));
         dn.initializeDN404(totalNFTSupply * _WAD, address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(totalNFTSupply));
+        if (_random() % 8 == 0) {
+            for (uint256 i; i != totalNFTSupply; ++i) {
+                assertEq(mirror.ownerOf(i), alice);
+            }
+        }
         for (uint256 t; t != 1; ++t) {
             uint256 id = _bound(r, 0, totalNFTSupply - 1);
             vm.prank(alice);
