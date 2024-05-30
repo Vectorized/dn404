@@ -1431,13 +1431,13 @@ abstract contract DN404 {
 
     /// @dev Wraps the NFT ID.
     function _wrapNFTId(uint256 id, uint256 idLimit) internal pure returns (uint256 result) {
-        uint256 t = _toUint(_useOneIndexed());
+        result = _toUint(_useOneIndexed());
         /// @solidity memory-safe-assembly
         assembly {
             result :=
                 or(
-                    mul(t, or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit))),
-                    mul(iszero(t), mul(lt(id, idLimit), id))
+                    mul(or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit)), result),
+                    mul(mul(lt(id, idLimit), id), iszero(result))
                 )
         }
     }
