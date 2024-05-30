@@ -1375,9 +1375,6 @@ abstract contract DN404 {
         view
         returns (uint256 unsetBitIndex)
     {
-        unchecked {
-            upTo += _toUint(_useOneIndexed());
-        }
         /// @solidity memory-safe-assembly
         assembly {
             unsetBitIndex := not(0) // Initialize to `type(uint256).max`.
