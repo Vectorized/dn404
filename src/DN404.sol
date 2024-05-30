@@ -1434,8 +1434,11 @@ abstract contract DN404 {
         bool t = _useOneIndexed();
         /// @solidity memory-safe-assembly
         assembly {
-            idLimit := sub(idLimit, iszero(t))
-            result := or(mul(iszero(gt(id, idLimit)), id), mul(iszero(iszero(t)), gt(id, idLimit)))
+            result :=
+                or(
+                    mul(iszero(iszero(t)), or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit))),
+                    mul(iszero(t), mul(lt(id, idLimit), id))
+                )
         }
     }
 
