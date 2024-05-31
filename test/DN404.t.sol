@@ -38,10 +38,12 @@ contract DN404Test is SoladyTest {
     }
 
     function testTokenURI(string memory baseURI, uint256 id) public {
+        id = _bound(id, 1, 1000);
         dn.initializeDN404(1000 * _WAD, address(this), address(mirror));
+        dn.transfer(address(0xbeef), 1000 * _WAD);
         dn.setBaseURI(baseURI);
         string memory expected = string(abi.encodePacked(baseURI, id));
-        assertEq(DN404Mirror(payable(address(dn))).tokenURI(id), expected);
+        assertEq(DN404Mirror(payable(address(mirror))).tokenURI(id), expected);
     }
 
     function testRegisterAndResolveAlias(address a0, address a1) public {

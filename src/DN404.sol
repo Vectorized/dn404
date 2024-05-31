@@ -1200,8 +1200,8 @@ abstract contract DN404 {
             );
             _return(1);
         }
-        // `setApprovalForAll(address,bool,address)`.
-        if (fnSelector == 0x813500fc) {
+        // `setApprovalForAllNFT(address,bool,address)`.
+        if (fnSelector == 0xf6916ddd) {
             if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
             _setApprovalForAll(
                 address(uint160(_calldataload(0x04))), // `spender`.
@@ -1210,20 +1210,20 @@ abstract contract DN404 {
             );
             _return(1);
         }
-        // `isApprovedForAll(address,address)`.
-        if (fnSelector == 0xe985e9c5) {
+        // `isApprovedForAllNFT(address,address)`.
+        if (fnSelector == 0x62fb246d) {
             bool result = _isApprovedForAll(
                 address(uint160(_calldataload(0x04))), // `owner`.
                 address(uint160(_calldataload(0x24))) // `operator`.
             );
             _return(_toUint(result));
         }
-        // `ownerOf(uint256)`.
-        if (fnSelector == 0x6352211e) {
+        // `ownerOfNFT(uint256)`.
+        if (fnSelector == 0x2d8a746e) {
             _return(uint160(_ownerOf(_calldataload(0x04))));
         }
-        // `ownerAt(uint256)`.
-        if (fnSelector == 0x24359879) {
+        // `ownerAtNFT(uint256)`.
+        if (fnSelector == 0xc016aa52) {
             _return(uint160(_ownerAt(_calldataload(0x04))));
         }
         // `approveNFT(address,uint256,address)`.
@@ -1236,8 +1236,8 @@ abstract contract DN404 {
             );
             _return(uint160(owner));
         }
-        // `getApproved(uint256)`.
-        if (fnSelector == 0x081812fc) {
+        // `getApprovedNFT(uint256)`.
+        if (fnSelector == 0x27ef5495) {
             _return(uint160(_getApproved(_calldataload(0x04))));
         }
         // `balanceOfNFT(address)`.
@@ -1248,8 +1248,8 @@ abstract contract DN404 {
         if (fnSelector == 0xe2c79281) {
             _return(_totalNFTSupply());
         }
-        // `tokenURI(uint256)`.
-        if (fnSelector == 0xc87b56dd) {
+        // `tokenURINFT(uint256)`.
+        if (fnSelector == 0xcb30b460) {
             /// @solidity memory-safe-assembly
             assembly {
                 mstore(0x40, add(mload(0x40), 0x20))

@@ -125,7 +125,7 @@ contract DN404Mirror {
         ownerOf(id); // `ownerOf` reverts if the token does not exist.
         // We'll leave if optional for `_tokenURI` to revert for non-existent token
         // on the ERC20 side, since this is only recommended by the ERC721 standard.
-        return _readString(0xc87b56dd, id); // `tokenURI(uint256)`.
+        return _readString(0xcb30b460, id); // `tokenURINFT(uint256)`.
     }
 
     /// @dev Returns the total NFT supply from the base DN404 contract.
@@ -146,13 +146,13 @@ contract DN404Mirror {
     /// Requirements:
     /// - Token `id` must exist.
     function ownerOf(uint256 id) public view virtual returns (address) {
-        return address(uint160(_readWord(0x6352211e, id, 0))); // `ownerOf(uint256)`.
+        return address(uint160(_readWord(0x2d8a746e, id, 0))); // `ownerOfNFT(uint256)`.
     }
 
     /// @dev Returns the owner of token `id` from the base DN404 contract.
     /// Returns `address(0)` instead of reverting if the token does not exist.
     function ownerAt(uint256 id) public view virtual returns (address) {
-        return address(uint160(_readWord(0x24359879, id, 0))); // `ownerAt(uint256)`.
+        return address(uint160(_readWord(0xc016aa52, id, 0))); // `ownerAtNFT(uint256)`.
     }
 
     /// @dev Sets `spender` as the approved account to manage token `id` in
@@ -196,7 +196,7 @@ contract DN404Mirror {
     /// Requirements:
     /// - Token `id` must exist.
     function getApproved(uint256 id) public view virtual returns (address) {
-        return address(uint160(_readWord(0x081812fc, id, 0))); // `getApproved(uint256)`.
+        return address(uint160(_readWord(0x27ef5495, id, 0))); // `getApprovedNFT(uint256)`.
     }
 
     /// @dev Sets whether `operator` is approved to manage the tokens of the caller in
@@ -209,7 +209,7 @@ contract DN404Mirror {
         assembly {
             operator := shr(96, shl(96, operator))
             let m := mload(0x40)
-            mstore(0x00, 0x813500fc) // `setApprovalForAll(address,bool,address)`.
+            mstore(0x00, 0xf6916ddd) // `setApprovalForAllNFT(address,bool,address)`.
             mstore(0x20, operator)
             mstore(0x40, iszero(iszero(approved)))
             mstore(0x60, caller())
@@ -238,8 +238,8 @@ contract DN404Mirror {
         virtual
         returns (bool)
     {
-        // `isApprovedForAll(address,address)`.
-        return _readWord(0xe985e9c5, uint160(nftOwner), uint160(operator)) != 0;
+        // `isApprovedForAllNFT(address,address)`.
+        return _readWord(0x62fb246d, uint160(nftOwner), uint160(operator)) != 0;
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
