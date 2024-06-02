@@ -246,7 +246,7 @@ abstract contract DN404 {
             }
         }
 
-        $.nextTokenId = 1;
+        $.nextTokenId = uint32(_toUint(_useOneIndexed()));
         $.mirrorERC721 = mirror;
 
         if (initialTokenSupply != 0) {
@@ -295,6 +295,11 @@ abstract contract DN404 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                       CONFIGURABLES                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
+
+    /// @dev Returns whether the tokens IDs are from `[1..n]` instead of `[0..n-1]`.
+    function _useOneIndexed() internal pure virtual returns (bool) {
+        return true;
+    }
 
     /// @dev Returns if direct NFT transfers should be used during ERC20 transfers
     /// whenever possible, instead of burning and re-minting.
@@ -454,7 +459,7 @@ abstract contract DN404 {
     /// Note:
     /// - May mint more NFTs than `amount / _unit()`.
     ///   The number of NFTs minted is what is needed to make `to`'s NFT balance whole.
-    /// - Token IDs may wrap around `totalSupply / _unit()` back to 1.
+    /// - Token IDs wraps back to `_toUint(_useOneIndexed())` upon exceeding the upper limit.
     ///
     /// Emits a {Transfer} event.
     function _mint(address to, uint256 amount) internal virtual {
@@ -471,13 +476,13 @@ abstract contract DN404 {
                 toAddressData.balance = uint96(toBalance);
                 t.toEnd = toBalance / _unit();
             }
-            uint256 maxId;
+            uint256 idLimit;
             {
                 uint256 newTotalSupply = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(newTotalSupply);
                 uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
                 if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
-                maxId = newTotalSupply / _unit();
+                idLimit = newTotalSupply / _unit();
             }
             while (!getSkipNFT(to)) {
                 Uint32Map storage toOwned = $.owned[to];
@@ -492,7 +497,7 @@ abstract contract DN404 {
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
                 uint32 burnedPoolHead = $.burnedPoolHead;
                 t.burnedPoolTail = $.burnedPoolTail;
-                t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
+                t.nextTokenId = _wrapNFTId($.nextTokenId, idLimit);
                 // Mint loop.
                 do {
                     uint256 id;
@@ -502,10 +507,10 @@ abstract contract DN404 {
                         id = t.nextTokenId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
                             id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
-                                : _wrapNFTId(id + 1, maxId);
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, idLimit), idLimit)
+                                : _wrapNFTId(id + 1, idLimit);
                         }
-                        t.nextTokenId = _wrapNFTId(id + 1, maxId);
+                        t.nextTokenId = _wrapNFTId(id + 1, idLimit);
                     }
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
@@ -535,7 +540,8 @@ abstract contract DN404 {
     }
 
     /// @dev Mints `amount` tokens to `to`, increasing the total supply.
-    /// This variant mints NFT tokens starting from ID `preTotalSupply / _unit() + 1`.
+    /// This variant mints NFT tokens starting from ID
+    /// `preTotalSupply / _unit() + _toUint(_useOneIndexed())`.
     /// The `nextTokenId` will not be changed.
     /// If any NFTs are minted, the burned pool will be invalidated (emptied).
     ///
@@ -545,7 +551,7 @@ abstract contract DN404 {
     /// Note:
     /// - May mint more NFTs than `amount / _unit()`.
     ///   The number of NFTs minted is what is needed to make `to`'s NFT balance whole.
-    /// - Token IDs may wrap around `totalSupply / _unit()` back to 1.
+    /// - Token IDs wraps back to `_toUint(_useOneIndexed())` upon exceeding the upper limit.
     ///
     /// Emits a {Transfer} event.
     function _mintNext(address to, uint256 amount) internal virtual {
@@ -563,15 +569,15 @@ abstract contract DN404 {
                 t.toEnd = toBalance / _unit();
             }
             uint256 id;
-            uint256 maxId;
+            uint256 idLimit;
             {
                 uint256 preTotalSupply = uint256($.totalSupply);
                 uint256 newTotalSupply = uint256(preTotalSupply) + amount;
                 $.totalSupply = uint96(newTotalSupply);
                 uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
                 if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
-                maxId = newTotalSupply / _unit();
-                id = _wrapNFTId(preTotalSupply / _unit() + 1, maxId);
+                idLimit = newTotalSupply / _unit();
+                id = _wrapNFTId(preTotalSupply / _unit() + _toUint(_useOneIndexed()), idLimit);
             }
             while (!getSkipNFT(to)) {
                 Uint32Map storage toOwned = $.owned[to];
@@ -591,14 +597,14 @@ abstract contract DN404 {
                 do {
                     while (_get(oo, _ownershipIndex(id)) != 0) {
                         id = _useExistsLookup()
-                            ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
-                            : _wrapNFTId(id + 1, maxId);
+                            ? _wrapNFTId(_findFirstUnset($.exists, id + 1, idLimit), idLimit)
+                            : _wrapNFTId(id + 1, idLimit);
                     }
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
                     _setOwnerAliasAndOwnedIndex(oo, id, t.toAlias, uint32(toIndex++));
                     _packedLogsAppend(t.packedLogs, id);
-                    id = _wrapNFTId(id + 1, maxId);
+                    id = _wrapNFTId(id + 1, idLimit);
                 } while (toIndex != t.toEnd);
 
                 _packedLogsSend(t.packedLogs, $);
@@ -803,8 +809,8 @@ abstract contract DN404 {
                 _packedLogsSet(t.packedLogs, to, 0);
                 Uint32Map storage toOwned = $.owned[to];
                 t.toAlias = _registerAndResolveAlias(toAddressData, to);
-                uint256 maxId = $.totalSupply / _unit();
-                t.nextTokenId = _wrapNFTId($.nextTokenId, maxId);
+                uint256 idLimit = $.totalSupply / _unit();
+                t.nextTokenId = _wrapNFTId($.nextTokenId, idLimit);
                 uint256 toIndex = t.toOwnedLength;
                 toAddressData.ownedLength = uint32(t.toEnd = toIndex + t.numNFTMints);
                 uint32 burnedPoolHead = $.burnedPoolHead;
@@ -817,10 +823,10 @@ abstract contract DN404 {
                         id = t.nextTokenId;
                         while (_get(oo, _ownershipIndex(id)) != 0) {
                             id = _useExistsLookup()
-                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, maxId), maxId)
-                                : _wrapNFTId(id + 1, maxId);
+                                ? _wrapNFTId(_findFirstUnset($.exists, id + 1, idLimit), idLimit)
+                                : _wrapNFTId(id + 1, idLimit);
                         }
-                        t.nextTokenId = _wrapNFTId(id + 1, maxId);
+                        t.nextTokenId = _wrapNFTId(id + 1, idLimit);
                     }
                     if (_useExistsLookup()) _set($.exists, id, true);
                     _set(toOwned, toIndex, uint32(id));
@@ -1290,17 +1296,17 @@ abstract contract DN404 {
     /*                 INTERNAL / PRIVATE HELPERS                 */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns `(i - 1) << 1`.
+    /// @dev Returns `(i - _toUint(_useOneIndexed())) << 1`.
     function _ownershipIndex(uint256 i) internal pure returns (uint256) {
         unchecked {
-            return (i - 1) << 1; // Minus 1 as token IDs start from 1.
+            return (i - _toUint(_useOneIndexed())) << 1;
         }
     }
 
-    /// @dev Returns `((i - 1) << 1) + 1`.
+    /// @dev Returns `((i - _toUint(_useOneIndexed())) << 1) + 1`.
     function _ownedIndex(uint256 i) internal pure returns (uint256) {
         unchecked {
-            return ((i - 1) << 1) + 1; // Minus 1 as token IDs start from 1.
+            return ((i - _toUint(_useOneIndexed())) << 1) + 1;
         }
     }
 
@@ -1331,9 +1337,10 @@ abstract contract DN404 {
         uint32 ownership,
         uint32 ownedIndex
     ) internal {
+        uint256 t = _toUint(_useOneIndexed());
         /// @solidity memory-safe-assembly
         assembly {
-            let i := sub(id, 1) // Index of the uint64 combined value.
+            let i := sub(id, t) // Index of the uint64 combined value.
             let s := add(shl(96, map.slot), shr(2, i)) // Storage slot.
             let v := sload(s) // Storage slot value.
             let o := shl(6, and(i, 3)) // Storage slot offset (bits).
@@ -1423,10 +1430,15 @@ abstract contract DN404 {
     }
 
     /// @dev Wraps the NFT ID.
-    function _wrapNFTId(uint256 id, uint256 maxId) internal pure returns (uint256 result) {
+    function _wrapNFTId(uint256 id, uint256 idLimit) internal pure returns (uint256 result) {
+        result = _toUint(_useOneIndexed());
         /// @solidity memory-safe-assembly
         assembly {
-            result := or(mul(iszero(gt(id, maxId)), id), gt(id, maxId))
+            result :=
+                or(
+                    mul(or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit)), result),
+                    mul(mul(lt(id, idLimit), id), iszero(result))
+                )
         }
     }
 
