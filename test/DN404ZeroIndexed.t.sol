@@ -809,4 +809,40 @@ contract DN404ZeroIndexedTest is SoladyTest {
             }
         }
     }
+
+    function testWrapNFTIdEquivalence(uint256 id, uint256 idLimit, bool useOneIndexed) public {
+        id = _bound(id, 0, 0xffff);
+        idLimit = _bound(idLimit, 0, 0xff);
+        // if (useOneIndexed) while (id == 0) id = _random();
+        uint256 original = _wrapNFTIdOrigina(id, idLimit, useOneIndexed);
+        assertEq(_wrapNFTId(id, idLimit, useOneIndexed), original);
+    }
+
+    function _wrapNFTIdOrigina(uint256 id, uint256 idLimit, bool useOneIndexed)
+        internal
+        pure
+        returns (uint256)
+    {
+        if (useOneIndexed) {
+            return id <= idLimit ? id : 1;
+        } else {
+            return id < idLimit ? id : 0;
+        }
+    }
+
+    function _wrapNFTId(uint256 id, uint256 idLimit, bool useOneIndexed)
+        internal
+        pure
+        returns (uint256 result)
+    {
+        result = useOneIndexed ? 1 : 0;
+        /// @solidity memory-safe-assembly
+        assembly {
+            result :=
+                or(
+                    mul(or(mul(iszero(gt(id, idLimit)), id), gt(id, idLimit)), result),
+                    mul(mul(lt(id, idLimit), id), iszero(result))
+                )
+        }
+    }
 }
