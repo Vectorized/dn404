@@ -52,7 +52,7 @@ contract ArrayOpsTest is SoladyTest {
             if n {
                 result := mload(0x40)
                 mstore(result, n)
-                function copyWords(dst_, src_, n_) -> _end {
+                function copy(dst_, src_, n_) -> _end {
                     _end := add(dst_, shl(5, n_))
                     if n_ {
                         for { let d_ := sub(src_, dst_) } 1 {} {
@@ -62,10 +62,7 @@ contract ArrayOpsTest is SoladyTest {
                         }
                     }
                 }
-                mstore(
-                    0x40,
-                    copyWords(copyWords(add(result, 0x20), add(a, 0x20), aN), add(b, 0x20), bN)
-                )
+                mstore(0x40, copy(copy(add(result, 0x20), add(a, 0x20), aN), add(b, 0x20), bN))
             }
         }
     }
