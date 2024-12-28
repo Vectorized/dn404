@@ -129,6 +129,10 @@ abstract contract DN404 {
     /// [Etherscan](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
     address internal constant _PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
+    /// @dev The ZKsync deployment.
+    /// [Etherscan](https://era.zksync.network/address/0x0000000000225e31D15943971F47aD3022F714Fa)
+    address internal constant _ZKSYNC_PERMIT_2 = 0x0000000000225e31D15943971F47aD3022F714Fa;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                          STORAGE                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -364,7 +368,7 @@ abstract contract DN404 {
 
     /// @dev Returns the amount of tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
-        if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
+        if (_givePermit2DefaultInfiniteAllowance() && _isPermit2(spender)) {
             uint8 flags = _getDN404Storage().addressData[owner].flags;
             if ((flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == uint256(0)) {
                 return type(uint256).max;
@@ -418,7 +422,7 @@ abstract contract DN404 {
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         Uint256Ref storage a = _ref(_getDN404Storage().allowance, from, msg.sender);
 
-        uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
+        uint256 allowed = _givePermit2DefaultInfiniteAllowance() && _isPermit2(msg.sender)
             && (_getDN404Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)
                 == uint256(0) ? type(uint256).max : a.value;
 
@@ -445,6 +449,12 @@ abstract contract DN404 {
     /// it can override the user customized allowances for Permit2 to infinity.
     function _givePermit2DefaultInfiniteAllowance() internal view virtual returns (bool) {
         return false;
+    }
+
+    /// @dev Returns checks if `sender` is the canonical Permit2 address.
+    /// If on ZKsync, override this function to check against `_ZKSYNC_PERMIT_2` as well.
+    function _isPermit2(address sender) internal view virtual returns (bool) {
+        return sender == _PERMIT2;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -975,7 +985,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function _approve(address owner, address spender, uint256 amount) internal virtual {
-        if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
+        if (_givePermit2DefaultInfiniteAllowance() && _isPermit2(spender)) {
             _getDN404Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
         }
         _ref(_getDN404Storage().allowance, owner, spender).value = amount;
