@@ -523,7 +523,15 @@ contract DN404Mirror {
             mstore(add(m, 0x80), 0x80)
             let n := mload(data)
             mstore(add(m, 0xa0), n)
-            if n { pop(staticcall(gas(), 4, add(data, 0x20), n, add(m, 0xc0), n)) }
+            if n {
+                let dst := add(m, 0xc0)
+                let end := add(dst, n)
+                for { let d := sub(add(data, 0x20), dst) } 1 {} {
+                    mstore(dst, mload(add(dst, d)))
+                    dst := add(dst, 0x20)
+                    if iszero(lt(dst, end)) { break }
+                }
+            }
             // Revert if the call reverts.
             if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
                 if returndatasize() {

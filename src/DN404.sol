@@ -1616,7 +1616,7 @@ abstract contract DN404 {
             result := mload(0x40)
             mstore(0x40, add(add(result, 0x20), shl(5, n)))
             mstore(result, n)
-            codecopy(add(result, 0x20), codesize(), shl(5, n))
+            calldatacopy(add(result, 0x20), calldatasize(), shl(5, n))
         }
     }
 
@@ -1641,7 +1641,7 @@ abstract contract DN404 {
     /// @dev Concatenates the arrays.
     function _concat(uint256[] memory a, uint256[] memory b)
         private
-        view
+        pure
         returns (uint256[] memory result)
     {
         uint256 aN = a.length;
@@ -1654,11 +1654,20 @@ abstract contract DN404 {
             if n {
                 result := mload(0x40)
                 mstore(result, n)
-                let o := add(result, 0x20)
-                mstore(0x40, add(o, shl(5, n)))
-                let aL := shl(5, aN)
-                pop(staticcall(gas(), 4, add(a, 0x20), aL, o, aL))
-                pop(staticcall(gas(), 4, add(b, 0x20), shl(5, bN), add(o, aL), shl(5, bN)))
+                function copyWords(dst_, src_, n_) -> _end {
+                    _end := add(dst_, shl(5, n_))
+                    if n_ {
+                        for { let d_ := sub(src_, dst_) } 1 {} {
+                            mstore(dst_, mload(add(dst_, d_)))
+                            dst_ := add(dst_, 0x20)
+                            if eq(dst_, _end) { break }
+                        }
+                    }
+                }
+                mstore(
+                    0x40,
+                    copyWords(copyWords(add(result, 0x20), add(a, 0x20), aN), add(b, 0x20), bN)
+                )
             }
         }
     }
@@ -1666,7 +1675,7 @@ abstract contract DN404 {
     /// @dev Concatenates the arrays.
     function _concat(address[] memory a, address[] memory b)
         private
-        view
+        pure
         returns (address[] memory result)
     {
         result = _toAddresses(_concat(_toUints(a), _toUints(b)));
