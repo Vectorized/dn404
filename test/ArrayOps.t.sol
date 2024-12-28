@@ -14,7 +14,7 @@ contract ArrayOpsTest is SoladyTest {
             result := mload(0x40)
             mstore(0x40, add(add(result, 0x20), shl(5, n)))
             mstore(result, n)
-            codecopy(add(result, 0x20), codesize(), shl(5, n))
+            calldatacopy(add(result, 0x20), calldatasize(), shl(5, n))
         }
     }
 
@@ -181,5 +181,26 @@ contract ArrayOpsTest is SoladyTest {
             _checkMemory();
             assertEq(concatenated, t.combined);
         }
+    }
+
+    function testERC721ReceiverCheckCopy(bytes memory data) public {
+        bytes32 expected = keccak256(data);
+        bytes32 computed;
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            let n := mload(data)
+            if n {
+                let dst := add(m, 0xc0)
+                let end := add(dst, n)
+                for { let d := sub(add(data, 0x20), dst) } 1 {} {
+                    mstore(dst, mload(add(dst, d)))
+                    dst := add(dst, 0x20)
+                    if iszero(lt(dst, end)) { break }
+                }
+            }
+            computed := keccak256(add(m, 0xc0), n)
+        }
+        assertEq(computed, expected);
     }
 }
