@@ -129,7 +129,8 @@ abstract contract DN404 {
     /// [Etherscan](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
     address internal constant _PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
-    /// @dev The ZKsync deployment.
+    /// @dev The ZKsync Permit2 deployment.
+    /// If deploying on ZKsync or Abstract, override `_isPermit2(address)` to check against this too.
     /// [Etherscan](https://era.zksync.network/address/0x0000000000225e31D15943971F47aD3022F714Fa)
     address internal constant _ZKSYNC_PERMIT_2 = 0x0000000000225e31D15943971F47aD3022F714Fa;
 
