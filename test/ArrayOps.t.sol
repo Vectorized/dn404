@@ -14,7 +14,7 @@ contract ArrayOpsTest is SoladyTest {
             result := mload(0x40)
             mstore(0x40, add(add(result, 0x20), shl(5, n)))
             mstore(result, n)
-            codecopy(add(result, 0x20), codesize(), shl(5, n))
+            calldatacopy(add(result, 0x20), calldatasize(), shl(5, n))
         }
     }
 
@@ -39,7 +39,7 @@ contract ArrayOpsTest is SoladyTest {
     /// @dev Concatenates the arrays.
     function _concat(uint256[] memory a, uint256[] memory b)
         private
-        view
+        pure
         returns (uint256[] memory result)
     {
         uint256 aN = a.length;
@@ -52,11 +52,17 @@ contract ArrayOpsTest is SoladyTest {
             if n {
                 result := mload(0x40)
                 mstore(result, n)
-                let o := add(result, 0x20)
-                mstore(0x40, add(o, shl(5, n)))
-                let aL := shl(5, aN)
-                pop(staticcall(gas(), 4, add(a, 0x20), aL, o, aL))
-                pop(staticcall(gas(), 4, add(b, 0x20), shl(5, bN), add(o, aL), shl(5, bN)))
+                function copy(dst_, src_, n_) -> _end {
+                    _end := add(dst_, shl(5, n_))
+                    if n_ {
+                        for { let d_ := sub(src_, dst_) } 1 {} {
+                            mstore(dst_, mload(add(dst_, d_)))
+                            dst_ := add(dst_, 0x20)
+                            if eq(dst_, _end) { break }
+                        }
+                    }
+                }
+                mstore(0x40, copy(copy(add(result, 0x20), add(a, 0x20), aN), add(b, 0x20), bN))
             }
         }
     }
@@ -64,7 +70,7 @@ contract ArrayOpsTest is SoladyTest {
     /// @dev Concatenates the arrays.
     function _concat(address[] memory a, address[] memory b)
         private
-        view
+        pure
         returns (address[] memory result)
     {
         result = _toAddresses(_concat(_toUints(a), _toUints(b)));
@@ -175,5 +181,26 @@ contract ArrayOpsTest is SoladyTest {
             _checkMemory();
             assertEq(concatenated, t.combined);
         }
+    }
+
+    function testERC721ReceiverCheckCopy(bytes memory data) public {
+        bytes32 expected = keccak256(data);
+        bytes32 computed;
+        /// @solidity memory-safe-assembly
+        assembly {
+            let m := mload(0x40)
+            let n := mload(data)
+            if n {
+                let dst := add(m, 0xc0)
+                let end := add(dst, n)
+                for { let d := sub(add(data, 0x20), dst) } 1 {} {
+                    mstore(dst, mload(add(dst, d)))
+                    dst := add(dst, 0x20)
+                    if iszero(lt(dst, end)) { break }
+                }
+            }
+            computed := keccak256(add(m, 0xc0), n)
+        }
+        assertEq(computed, expected);
     }
 }

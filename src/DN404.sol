@@ -129,6 +129,11 @@ abstract contract DN404 {
     /// [Etherscan](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
     address internal constant _PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
+    /// @dev The ZKsync Permit2 deployment.
+    /// If deploying on ZKsync or Abstract, override `_isPermit2(address)` to check against this too.
+    /// [Etherscan](https://era.zksync.network/address/0x0000000000225e31D15943971F47aD3022F714Fa)
+    address internal constant _ZKSYNC_PERMIT_2 = 0x0000000000225e31D15943971F47aD3022F714Fa;
+
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                          STORAGE                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
@@ -364,7 +369,7 @@ abstract contract DN404 {
 
     /// @dev Returns the amount of tokens that `spender` can spend on behalf of `owner`.
     function allowance(address owner, address spender) public view returns (uint256) {
-        if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
+        if (_givePermit2DefaultInfiniteAllowance() && _isPermit2(spender)) {
             uint8 flags = _getDN404Storage().addressData[owner].flags;
             if ((flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG) == uint256(0)) {
                 return type(uint256).max;
@@ -418,7 +423,7 @@ abstract contract DN404 {
     function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         Uint256Ref storage a = _ref(_getDN404Storage().allowance, from, msg.sender);
 
-        uint256 allowed = _givePermit2DefaultInfiniteAllowance() && msg.sender == _PERMIT2
+        uint256 allowed = _givePermit2DefaultInfiniteAllowance() && _isPermit2(msg.sender)
             && (_getDN404Storage().addressData[from].flags & _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG)
                 == uint256(0) ? type(uint256).max : a.value;
 
@@ -445,6 +450,12 @@ abstract contract DN404 {
     /// it can override the user customized allowances for Permit2 to infinity.
     function _givePermit2DefaultInfiniteAllowance() internal view virtual returns (bool) {
         return false;
+    }
+
+    /// @dev Returns checks if `sender` is the canonical Permit2 address.
+    /// If on ZKsync, override this function to check against `_ZKSYNC_PERMIT_2` as well.
+    function _isPermit2(address sender) internal view virtual returns (bool) {
+        return sender == _PERMIT2;
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
@@ -975,7 +986,7 @@ abstract contract DN404 {
     ///
     /// Emits a {Approval} event.
     function _approve(address owner, address spender, uint256 amount) internal virtual {
-        if (_givePermit2DefaultInfiniteAllowance() && spender == _PERMIT2) {
+        if (_givePermit2DefaultInfiniteAllowance() && _isPermit2(spender)) {
             _getDN404Storage().addressData[owner].flags |= _ADDRESS_DATA_OVERRIDE_PERMIT2_FLAG;
         }
         _ref(_getDN404Storage().allowance, owner, spender).value = amount;
@@ -1616,7 +1627,7 @@ abstract contract DN404 {
             result := mload(0x40)
             mstore(0x40, add(add(result, 0x20), shl(5, n)))
             mstore(result, n)
-            codecopy(add(result, 0x20), codesize(), shl(5, n))
+            calldatacopy(add(result, 0x20), calldatasize(), shl(5, n))
         }
     }
 
@@ -1641,7 +1652,7 @@ abstract contract DN404 {
     /// @dev Concatenates the arrays.
     function _concat(uint256[] memory a, uint256[] memory b)
         private
-        view
+        pure
         returns (uint256[] memory result)
     {
         uint256 aN = a.length;
@@ -1654,11 +1665,17 @@ abstract contract DN404 {
             if n {
                 result := mload(0x40)
                 mstore(result, n)
-                let o := add(result, 0x20)
-                mstore(0x40, add(o, shl(5, n)))
-                let aL := shl(5, aN)
-                pop(staticcall(gas(), 4, add(a, 0x20), aL, o, aL))
-                pop(staticcall(gas(), 4, add(b, 0x20), shl(5, bN), add(o, aL), shl(5, bN)))
+                function copy(dst_, src_, n_) -> _end {
+                    _end := add(dst_, shl(5, n_))
+                    if n_ {
+                        for { let d_ := sub(src_, dst_) } 1 {} {
+                            mstore(dst_, mload(add(dst_, d_)))
+                            dst_ := add(dst_, 0x20)
+                            if eq(dst_, _end) { break }
+                        }
+                    }
+                }
+                mstore(0x40, copy(copy(add(result, 0x20), add(a, 0x20), aN), add(b, 0x20), bN))
             }
         }
     }
@@ -1666,7 +1683,7 @@ abstract contract DN404 {
     /// @dev Concatenates the arrays.
     function _concat(address[] memory a, address[] memory b)
         private
-        view
+        pure
         returns (address[] memory result)
     {
         result = _toAddresses(_concat(_toUints(a), _toUints(b)));
