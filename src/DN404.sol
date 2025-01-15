@@ -124,7 +124,7 @@ abstract contract DN404 {
 
     /// @dev The canonical Permit2 address.
     /// For signature-based allowance granting for single transaction ERC20 `transferFrom`.
-    /// Enabled by default.
+    /// Enabled by default. In Permit2 we trust.
     /// To disable, override `_givePermit2DefaultInfiniteAllowance()`.
     /// [Github](https://github.com/Uniswap/permit2)
     /// [Etherscan](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
@@ -453,8 +453,8 @@ abstract contract DN404 {
     /// For signature-based allowance granting for single transaction ERC20 `transferFrom`.
     /// To disable, override this function to return false.
     ///
-    /// Note: The returned value SHOULD be kept constant.
-    /// If the returned value changes from true to false,
+    /// Note: The returned value SHOULD be kept constant after tokens have been minted.
+    /// If the returned value changes from false to true and vice-versa,
     /// it can override the user customized allowances for Permit2 to infinity.
     function _givePermit2DefaultInfiniteAllowance() internal view virtual returns (bool) {
         return true;

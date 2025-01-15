@@ -172,7 +172,8 @@ abstract contract DN420 {
 
     /// @dev The canonical Permit2 address.
     /// For signature-based allowance granting for single transaction ERC20 `transferFrom`.
-    /// To enable, override `_givePermit2DefaultInfiniteAllowance()`.
+    /// Enabled by default. In Permit2 we trust.
+    /// To disable, override `_givePermit2DefaultInfiniteAllowance()`.
     /// [Github](https://github.com/Uniswap/permit2)
     /// [Etherscan](https://etherscan.io/address/0x000000000022D473030F116dDEE9F6B43aC78BA3)
     address internal constant _PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
@@ -435,9 +436,13 @@ abstract contract DN420 {
 
     /// @dev Whether Permit2 has infinite ERC20 allowances by default for all owners.
     /// For signature-based allowance granting for single transaction ERC20 `transferFrom`.
-    /// To enable, override this function to return true.
+    /// To disable, override this function to return false.
+    ///
+    /// Note: The returned value SHOULD be kept constant after tokens have been minted.
+    /// If the returned value changes from false to true and vice-versa,
+    /// it can override the user customized allowances for Permit2 to infinity.
     function _givePermit2DefaultInfiniteAllowance() internal view virtual returns (bool) {
-        return false;
+        return true;
     }
 
     /// @dev Returns checks if `sender` is the canonical Permit2 address.
