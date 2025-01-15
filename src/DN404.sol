@@ -249,6 +249,13 @@ abstract contract DN404 {
                 mstore(0x00, 0xd125259c) // `LinkMirrorContractFailed()`.
                 revert(0x1c, 0x04)
             }
+            // Query `owner()` on this contract, and if it is non-zero, call `pullOwner()` on the mirror.
+            // This allows for any Ownable (e.g. OpenZeppelin, Solady).
+            mstore(0x00, 0x8da5cb5b6cef16e6) // `owner()` and `pullOwner()`.
+            if and(
+                lt(iszero(shl(96, mload(0x20))), gt(returndatasize(), 0x1f)),
+                staticcall(gas(), address(), 0x18, 0x04, 0x20, 0x20)
+            ) { if iszero(call(gas(), mirror, 0, 0x1c, 0x04, 0x00, 0x00)) { revert(0x00, 0x00) } }
         }
 
         $.nextTokenId = uint32(_toUint(_useOneIndexed()));

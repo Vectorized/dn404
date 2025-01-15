@@ -293,17 +293,34 @@ contract DN404MirrorTest is SoladyTest {
         assertEq(mirror.owner(), address(0));
     }
 
-    function testPullOwnerWithOwnable() public {
-        MockDN404Ownable dnOwnable = new MockDN404Ownable();
+    function testAutomaticPullOwnerWithOwnable() public {
+        MockDN404Ownable dnOwnable = new MockDN404Ownable(address(0));
         dnOwnable.initializeDN404(1000, address(this), address(mirror));
+        assertEq(mirror.owner(), address(0));
+        mirror.pullOwner();
+        assertEq(mirror.owner(), address(0));
+
+        dnOwnable.initializeOwner(address(this));
+        assertEq(mirror.owner(), address(0));
+        mirror.pullOwner();
+        assertEq(mirror.owner(), address(this));
+
         address newOwner = address(123);
         dnOwnable.transferOwnership(newOwner);
 
-        assertEq(mirror.owner(), address(0));
         vm.expectEmit(true, true, true, true);
-        emit OwnershipTransferred(address(0), newOwner);
+        emit OwnershipTransferred(address(this), newOwner);
         mirror.pullOwner();
         assertEq(mirror.owner(), newOwner);
+    }
+
+    function testAutomaticPullOwnerWithOwnable2() public {
+        MockDN404Ownable dnOwnable = new MockDN404Ownable(address(this));
+        assertEq(mirror.owner(), address(0));
+        vm.expectEmit(true, true, true, true);
+        emit OwnershipTransferred(address(0), address(this));
+        dnOwnable.initializeDN404(1000, address(this), address(mirror));
+        assertEq(mirror.owner(), address(this));
     }
 
     function testFnSelectorNotRecognized() public {
