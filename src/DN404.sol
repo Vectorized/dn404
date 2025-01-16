@@ -38,6 +38,7 @@ abstract contract DN404 {
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
     /// @dev Denotes the default skip NFT status.
+    /// Override `_skipNFTDefault` to return a preferred value (defaults to `HasCode`).
     enum SkipNFTDefault {
         // `On` if the ERC20 owner has code, else `Off`.
         HasCode,
@@ -323,7 +324,7 @@ abstract contract DN404 {
     /*                       CONFIGURABLES                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns the default mode for the skip NFT status. Defaults to `HasCode`.
+    /// @dev Returns the default mode for the skip NFT status.
     function _skipNFTDefault() internal view virtual returns (SkipNFTDefault) {
         return SkipNFTDefault.HasCode;
     }
@@ -1057,7 +1058,7 @@ abstract contract DN404 {
             if (_skipNFTDefault() == SkipNFTDefault.HasCode) {
                 /// @solidity memory-safe-assembly
                 assembly {
-                    result := iszero(iszero(extcodesize(owner)))    
+                    result := iszero(iszero(extcodesize(owner)))
                 }
             }
             if (_skipNFTDefault() == SkipNFTDefault.On) result = true;
