@@ -353,7 +353,7 @@ contract DN404Mirror {
     /// @dev Returns the address of the base DN404 contract.
     function baseERC20() public view virtual returns (address base) {
         base = _getDN404NFTStorage().baseERC20;
-        if (base == address(0)) revert NotLinked();
+        if (base == address(0)) _rv(uint32(NotLinked.selector));
     }
 
     /// @dev Fallback modifier to execute calls from the base DN404 contract.
@@ -364,7 +364,7 @@ contract DN404Mirror {
 
         // `logTransfer(uint256[])`.
         if (fnSelector == 0x263c69d6) {
-            if (msg.sender != $.baseERC20) revert SenderNotBase();
+            if (msg.sender != $.baseERC20) _rv(uint32(SenderNotBase.selector));
             /// @solidity memory-safe-assembly
             assembly {
                 let o := add(0x24, calldataload(0x04)) // Packed logs offset.
@@ -388,7 +388,7 @@ contract DN404Mirror {
         }
         // `logDirectTransfer(address,address,uint256[])`.
         if (fnSelector == 0x144027d3) {
-            if (msg.sender != $.baseERC20) revert SenderNotBase();
+            if (msg.sender != $.baseERC20) _rv(uint32(SenderNotBase.selector));
             /// @solidity memory-safe-assembly
             assembly {
                 let from := calldataload(0x04)
@@ -406,10 +406,10 @@ contract DN404Mirror {
         if (fnSelector == 0x0f4599e5) {
             if ($.deployer != address(0)) {
                 if (address(uint160(_calldataload(0x04))) != $.deployer) {
-                    revert SenderNotDeployer();
+                    _rv(uint32(SenderNotDeployer.selector));
                 }
             }
-            if ($.baseERC20 != address(0)) revert AlreadyLinked();
+            if ($.baseERC20 != address(0)) _rv(uint32(AlreadyLinked.selector));
             $.baseERC20 = msg.sender;
             /// @solidity memory-safe-assembly
             assembly {
@@ -425,7 +425,7 @@ contract DN404Mirror {
     /// fallback with utilities like Solady's `LibZip.cdFallback()`.
     /// And always remember to always wrap the fallback with `dn404NFTFallback`.
     fallback() external payable virtual dn404NFTFallback {
-        revert FnSelectorNotRecognized(); // Not mandatory. Just for quality of life.
+        _rv(uint32(FnSelectorNotRecognized.selector)); // Not mandatory. Just for quality of life.
     }
 
     /// @dev This is to silence the compiler warning.
@@ -503,6 +503,15 @@ contract DN404Mirror {
         /// @solidity memory-safe-assembly
         assembly {
             result := extcodesize(a) // Can handle dirty upper bits.
+        }
+    }
+
+    /// @dev More bytecode-efficient way to revert.
+    function _rv(uint32 s) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, s)
+            revert(0x1c, 0x04)
         }
     }
 

@@ -275,16 +275,18 @@ abstract contract DN420 {
     {
         DN420Storage storage $ = _getDN420Storage();
 
-        if ($.tokenIdUpTo != 0) revert DNAlreadyInitialized();
+        if ($.tokenIdUpTo != 0) _rv(uint32(DNAlreadyInitialized.selector));
         unchecked {
             $.tokenIdUpTo = uint32((initialTokenSupply / _unit()) | 1);
-            if (_unit() - 1 >= 2 ** 96 - 1) revert InvalidUnit();
+            if (_unit() - 1 >= 2 ** 96 - 1) _rv(uint32(InvalidUnit.selector));
         }
         $.nextTokenId = 1;
 
         if (initialTokenSupply != 0) {
-            if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (_totalSupplyOverflows(initialTokenSupply)) revert TotalSupplyOverflow();
+            if (initialSupplyOwner == address(0)) _rv(uint32(TransferToZeroAddress.selector));
+            if (_totalSupplyOverflows(initialTokenSupply)) {
+                _rv(uint32(TotalSupplyOverflow.selector));
+            }
 
             $.totalSupply = uint96(initialTokenSupply);
 
@@ -441,7 +443,7 @@ abstract contract DN420 {
                 == uint256(0) ? type(uint256).max : a.value;
 
         if (allowed != type(uint256).max) {
-            if (amount > allowed) revert InsufficientAllowance();
+            if (amount > allowed) _rv(uint32(InsufficientAllowance.selector));
             unchecked {
                 a.value = allowed - amount;
             }
@@ -483,10 +485,10 @@ abstract contract DN420 {
     /// Emits an ERC1155 {TransferBatch} event for mints (if any).
     /// Emits an ERC20 {Transfer} event.
     function _mint(address to, uint256 amount, bytes memory data) internal virtual {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) _rv(uint32(DNNotInitialized.selector));
         AddressData storage toAddressData = $.addressData[to];
 
         _DNMintTemps memory t;
@@ -501,7 +503,9 @@ abstract contract DN420 {
                 uint256 totalSupply_ = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(totalSupply_);
                 uint256 overflows = _toUint(_totalSupplyOverflows(totalSupply_));
-                if (overflows | _toUint(totalSupply_ < amount) != 0) revert TotalSupplyOverflow();
+                if (overflows | _toUint(totalSupply_ < amount) != 0) {
+                    _rv(uint32(TotalSupplyOverflow.selector));
+                }
                 maxId = totalSupply_ / _unit();
                 $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
             }
@@ -559,10 +563,10 @@ abstract contract DN420 {
     /// Emits an ERC1155 {TransferBatch} event for mints (if any).
     /// Emits an ERC20 {Transfer} event.
     function _mintNext(address to, uint256 amount, bytes memory data) internal virtual {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) _rv(uint32(DNNotInitialized.selector));
         AddressData storage toAddressData = $.addressData[to];
 
         _DNMintTemps memory t;
@@ -579,7 +583,9 @@ abstract contract DN420 {
                 uint256 newTotalSupply = uint256(preTotalSupply) + amount;
                 $.totalSupply = uint96(newTotalSupply);
                 uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
-                if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
+                if (overflows | _toUint(newTotalSupply < amount) != 0) {
+                    _rv(uint32(TotalSupplyOverflow.selector));
+                }
                 maxId = newTotalSupply / _unit();
                 id = _wrapNFTId(preTotalSupply / _unit() + 1, maxId);
                 $.tokenIdUpTo = uint32(_max($.tokenIdUpTo, maxId));
@@ -634,13 +640,13 @@ abstract contract DN420 {
     /// Emits an ERC20 {Transfer} event.
     function _burn(address from, uint256 amount) internal virtual {
         DN420Storage storage $ = _getDN420Storage();
-        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) _rv(uint32(DNNotInitialized.selector));
         AddressData storage fromAddressData = $.addressData[from];
 
         uint256[] memory ids;
         unchecked {
             uint256 fromBalance = fromAddressData.balance;
-            if (amount > fromBalance) revert InsufficientBalance();
+            if (amount > fromBalance) _rv(uint32(InsufficientBalance.selector));
 
             fromAddressData.balance = uint96(fromBalance -= amount);
             $.totalSupply -= uint96(amount);
@@ -698,10 +704,10 @@ abstract contract DN420 {
         internal
         virtual
     {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) _rv(uint32(DNNotInitialized.selector));
         AddressData storage fromAddressData = $.addressData[from];
         AddressData storage toAddressData = $.addressData[to];
 
@@ -712,7 +718,7 @@ abstract contract DN420 {
         unchecked {
             uint256 toBalance;
             uint256 fromBalance = fromAddressData.balance;
-            if (amount > fromBalance) revert InsufficientBalance();
+            if (amount > fromBalance) _rv(uint32(InsufficientBalance.selector));
 
             fromAddressData.balance = uint96(fromBalance -= amount);
             toAddressData.balance = uint96(toBalance = uint256(toAddressData.balance) + amount);
@@ -845,17 +851,17 @@ abstract contract DN420 {
         internal
         virtual
     {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) _rv(uint32(DNNotInitialized.selector));
 
         if (_toUint(by == address(0)) | _toUint(by == from) == uint256(0)) {
-            if (!isApprovedForAll(from, by)) revert NotOwnerNorApproved();
+            if (!isApprovedForAll(from, by)) _rv(uint32(NotOwnerNorApproved.selector));
         }
 
         Bitmap storage fromOwned = $.owned[from];
-        if (!_owns(fromOwned, id)) revert TransferFromIncorrectOwner();
+        if (!_owns(fromOwned, id)) _rv(uint32(TransferFromIncorrectOwner.selector));
         _set(fromOwned, id, false);
         _set($.owned[to], id, true);
 
@@ -909,13 +915,13 @@ abstract contract DN420 {
         uint256[] memory ids,
         bytes memory data
     ) internal virtual {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN420Storage storage $ = _getDN420Storage();
-        if ($.tokenIdUpTo == uint256(0)) revert DNNotInitialized();
+        if ($.tokenIdUpTo == uint256(0)) _rv(uint32(DNNotInitialized.selector));
 
         if (_toUint(by == address(0)) | _toUint(by == from) == uint256(0)) {
-            if (!isApprovedForAll(from, by)) revert NotOwnerNorApproved();
+            if (!isApprovedForAll(from, by)) _rv(uint32(NotOwnerNorApproved.selector));
         }
 
         uint256 amount;
@@ -929,7 +935,7 @@ abstract contract DN420 {
             Bitmap storage toOwned = $.owned[to];
             while (n != 0) {
                 uint256 id = _get(ids, --n);
-                if (!_owns(fromOwned, id)) revert TransferFromIncorrectOwner();
+                if (!_owns(fromOwned, id)) _rv(uint32(TransferFromIncorrectOwner.selector));
                 _set(fromOwned, id, false);
                 _set(toOwned, id, true);
                 upTo = _max(upTo, id);
@@ -1193,7 +1199,7 @@ abstract contract DN420 {
 
         // `safeTransferFrom(address,address,uint256,uint256,bytes)`.
         if (fnSelector == 0xf242432a) {
-            if (_calldataload(0x64) != 1) revert InvalidNFTAmount();
+            if (_calldataload(0x64) != 1) _rv(uint32(InvalidNFTAmount.selector));
             _safeTransferNFT(
                 msg.sender, // `by`.
                 address(uint160(_calldataload(0x04))), // `from`.
@@ -1209,8 +1215,8 @@ abstract contract DN420 {
             unchecked {
                 uint256[] memory amounts = _calldataUint256Array(0x64);
                 uint256 n = ids.length;
-                if (n != amounts.length) revert ArrayLengthsMismatch();
-                while (n-- != 0) if (_get(amounts, n) != 1) revert InvalidNFTAmount();
+                if (n != amounts.length) _rv(uint32(ArrayLengthsMismatch.selector));
+                while (n-- != 0) if (_get(amounts, n) != 1) _rv(uint32(InvalidNFTAmount.selector));
             }
             _safeBatchTransferNFTs(
                 msg.sender,
@@ -1227,7 +1233,7 @@ abstract contract DN420 {
             uint256[] memory ids = _calldataUint256Array(0x24);
             unchecked {
                 uint256 n = ids.length;
-                if (owners.length != n) revert ArrayLengthsMismatch();
+                if (owners.length != n) _rv(uint32(ArrayLengthsMismatch.selector));
                 uint256[] memory result = _idsMalloc(n);
                 while (n-- != 0) {
                     address owner = address(uint160(_get(owners, n)));
@@ -1260,7 +1266,7 @@ abstract contract DN420 {
     /// fallback with utilities like Solady's `LibZip.cdFallback()`.
     /// And always remember to always wrap the fallback with `dn420Fallback`.
     fallback() external payable virtual dn420Fallback {
-        revert FnSelectorNotRecognized(); // Not mandatory. Just for quality of life.
+        _rv(uint32(FnSelectorNotRecognized.selector)); // Not mandatory. Just for quality of life.
     }
 
     /// @dev This is to silence the compiler warning.
@@ -1753,6 +1759,15 @@ abstract contract DN420 {
         assembly {
             mstore(0x00, x)
             return(0x00, 0x20)
+        }
+    }
+
+    /// @dev More bytecode-efficient way to revert.
+    function _rv(uint32 s) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, s)
+            revert(0x1c, 0x04)
         }
     }
 }
