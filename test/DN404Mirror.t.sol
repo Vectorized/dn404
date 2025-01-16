@@ -7,7 +7,19 @@ import {MockDN404Ownable} from "./utils/mocks/MockDN404Ownable.sol";
 import {DN404Mirror, MockDN404Mirror} from "./utils/mocks/MockDN404Mirror.sol";
 import {LibSort} from "solady/utils/LibSort.sol";
 
-contract Invalid721Receiver {}
+contract InvalidERC721Receiver {}
+
+contract ERC721Receiver {
+    bytes32 public lastReceivedHash;
+
+    function onERC721Received(address by, address from, uint256 id, bytes calldata data)
+        public
+        returns (bytes4)
+    {
+        lastReceivedHash = keccak256(abi.encode(by, from, id, keccak256(data)));
+        return msg.sig;
+    }
+}
 
 contract DN404MirrorTest is SoladyTest {
     event Transfer(address indexed from, address indexed to, uint256 indexed id);
@@ -206,25 +218,44 @@ contract DN404MirrorTest is SoladyTest {
         }
     }
 
-    function testSafeTransferFrom(uint32 totalNFTSupply) public {
+    function testSafeTransferFrom(uint32 totalNFTSupply, bytes memory randomBytes) public {
         totalNFTSupply = uint32(_bound(totalNFTSupply, 5, 1000000));
         address alice = address(111);
         address bob = address(222);
-        address invalid = address(new Invalid721Receiver());
 
         dn.initializeDN404(uint96(uint256(totalNFTSupply) * _WAD), address(this), address(mirror));
         dn.transfer(alice, _WAD * uint256(5));
         assertEq(mirror.balanceOf(alice), 5);
         assertEq(mirror.balanceOf(bob), 0);
 
-        vm.prank(alice);
-        vm.expectRevert(DN404Mirror.TransferToNonERC721ReceiverImplementer.selector);
-        mirror.safeTransferFrom(alice, invalid, 1);
+        if (_random() % 2 == 0) {
+            address to = address(new InvalidERC721Receiver());
 
-        vm.prank(alice);
-        mirror.safeTransferFrom(alice, bob, 1);
-        assertEq(mirror.balanceOf(alice), 4);
-        assertEq(mirror.balanceOf(bob), 1);
+            vm.prank(alice);
+            vm.expectRevert(DN404Mirror.TransferToNonERC721ReceiverImplementer.selector);
+            mirror.safeTransferFrom(alice, to, 1);
+
+            vm.prank(alice);
+            mirror.safeTransferFrom(alice, bob, 1);
+            assertEq(mirror.balanceOf(alice), 4);
+            assertEq(mirror.balanceOf(bob), 1);
+        } else {
+            address to = address(new ERC721Receiver());
+            address operator = _randomNonZeroAddress();
+            vm.prank(alice);
+            mirror.setApprovalForAll(operator, true);
+
+            if (randomBytes.length == 0 && _random() % 2 == 0) {
+                vm.prank(operator);
+                mirror.safeTransferFrom(alice, to, 1);
+            } else {
+                vm.prank(operator);
+                mirror.safeTransferFrom(alice, to, 1, randomBytes);
+            }
+
+            bytes32 h = keccak256(abi.encode(operator, alice, 1, keccak256(randomBytes)));
+            assertEq(ERC721Receiver(to).lastReceivedHash(), h);
+        }
     }
 
     function testLinkMirrorContract() public {

@@ -280,8 +280,12 @@ contract DN404Mirror {
 
     /// @dev Equivalent to `safeTransferFrom(from, to, id, "")`.
     function safeTransferFrom(address from, address to, uint256 id) public payable virtual {
-        transferFrom(from, to, id);
-        if (_hasCode(to)) _checkOnERC721Received(from, to, id, "");
+        bytes calldata emptyData;
+        /// @solidity memory-safe-assembly
+        assembly {
+            emptyData.length := 0
+        }
+        safeTransferFrom(from, to, id, emptyData);
     }
 
     /// @dev Transfers token `id` from `from` to `to`.
@@ -302,7 +306,34 @@ contract DN404Mirror {
         virtual
     {
         transferFrom(from, to, id);
-        if (_hasCode(to)) _checkOnERC721Received(from, to, id, data);
+        /// @solidity memory-safe-assembly
+        assembly {
+            if extcodesize(to) {
+                // Prepare the calldata.
+                let m := mload(0x40)
+                let onERC721ReceivedSelector := 0x150b7a02
+                mstore(m, onERC721ReceivedSelector)
+                mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
+                mstore(add(m, 0x40), shr(96, shl(96, from)))
+                mstore(add(m, 0x60), id)
+                mstore(add(m, 0x80), 0x80)
+                mstore(add(m, 0xa0), data.length)
+                calldatacopy(add(m, 0xc0), data.offset, data.length)
+                // Revert if the call reverts.
+                if iszero(call(gas(), to, 0, add(m, 0x1c), add(data.length, 0xa4), m, 0x20)) {
+                    if returndatasize() {
+                        // Bubble up the revert if the call reverts.
+                        returndatacopy(m, 0x00, returndatasize())
+                        revert(m, returndatasize())
+                    }
+                }
+                // Load the returndata and compare it.
+                if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
+                    mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
+                    revert(0x1c, 0x04)
+                }
+            }
+        }
     }
 
     /// @dev Returns true if this contract implements the interface defined by `interfaceId`.
@@ -498,62 +529,12 @@ contract DN404Mirror {
         }
     }
 
-    /// @dev Returns if `a` has bytecode of non-zero length.
-    function _hasCode(address a) private view returns (bool result) {
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := extcodesize(a) // Can handle dirty upper bits.
-        }
-    }
-
     /// @dev More bytecode-efficient way to revert.
     function _rv(uint32 s) private pure {
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, s)
             revert(0x1c, 0x04)
-        }
-    }
-
-    /// @dev Perform a call to invoke {IERC721Receiver-onERC721Received} on `to`.
-    /// Reverts if the target does not support the function correctly.
-    function _checkOnERC721Received(address from, address to, uint256 id, bytes memory data)
-        private
-    {
-        /// @solidity memory-safe-assembly
-        assembly {
-            // Prepare the calldata.
-            let m := mload(0x40)
-            let onERC721ReceivedSelector := 0x150b7a02
-            mstore(m, onERC721ReceivedSelector)
-            mstore(add(m, 0x20), caller()) // The `operator`, which is always `msg.sender`.
-            mstore(add(m, 0x40), shr(96, shl(96, from)))
-            mstore(add(m, 0x60), id)
-            mstore(add(m, 0x80), 0x80)
-            let n := mload(data)
-            mstore(add(m, 0xa0), n)
-            if n {
-                let dst := add(m, 0xc0)
-                let end := add(dst, n)
-                for { let d := sub(add(data, 0x20), dst) } 1 {} {
-                    mstore(dst, mload(add(dst, d)))
-                    dst := add(dst, 0x20)
-                    if iszero(lt(dst, end)) { break }
-                }
-            }
-            // Revert if the call reverts.
-            if iszero(call(gas(), to, 0, add(m, 0x1c), add(n, 0xa4), m, 0x20)) {
-                if returndatasize() {
-                    // Bubble up the revert if the call reverts.
-                    returndatacopy(m, 0x00, returndatasize())
-                    revert(m, returndatasize())
-                }
-            }
-            // Load the returndata and compare it.
-            if iszero(eq(mload(m), shl(224, onERC721ReceivedSelector))) {
-                mstore(0x00, 0xd1a57ed6) // `TransferToNonERC721ReceiverImplementer()`.
-                revert(0x1c, 0x04)
-            }
         }
     }
 }
