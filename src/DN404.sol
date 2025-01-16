@@ -251,10 +251,10 @@ abstract contract DN404 {
         DN404Storage storage $ = _getDN404Storage();
 
         unchecked {
-            if (_unit() - 1 >= 2 ** 96 - 1) revert InvalidUnit();
+            if (_unit() - 1 >= 2 ** 96 - 1) _rv(uint32(InvalidUnit.selector));
         }
-        if ($.mirrorERC721 != address(0)) revert DNAlreadyInitialized();
-        if (mirror == address(0)) revert MirrorAddressIsZero();
+        if ($.mirrorERC721 != address(0)) _rv(uint32(DNAlreadyInitialized.selector));
+        if (mirror == address(0)) _rv(uint32(MirrorAddressIsZero.selector));
 
         /// @solidity memory-safe-assembly
         assembly {
@@ -278,8 +278,10 @@ abstract contract DN404 {
         $.mirrorERC721 = mirror;
 
         if (initialTokenSupply != 0) {
-            if (initialSupplyOwner == address(0)) revert TransferToZeroAddress();
-            if (_totalSupplyOverflows(initialTokenSupply)) revert TotalSupplyOverflow();
+            if (initialSupplyOwner == address(0)) _rv(uint32(TransferToZeroAddress.selector));
+            if (_totalSupplyOverflows(initialTokenSupply)) {
+                _rv(uint32(TotalSupplyOverflow.selector));
+            }
 
             $.totalSupply = uint96(initialTokenSupply);
             AddressData storage initialOwnerAddressData = $.addressData[initialSupplyOwner];
@@ -456,7 +458,7 @@ abstract contract DN404 {
                 == uint256(0) ? type(uint256).max : a.value;
 
         if (allowed != type(uint256).max) {
-            if (amount > allowed) revert InsufficientAllowance();
+            if (amount > allowed) _rv(uint32(InsufficientAllowance.selector));
             unchecked {
                 a.value = allowed - amount;
             }
@@ -502,10 +504,10 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function _mint(address to, uint256 amount) internal virtual {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
+        if ($.mirrorERC721 == address(0)) _rv(uint32(DNNotInitialized.selector));
         AddressData storage toAddressData = $.addressData[to];
 
         _DNMintTemps memory t;
@@ -520,7 +522,9 @@ abstract contract DN404 {
                 uint256 newTotalSupply = uint256($.totalSupply) + amount;
                 $.totalSupply = uint96(newTotalSupply);
                 uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
-                if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
+                if (overflows | _toUint(newTotalSupply < amount) != 0) {
+                    _rv(uint32(TotalSupplyOverflow.selector));
+                }
                 idLimit = newTotalSupply / _unit();
             }
             while (!getSkipNFT(to)) {
@@ -594,10 +598,10 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function _mintNext(address to, uint256 amount) internal virtual {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
+        if ($.mirrorERC721 == address(0)) _rv(uint32(DNNotInitialized.selector));
         AddressData storage toAddressData = $.addressData[to];
 
         _DNMintTemps memory t;
@@ -614,7 +618,9 @@ abstract contract DN404 {
                 uint256 newTotalSupply = uint256(preTotalSupply) + amount;
                 $.totalSupply = uint96(newTotalSupply);
                 uint256 overflows = _toUint(_totalSupplyOverflows(newTotalSupply));
-                if (overflows | _toUint(newTotalSupply < amount) != 0) revert TotalSupplyOverflow();
+                if (overflows | _toUint(newTotalSupply < amount) != 0) {
+                    _rv(uint32(TotalSupplyOverflow.selector));
+                }
                 idLimit = newTotalSupply / _unit();
                 id = _wrapNFTId(preTotalSupply / _unit() + _toUint(_useOneIndexed()), idLimit);
             }
@@ -677,14 +683,14 @@ abstract contract DN404 {
     /// Emits a {Transfer} event.
     function _burn(address from, uint256 amount) internal virtual {
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
+        if ($.mirrorERC721 == address(0)) _rv(uint32(DNNotInitialized.selector));
 
         AddressData storage fromAddressData = $.addressData[from];
         _DNBurnTemps memory t;
 
         unchecked {
             t.fromBalance = fromAddressData.balance;
-            if (amount > t.fromBalance) revert InsufficientBalance();
+            if (amount > t.fromBalance) _rv(uint32(InsufficientBalance.selector));
 
             fromAddressData.balance = uint96(t.fromBalance -= amount);
             t.totalSupply = uint256($.totalSupply) - amount;
@@ -755,12 +761,12 @@ abstract contract DN404 {
     ///
     /// Emits a {Transfer} event.
     function _transfer(address from, address to, uint256 amount) internal virtual {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN404Storage storage $ = _getDN404Storage();
         AddressData storage fromAddressData = $.addressData[from];
         AddressData storage toAddressData = $.addressData[to];
-        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
+        if ($.mirrorERC721 == address(0)) _rv(uint32(DNNotInitialized.selector));
 
         _DNTransferTemps memory t;
         t.fromOwnedLength = fromAddressData.ownedLength;
@@ -769,7 +775,7 @@ abstract contract DN404 {
         unchecked {
             {
                 uint256 fromBalance = fromAddressData.balance;
-                if (amount > fromBalance) revert InsufficientBalance();
+                if (amount > fromBalance) _rv(uint32(InsufficientBalance.selector));
                 fromAddressData.balance = uint96(fromBalance -= amount);
 
                 uint256 toBalance = uint256(toAddressData.balance) + amount;
@@ -947,21 +953,21 @@ abstract contract DN404 {
         internal
         virtual
     {
-        if (to == address(0)) revert TransferToZeroAddress();
+        if (to == address(0)) _rv(uint32(TransferToZeroAddress.selector));
 
         DN404Storage storage $ = _getDN404Storage();
-        if ($.mirrorERC721 == address(0)) revert DNNotInitialized();
+        if ($.mirrorERC721 == address(0)) _rv(uint32(DNNotInitialized.selector));
 
         Uint32Map storage oo = $.oo;
 
         if (from != $.aliasToAddress[_get(oo, _ownershipIndex(_restrictNFTId(id)))]) {
-            revert TransferFromIncorrectOwner();
+            _rv(uint32(TransferFromIncorrectOwner.selector));
         }
 
         if (msgSender != from) {
             if (!_isApprovedForAll(from, msgSender)) {
                 if (_getApproved(id) != msgSender) {
-                    revert TransferCallerNotOwnerNorApproved();
+                    _rv(uint32(TransferCallerNotOwnerNorApproved.selector));
                 }
             }
         }
@@ -974,7 +980,7 @@ abstract contract DN404 {
 
         unchecked {
             uint256 fromBalance = fromAddressData.balance;
-            if (unit > fromBalance) revert InsufficientBalance();
+            if (unit > fromBalance) _rv(uint32(InsufficientBalance.selector));
             fromAddressData.balance = uint96(fromBalance - unit);
             toAddressData.balance += uint96(unit);
         }
@@ -1144,7 +1150,7 @@ abstract contract DN404 {
     /// Requirements:
     /// - Token `id` must exist.
     function _ownerOf(uint256 id) internal view virtual returns (address) {
-        if (!_exists(id)) revert TokenDoesNotExist();
+        if (!_exists(id)) _rv(uint32(TokenDoesNotExist.selector));
         return _ownerAt(id);
     }
 
@@ -1168,7 +1174,7 @@ abstract contract DN404 {
     /// Requirements:
     /// - Token `id` must exist.
     function _getApproved(uint256 id) internal view virtual returns (address) {
-        if (!_exists(id)) revert TokenDoesNotExist();
+        if (!_exists(id)) _rv(uint32(TokenDoesNotExist.selector));
         return _getDN404Storage().nftApprovals[id];
     }
 
@@ -1187,7 +1193,7 @@ abstract contract DN404 {
 
         if (msgSender != owner) {
             if (!_isApprovedForAll(owner, msgSender)) {
-                revert ApprovalCallerNotOwnerNorApproved();
+                _rv(uint32(ApprovalCallerNotOwnerNorApproved.selector));
             }
         }
 
@@ -1240,7 +1246,7 @@ abstract contract DN404 {
 
         // `transferFromNFT(address,address,uint256,address)`.
         if (fnSelector == 0xe5eb36c8) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) _rv(uint32(SenderNotMirror.selector));
             _transferFromNFT(
                 address(uint160(_calldataload(0x04))), // `from`.
                 address(uint160(_calldataload(0x24))), // `to`.
@@ -1251,7 +1257,7 @@ abstract contract DN404 {
         }
         // `setApprovalForAllNFT(address,bool,address)`.
         if (fnSelector == 0xf6916ddd) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) _rv(uint32(SenderNotMirror.selector));
             _setApprovalForAll(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24) != 0, // `status`.
@@ -1277,7 +1283,7 @@ abstract contract DN404 {
         }
         // `approveNFT(address,uint256,address)`.
         if (fnSelector == 0xd10b6e0c) {
-            if (msg.sender != $.mirrorERC721) revert SenderNotMirror();
+            if (msg.sender != $.mirrorERC721) _rv(uint32(SenderNotMirror.selector));
             address owner = _approveNFT(
                 address(uint160(_calldataload(0x04))), // `spender`.
                 _calldataload(0x24), // `id`.
@@ -1326,7 +1332,7 @@ abstract contract DN404 {
     /// fallback with utilities like Solady's `LibZip.cdFallback()`.
     /// And always remember to always wrap the fallback with `dn404Fallback`.
     fallback() external payable virtual dn404Fallback {
-        revert FnSelectorNotRecognized(); // Not mandatory. Just for quality of life.
+        _rv(uint32(FnSelectorNotRecognized.selector)); // Not mandatory. Just for quality of life.
     }
 
     /// @dev This is to silence the compiler warning.
@@ -1785,6 +1791,15 @@ abstract contract DN404 {
         assembly {
             mstore(0x00, x)
             return(0x00, 0x20)
+        }
+    }
+
+    /// @dev More bytecode-efficient way to revert.
+    function _rv(uint32 s) private pure {
+        /// @solidity memory-safe-assembly
+        assembly {
+            mstore(0x00, s)
+            revert(0x1c, 0x04)
         }
     }
 }
