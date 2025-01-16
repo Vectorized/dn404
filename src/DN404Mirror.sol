@@ -362,9 +362,10 @@ contract DN404Mirror {
     function pullOwner() public virtual returns (bool) {
         address newOwner;
         address base = baseERC20();
+        uint32 baseOwnerFunctionSelector = uint32(_baseOwnerFunctionSelector());
         /// @solidity memory-safe-assembly
         assembly {
-            mstore(0x00, 0x8da5cb5b) // `owner()`.
+            mstore(0x00, baseOwnerFunctionSelector)
             let success := staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)
             newOwner := mul(shr(96, mload(0x0c)), and(gt(returndatasize(), 0x1f), success))
         }
@@ -375,6 +376,11 @@ contract DN404Mirror {
             emit OwnershipTransferred(oldOwner, newOwner);
         }
         return true;
+    }
+
+    /// @dev Override to allow for a different function selector on `baseERC20`.
+    function _baseOwnerFunctionSelector() internal view virtual returns (bytes4) {
+        return 0x8da5cb5b; // `owner()`.
     }
 
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
