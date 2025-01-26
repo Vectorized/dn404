@@ -363,14 +363,15 @@ contract DN404Mirror {
         address newOwner;
         address base = baseERC20();
         uint32 baseOwnerFunctionSelector = uint32(_baseOwnerFunctionSelector());
+        DN404NFTStorage storage $ = _getDN404NFTStorage();
+        address oldOwner = $.owner;
         /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, baseOwnerFunctionSelector)
             let success := staticcall(gas(), base, 0x1c, 0x04, 0x00, 0x20)
             newOwner := mul(shr(96, mload(0x0c)), and(gt(returndatasize(), 0x1f), success))
+            if iszero(success) { if shl(96, oldOwner) { revert(0x00, 0x00) } }
         }
-        DN404NFTStorage storage $ = _getDN404NFTStorage();
-        address oldOwner = $.owner;
         if (oldOwner != newOwner) {
             $.owner = newOwner;
             emit OwnershipTransferred(oldOwner, newOwner);
