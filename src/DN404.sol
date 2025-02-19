@@ -34,21 +34,6 @@ pragma solidity ^0.8.4;
 /// - For MEV safety, users should NOT have concurrently open orders for the ERC20 and ERC721.
 abstract contract DN404 {
     /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
-    /*                           ENUMS                            */
-    /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
-
-    /// @dev Denotes the default skip NFT status.
-    /// Override `_skipNFTDefault` to return a preferred value (defaults to `HasCode`).
-    enum SkipNFTDefault {
-        // `On` if the ERC20 owner has code, else `Off`.
-        HasCode,
-        // Skip NFT (ERC20 transfers will NOT trigger NFT minting / burning / transferring).
-        On,
-        // NOT skip NFT (ERC20 transfers will trigger NFT minting / burning / transferring).
-        Off
-    }
-
-    /*«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-«-*/
     /*                           EVENTS                           */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
@@ -326,9 +311,12 @@ abstract contract DN404 {
     /*                       CONFIGURABLES                        */
     /*-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»-»*/
 
-    /// @dev Returns the default mode for the skip NFT status.
-    function _skipNFTDefault() internal view virtual returns (SkipNFTDefault) {
-        return SkipNFTDefault.HasCode;
+    /// @dev Returns the default skip NFT flag for `owner`.
+    function _skipNFTDefault(address owner) internal view virtual returns (bool result) {
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := iszero(iszero(extcodesize(owner)))
+        }
     }
 
     /// @dev Returns whether the tokens IDs are from `[1..n]` instead of `[0..n-1]`.
@@ -1061,14 +1049,7 @@ abstract contract DN404 {
         uint8 flags = _getDN404Storage().addressData[owner].flags;
         result = flags & _ADDRESS_DATA_SKIP_NFT_FLAG != 0;
         if (flags & _ADDRESS_DATA_SKIP_NFT_INITIALIZED_FLAG == uint256(0)) {
-            if (_skipNFTDefault() == SkipNFTDefault.HasCode) {
-                /// @solidity memory-safe-assembly
-                assembly {
-                    result := iszero(iszero(extcodesize(owner)))
-                }
-            }
-            if (_skipNFTDefault() == SkipNFTDefault.On) result = true;
-            if (_skipNFTDefault() == SkipNFTDefault.Off) result = false;
+            result = _skipNFTDefault(owner);
         }
     }
 
